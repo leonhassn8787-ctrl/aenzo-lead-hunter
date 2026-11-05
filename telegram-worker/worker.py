@@ -251,7 +251,7 @@ async def run(once=False):
                         "status": "new",
                         "evidence_summary": text_body[:3500],
                         "evidence_url": group_url,
-                        "evidence_date": msg.date.astimezone(timezone.utc).isoformat(),
+                        "evidence_date": msg.date.astimezone(timezone.utc).date().isoformat(),
                         "telegram_group_url": f"https://t.me/{public_name}" if public_name else group_url,
                         "contacts": ([{"type": "telegram", "username": username, "url": sender_contact, "source": "message author"}] if username else []),
                         "outreach_english": en,
