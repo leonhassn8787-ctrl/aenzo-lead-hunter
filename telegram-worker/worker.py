@@ -11,6 +11,7 @@ from pathlib import Path
 
 import httpx
 from telethon import TelegramClient
+from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
@@ -19,7 +20,8 @@ log = logging.getLogger("aenzo-telegram-worker")
 API_ID = int(os.environ["TELEGRAM_API_ID"])
 API_HASH = os.environ["TELEGRAM_API_HASH"]
 PHONE = os.getenv("TELEGRAM_PHONE", "").strip()
-SESSION_FILE = Path(os.getenv("SESSION_FILE", "/data/aenzo_telegram.session"))
+SESSION_FILE = Path(os.getenv("SESSION_FILE", "aenzo_telegram.session"))
+SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING", "").strip()
 STATE_FILE = Path(os.getenv("STATE_FILE", "/data/scan_state.json"))
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
@@ -134,9 +136,10 @@ async def login(client):
         await client.sign_in(password=password)
     log.info("Telegram account authorized. Keep the session file private.")
 
-async def run():
+async def run(once=False):
     SESSION_FILE.parent.mkdir(parents=True, exist_ok=True)
-    client = TelegramClient(str(SESSION_FILE), API_ID, API_HASH)
+    client = (TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+              if SESSION_STRING else TelegramClient(str(SESSION_FILE), API_ID, API_HASH))
     await client.connect()
     if not await client.is_user_authorized():
         await client.disconnect()
@@ -205,6 +208,8 @@ async def run():
                     write_state(state)
             write_state(state)
             log.info("Scan complete: %s groups checked; %s new leads saved.", checked, saved)
+            if once:
+                break
             await asyncio.sleep(POLL_SECONDS)
 
 if __name__ == "__main__":
@@ -215,4 +220,4 @@ if __name__ == "__main__":
             await client.disconnect()
         asyncio.run(do_login())
     else:
-        asyncio.run(run())
+        asyncio.run(run(once="--once" in sys.argv))
