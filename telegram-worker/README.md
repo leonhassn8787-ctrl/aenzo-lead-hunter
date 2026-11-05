@@ -41,3 +41,26 @@ The session file grants access to the Telegram account. Keep it private, never c
 python -m pip install -r requirements.txt
 python -m py_compile worker.py
 ```
+
+
+## Free scheduled runner (GitHub Actions)
+A free GitHub Actions workflow is provided at `.github/workflows/telegram-scan.yml`. It runs one scan every 6 hours and can also be started manually from the repository's Actions tab. Standard GitHub-hosted runners are free for public repositories; GitHub Free private repositories include 2,000 Actions minutes per month. Usage beyond the allowance must not be enabled or purchased without the account owner's approval.
+
+### One-time Telegram session setup
+The workflow uses a Telethon StringSession stored as a GitHub Actions secret. Generate it on a trusted device:
+```bash
+python -m pip install -r telegram-worker/requirements.txt
+python telegram-worker/session_login.py
+``
+Enter the API ID, API Hash, phone number, Telegram login code, and (if requested) 2-step password only in the private terminal. The script prints a session string. Treat it like the account password; never commit it or paste it into chat.
+
+### Required GitHub Actions secrets
+Add these in repository Settings → Secrets and variables → Actions:
+- `TELEGRAM_API_ID`
+- `TELEGRAM_API_HASH`
+- `TELEGRAM_SESSION_STRING`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-side secret only)
+- `SUPABASE_OWNER_ID`
+
+The scheduled workflow scans groups only, excludes broadcast channels, and stores scan progress in the GitHub Actions cache. Each run is a one-shot scan; it does not require a continuously running server. It is not active until all secrets are configured and a successful manual run is verified.
