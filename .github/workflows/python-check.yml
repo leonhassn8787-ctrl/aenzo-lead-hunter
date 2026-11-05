@@ -1,4 +1,4 @@
-name: Python syntax check
+name: Python syntax and dependency check
 
 on:
   push:
@@ -16,5 +16,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Compile Telegram worker
+      - name: Install pinned worker dependencies
+        run: python -m pip install -r telegram-worker/requirements.txt
+      - name: Compile Telegram worker and login helper
         run: python -m py_compile telegram-worker/worker.py telegram-worker/session_login.py
+      - name: Verify required imports
+        run: python -c "import telethon, httpx; print('Telethon and httpx imports OK')"
