@@ -1,66 +1,56 @@
 # AENZO LABS — Telegram Group Lead Hunter
 
-## What this worker does
-- Uses the user's own Telegram account through Telethon (MTProto).
-- Reads messages only from groups that account has already joined and can access.
-- Excludes broadcast channels.
-- Looks for explicit buying-intent language related to AENZO services.
-- Saves the exact message text, message link, date, source group, and a publicly visible sender username (if one exists).
-- Adds a first-draft outreach message in English and Bengali.
-- Checks the same Telegram message's hash before inserting again.
+## What it does
+- Uses the owner's own Telegram account through Telethon (MTProto).
+- Scans only group conversations the account has already joined and can access; excludes broadcast channels.
+- Detects messages that appear to request services matching AENZO LABS.
+- Stores the message evidence, date, group/message link, and a publicly visible sender username when available.
+- Drafts English outreach with a Bengali meaning and deduplicates by Telegram group/message ID.
 
 ## Important limitations
-- It cannot read private groups unless the account has been invited/approved and joined.
-- It does not bypass membership, privacy, or Telegram access controls.
-- The first scan checks up to the latest 200 messages per accessible group, limited to the last 30 days. Later scans check newer messages.
-- A group title is not proof of the project/company name. Leads are deliberately labelled “Potential project (verify)” until a human verifies them.
-- The signal matcher is rule-based, so every result must be reviewed before outreach. It is not an AI guarantee and may miss or misclassify messages.
-- This worker is not deployed or running yet.
+- It cannot access private groups unless the account has already joined them.
+- It does not bypass Telegram membership or privacy controls.
+- The first scan checks up to 200 recent messages per accessible group within the last 30 days. Later runs check messages newer than the saved scan cursor.
+- A group title is not proof of a project/company identity. Results are labelled “Potential project (verify)” and must be reviewed manually.
+- Detection is rule-based, not an AI guarantee. It can miss or misclassify messages.
+- The worker is not active until the required GitHub Actions secrets are configured and a manual scan succeeds.
 
-## Deploy prerequisites
-A Render Background Worker with a persistent disk is described in the repository's root `render.yaml`. The Render `starter` worker plan and persistent disk are paid services. Do not deploy until the account owner approves the displayed price.
+## Free GitHub Actions runner
+The repository is public. The workflow at `.github/workflows/telegram-scan.yml` can be run manually from the repository's **Actions** tab and is scheduled every six hours. GitHub documents standard hosted runners as free for public repositories. See https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job.
 
-Required environment variables:
-- `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_PHONE`: from https://my.telegram.org.
-- `SUPABASE_URL`: the AENZO Supabase project URL.
-- `SUPABASE_SERVICE_ROLE_KEY`: server-side secret only. Never put it in browser code, GitHub, chat, or a public file.
-- `SUPABASE_OWNER_ID`: the UUID of the signed-in Supabase user who owns the leads.
-- `SESSION_FILE` and `STATE_FILE`: must remain on the persistent disk under `/data`.
+## Generate the Telegram session from an Android browser (no Termux)
+A one-time Telegram StringSession is required. It acts like a password for the Telegram account.
 
-## First Telegram authorization
-1. Configure the environment variables in the private Render service settings.
-2. Open the service's Shell and run: `cd /app && python worker.py --login`.
-3. Enter the one-time login code only in that private Shell. If Telegram asks for the 2-step password, enter it only at the hidden password prompt. Never send either value to anyone.
-4. Confirm that `/data/aenzo_telegram.session` exists on the persistent disk.
-5. Start/restart the worker normally. The worker should log a scan summary every 10 minutes.
+1. Open https://github.com/codespaces/new?repo=leonhassn8787-ctrl/aenzo-lead-hunter in a browser and create a Codespace on the `main` branch using the smallest available machine.
+2. Wait for the browser editor to open. Open **Terminal → New Terminal**.
+3. Run:
+   ```bash
+   python -m pip install -r telegram-worker/requirements.txt
+   python telegram-worker/session_login.py
+   ```
+4. Enter the Telegram API ID, API Hash, phone number, login code, and (if requested) 2-step password only in that Codespaces terminal. Never paste them into chat or a public file.
+5. Copy the generated session string directly into the GitHub Actions secret named `TELEGRAM_SESSION_STRING`. Do not save it in the repository.
+6. After saving the secret, stop and delete the Codespace if it is no longer needed. Do not continue if GitHub warns that the free Codespaces quota is exhausted or that paid usage would start. GitHub Free personal accounts currently include 120 core-hours and 15 GB-month of Codespaces storage; usage beyond the allowance can be billed if billing is enabled. See https://docs.github.com/en/billing/concepts/product-billing/github-codespaces.
 
-The session file grants access to the Telegram account. Keep it private, never commit it to GitHub, and revoke the session from Telegram's Devices settings if it is exposed.
-
-## Local validation
-```bash
-python -m pip install -r requirements.txt
-python -m py_compile worker.py
-```
-
-
-## Free scheduled runner (GitHub Actions)
-A free GitHub Actions workflow is provided at `.github/workflows/telegram-scan.yml`. It runs one scan every 6 hours and can also be started manually from the repository's Actions tab. Standard GitHub-hosted runners are free for public repositories; GitHub Free private repositories include 2,000 Actions minutes per month. Usage beyond the allowance must not be enabled or purchased without the account owner's approval.
-
-### One-time Telegram session setup
-The workflow uses a Telethon StringSession stored as a GitHub Actions secret. Generate it on a trusted device:
-```bash
-python -m pip install -r telegram-worker/requirements.txt
-python telegram-worker/session_login.py
-``
-Enter the API ID, API Hash, phone number, Telegram login code, and (if requested) 2-step password only in the private terminal. The script prints a session string. Treat it like the account password; never commit it or paste it into chat.
-
-### Required GitHub Actions secrets
-Add these in repository Settings → Secrets and variables → Actions:
+## Required repository Actions secrets
+Open repository **Settings → Secrets and variables → Actions → New repository secret** and add:
 - `TELEGRAM_API_ID`
 - `TELEGRAM_API_HASH`
 - `TELEGRAM_SESSION_STRING`
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY` (server-side secret only)
-- `SUPABASE_OWNER_ID`
+- `SUPABASE_URL` (AENZO Supabase project URL)
+- `SUPABASE_SERVICE_ROLE_KEY` (server-side secret only; never expose it in browser code, chat, or repository files)
+- `SUPABASE_OWNER_ID` (the UUID of the Supabase user who should own the saved leads)
 
-The scheduled workflow scans groups only, excludes broadcast channels, and stores scan progress in the GitHub Actions cache. Each run is a one-shot scan; it does not require a continuously running server. It is not active until all secrets are configured and a successful manual run is verified.
+Do not send any of these values to anyone. Do not commit a Telegram session string or a Supabase service-role key.
+
+## Run and verify
+1. Open the repository's **Actions** tab.
+2. Select **AENZO Telegram Group Lead Scan**.
+3. Press **Run workflow** and confirm the branch is `main`.
+4. Open the new run and check the job logs. A successful run should finish with a scan summary.
+5. Confirm that new candidates are stored in the AENZO Supabase `leads` table.
+
+The workflow runs once per invocation and exits; it does not keep a server running. Scan progress is saved in the Actions cache. It is not proven operational until the first manual run succeeds and a lead (or a zero-result scan) is verified.
+
+## Paid Render option
+The root `render.yaml` describes a paid Render worker. It is not needed for the free GitHub Actions route and must not be deployed unless the account owner explicitly approves its price.
