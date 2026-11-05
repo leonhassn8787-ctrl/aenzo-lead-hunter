@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: a enzo-telegram-lead-scan
+  group: aenzo-telegram-lead-scan
   cancel-in-progress: false
 
 jobs:
