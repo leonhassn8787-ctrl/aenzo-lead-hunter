@@ -1,0 +1,36 @@
+services:
+  - type: worker
+    name: aenzo-telegram-lead-hunter
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./telegram-worker/Dockerfile
+    dockerContext: .
+    disk:
+      name: aenzo-telegram-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: TELEGRAM_API_ID
+        sync: false
+      - key: TELEGRAM_API_HASH
+        sync: false
+      - key: TELEGRAM_PHONE
+        sync: false
+      - key: SUPABASE_URL
+        value: https://royezoicromoebaxqzhx.supabase.co
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_OWNER_ID
+        sync: false
+      - key: SESSION_FILE
+        value: /data/aenzo_telegram.session
+      - key: STATE_FILE
+        value: /data/scan_state.json
+      - key: POLL_SECONDS
+        value: "600"
+      - key: MAX_MESSAGES_PER_GROUP
+        value: "200"
+      - key: LOOKBACK_DAYS
+        value: "30"
+      - key: LOG_LEVEL
+        value: INFO
