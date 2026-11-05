@@ -32,17 +32,71 @@ LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", "30"))
 
 # Signals that indicate a project may need one or more AENZO services.
 SIGNALS = {
-    "KOL & Influencer Marketing": [r"looking for (kol|influencer)", r"need (kols|influencers)", r"kol campaign", r"influencer campaign"],
-    "Community Promotion": [r"looking for (community|telegram) (growth|promotion|marketing)", r"need (community|telegram) (growth|promotion)", r"grow our community"],
-    "AMA Hosting & Engagement": [r"looking for ama", r"need ama (host|hosting|partner)", r"ama collaboration"],
-    "PR & Media Visibility": [r"looking for pr", r"need pr (agency|service|support)", r"media coverage", r"press release"],
-    "Giveaways & Airdrops": [r"looking for (airdrop|giveaway) (partner|campaign|support)", r"need (airdrop|giveaway)"],
-    "Content & Social Media Marketing": [r"looking for (marketing|content) agency", r"need (social media|content) marketing", r"marketing partner"],
-    "Project Promotion": [r"looking for (promotion|marketing) (agency|partner|service)", r"need project promotion", r"promote our project"],
-    "Website Design & Development": [r"looking for (web|website) (developer|development|agency)", r"need website (design|development)", r"build our website"],
-    "Recruitment": [r"looking for (community manager|moderator|developer)", r"hiring (community manager|moderator|developer)", r"need moderators"],
-    "Video & Creative Production": [r"looking for (video|creative) (agency|team|partner)", r"need (promo video|video production)"],
-    "Project Review / VERDICT": [r"looking for (project|product) review", r"need testers", r"looking for beta testers"],
+    "KOL & Influencer Marketing": [
+        r"looking for (kol|kols|influencer|influencers)",
+        r"need (kols|influencers)", r"kol campaign", r"influencer campaign",
+        r"(crypto|web3) influencer (marketing|campaign|promotion)",
+    ],
+    "Community Promotion": [
+        r"looking for (community|telegram) (growth|promotion|marketing)",
+        r"need (community|telegram) (growth|promotion|marketing)",
+        r"grow our (telegram )?community", r"community growth (agency|partner|service)",
+        r"telegram group promotion",
+    ],
+    "AMA Hosting & Engagement": [
+        r"looking for ama", r"need ama (host|hosting|partner)",
+        r"ama collaboration", r"(host|hosting) an ama",
+    ],
+    "PR & Media Visibility": [
+        r"looking for pr", r"need pr (agency|service|support)",
+        r"media coverage", r"press release", r"crypto pr (agency|services|campaign)",
+    ],
+    "Giveaways & Airdrops": [
+        r"looking for (airdrop|giveaway) (partner|campaign|support)",
+        r"need (airdrop|giveaway)", r"(airdrop|giveaway) campaign (manager|partner|support)",
+    ],
+    "Content Distribution & Marketing": [
+        r"looking for (content distribution|content marketing)",
+        r"need (content distribution|content marketing)",
+        r"content distribution (partner|service|agency)",
+        r"looking for (marketing|content) agency",
+    ],
+    "Social Media Marketing": [
+        r"need social media (marketing|management|promotion)",
+        r"looking for social media (marketing|management|agency)",
+        r"(manage|grow) our (twitter|x|social media)",
+    ],
+    "Project Promotion": [
+        r"looking for (promotion|marketing) (agency|partner|service)",
+        r"need project promotion", r"promote our project",
+        r"looking for a marketing partner", r"project marketing campaign",
+        r"upcoming launch (promotion|marketing)",
+    ],
+    "Website Design & Development": [
+        r"looking for (web|website) (developer|development|agency)",
+        r"need website (design|development)", r"build our website",
+        r"website redesign (agency|developer|team)",
+    ],
+    "Recruitment": [
+        r"looking for (community manager|moderator|developer)",
+        r"hiring (community manager|moderator|developer)",
+        r"need moderators", r"recruiting (community|telegram) moderators",
+    ],
+    "Video & Creative Production": [
+        r"looking for (video|creative) (agency|team|partner)",
+        r"need (promo video|video production)",
+        r"looking for (motion graphics|video editing|graphic design)",
+    ],
+    "Project Review / VERDICT": [
+        r"looking for (project|product) review", r"need testers",
+        r"looking for beta testers", r"need (app|game|platform|website) testers",
+        r"looking for product feedback",
+    ],
+    "Fundraising / Launch Promotion": [
+        r"looking for (fundraising|launch) (marketing|promotion|partner)",
+        r"need (fundraising|launch) promotion",
+        r"pre[- ]launch marketing (agency|partner|support)",
+    ],
 }
 COMPILED = {name: [re.compile(p, re.I) for p in patterns] for name, patterns in SIGNALS.items()}
 BUYING_CONTEXT = re.compile(r"\b(looking for|need|seeking|hiring|searching for|want to hire|any recommendation|recommend a|partner with|agency|service provider)\b", re.I)
