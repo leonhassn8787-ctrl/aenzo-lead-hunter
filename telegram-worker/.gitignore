@@ -1,0 +1,5 @@
+.env
+*.session
+*.session-journal
+scan_state.json
+__pycache__/
