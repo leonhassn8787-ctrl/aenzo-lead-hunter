@@ -11,7 +11,6 @@ from pathlib import Path
 import httpx
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
-from telethon.sessions import StringSession
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("aenzo-telegram-worker")
@@ -96,13 +95,27 @@ async def save_lead(client_http, payload):
         "Prefer": "return=representation",
     }
     url = f"{SUPABASE_URL}/rest/v1/leads"
-    async with client_http.post(url, headers=headers, json=payload, timeout=30) as response:
-        if response.status_code in (200, 201):
-            return True
-        if response.status_code == 409:
-            return False
-        log.warning("Supabase insert failed (%s): %s", response.status_code, response.text[:500])
+    lookup = await client_http.get(
+        url,
+        headers=headers,
+        params={
+            "select": "id",
+            "owner_id": f"eq.{SUPABASE_OWNER_ID}",
+            "dedupe_key": "eq." + str(payload["dedupe_key"]),
+            "limit": "1",
+        },
+        timeout=30,
+    )
+    if lookup.status_code != 200:
+        log.warning("Supabase duplicate check failed (%s): %s", lookup.status_code, lookup.text[:300])
         return False
+    if lookup.json():
+        return False
+    response = await client_http.post(url, headers=headers, json=payload, timeout=30)
+    if response.status_code in (200, 201):
+        return True
+    log.warning("Supabase insert failed (%s): %s", response.status_code, response.text[:500])
+    return False
 
 async def login(client):
     await client.connect()
