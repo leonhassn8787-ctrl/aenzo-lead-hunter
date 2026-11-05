@@ -238,9 +238,12 @@ async def run(once=False):
                     public_name = getattr(entity, "username", None)
                     if public_name:
                         group_url = f"https://t.me/{public_name}/{msg.id}"
+                    elif bool(getattr(entity, "megagroup", False)):
+                        # Private supergroups support /c/ message links. Basic
+                        # groups do not have a reliable public permalink format.
+                        group_url = f"https://t.me/c/{entity.id}/{msg.id}"
                     else:
-                        raw_id = str(entity.id)
-                        group_url = f"https://t.me/c/{raw_id}/{msg.id}" if raw_id else None
+                        group_url = None
                     sender_contact = f"https://t.me/{username}" if username else None
                     project = f"Potential project (verify) — {group_name}"[:250]
                     en, bn = make_outreach(project, services)
