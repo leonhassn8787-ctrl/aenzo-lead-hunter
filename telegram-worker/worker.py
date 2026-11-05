@@ -219,11 +219,15 @@ async def run(once=False):
                 newest_seen = last_seen
                 group_write_failed = False
                 async for msg in client.iter_messages(entity, limit=MAX_MESSAGES_PER_GROUP, min_id=last_seen):
-                    if not msg or not msg.message or not msg.date:
+                    if not msg:
+                        continue
+                    # Advance past every Telegram update, including service and
+                    # non-text messages, so quiet groups are not rescanned forever.
+                    newest_seen = max(newest_seen, int(msg.id))
+                    if not msg.message or not msg.date:
                         continue
                     if msg.date.replace(tzinfo=timezone.utc) < cutoff:
                         continue
-                    newest_seen = max(newest_seen, int(msg.id))
                     text_body = msg.message.strip()
                     services = classify(text_body)
                     if not services:
