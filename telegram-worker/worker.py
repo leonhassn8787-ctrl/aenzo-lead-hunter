@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import getpass
 import json
 import logging
 import os
@@ -129,7 +130,7 @@ async def login(client):
     try:
         await client.sign_in(phone=PHONE, code=code, phone_code_hash=sent.phone_code_hash)
     except SessionPasswordNeededError:
-        password = input("Enter your Telegram 2-step verification password (input hidden by terminal if supported): ")
+        password = getpass.getpass("Telegram 2-step verification password: ")
         await client.sign_in(password=password)
     log.info("Telegram account authorized. Keep the session file private.")
 
@@ -175,7 +176,7 @@ async def run():
                         raw_id = str(entity.id)
                         group_url = f"https://t.me/c/{raw_id}/{msg.id}" if raw_id else None
                     sender_contact = f"https://t.me/{username}" if username else None
-                    project = group_name[:250]
+                    project = f"Potential project (verify) — {group_name}"[:250]
                     en, bn = make_outreach(project, services)
                     payload = {
                         "owner_id": SUPABASE_OWNER_ID,
