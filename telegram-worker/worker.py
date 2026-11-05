@@ -98,27 +98,31 @@ async def save_lead(client_http, payload):
         "Prefer": "return=representation",
     }
     url = f"{SUPABASE_URL}/rest/v1/leads"
-    lookup = await client_http.get(
-        url,
-        headers=headers,
-        params={
-            "select": "id",
-            "owner_id": f"eq.{SUPABASE_OWNER_ID}",
-            "dedupe_key": "eq." + str(payload["dedupe_key"]),
-            "limit": "1",
-        },
-        timeout=30,
-    )
-    if lookup.status_code != 200:
-        log.warning("Supabase duplicate check failed (%s): %s", lookup.status_code, lookup.text[:300])
-        return False
-    if lookup.json():
-        return False
-    response = await client_http.post(url, headers=headers, json=payload, timeout=30)
-    if response.status_code in (200, 201):
-        return True
-    log.warning("Supabase insert failed (%s): %s", response.status_code, response.text[:500])
-    return False
+    try:
+        lookup = await client_http.get(
+            url,
+            headers=headers,
+            params={
+                "select": "id",
+                "owner_id": f"eq.{SUPABASE_OWNER_ID}",
+                "dedupe_key": "eq." + str(payload["dedupe_key"]),
+                "limit": "1",
+            },
+            timeout=30,
+        )
+        if lookup.status_code != 200:
+            log.warning("Supabase duplicate check failed (%s): %s", lookup.status_code, lookup.text[:300])
+            return "error"
+        if lookup.json():
+            return "duplicate"
+        response = await client_http.post(url, headers=headers, json=payload, timeout=30)
+        if response.status_code in (200, 201):
+            return "saved"
+        log.warning("Supabase insert failed (%s): %s", response.status_code, response.text[:500])
+        return "error"
+    except Exception:
+        log.exception("Supabase request failed; this message will be retried.")
+        return "error"
 
 async def login(client):
     await client.connect()
@@ -159,6 +163,7 @@ async def run(once=False):
                 group_id = str(entity.id)
                 last_seen = int(state.get(group_id, 0))
                 newest_seen = last_seen
+                group_write_failed = False
                 async for msg in client.iter_messages(entity, limit=MAX_MESSAGES_PER_GROUP, min_id=last_seen):
                     if not msg or not msg.message or not msg.date:
                         continue
@@ -200,9 +205,17 @@ async def run(once=False):
                         "notes": "Automatically detected from a member-written Telegram group message. Verify project identity and need before outreach.",
                         "dedupe_key": dedupe(group_id, msg.id),
                     }
-                    if await save_lead(http, payload):
+                    save_status = await save_lead(http, payload)
+                    if save_status == "saved":
                         saved += 1
-                state[group_id] = max(last_seen, newest_seen)
+                    elif save_status == "error":
+                        group_write_failed = True
+                # Do not move this group's cursor past any message whose lead
+                # could not be checked/saved; the next run will retry it.
+                if not group_write_failed:
+                    state[group_id] = max(last_seen, newest_seen)
+                else:
+                    log.warning("Keeping cursor unchanged for group %s so failed writes can be retried.", group_id)
                 checked += 1
                 if checked % 10 == 0:
                     write_state(state)
