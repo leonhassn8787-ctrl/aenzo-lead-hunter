@@ -43,7 +43,7 @@ class LeadSignalTests(unittest.TestCase):
                 r"hire me|anyone hiring me|free airdrop|airdrop claim|claim (my )?airdrop|"
                 r"token price prediction|price prediction|trading signals|wallet (is )?(not working|stuck)|"
                 r"account (is )?(locked|suspended)|"
-                r"we (are|offer|provide|specialize in)|our (agency|company) (offers|provides|specializes in)|"
+                r"we (offer|provide|specialize in)|we are (a|an) [a-z -]{1,50}(agency|service provider|marketing team)|our (agency|company) (offers|provides|specializes in)|"
                 r"we help (web3|crypto|blockchain) projects)\b",
                 re.I,
             ),
@@ -174,6 +174,9 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_real_service_request_still_matches(self):
         self.assertIn("KOL & Influencer Marketing", self.classify("Looking for KOLs for our crypto launch"))
+
+    def test_first_person_buyer_request_is_not_excluded(self):
+        self.assertIn("KOL & Influencer Marketing", self.classify("We are looking for KOLs for our crypto launch"))
 
     def test_outreach_is_specific_to_detected_service(self):
         english, bengali = self.make_outreach(["Website Design & Development"])
