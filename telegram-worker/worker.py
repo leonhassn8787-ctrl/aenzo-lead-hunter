@@ -97,6 +97,28 @@ SIGNALS = {
         r"need (fundraising|launch) promotion",
         r"pre[- ]launch marketing (agency|partner|support)",
     ],
+    "AI / Automation Promotion": [
+        r"looking for (ai|automation) (marketing|promotion|growth)",
+        r"need (ai agent|bot|saas) (promotion|marketing|users|growth)",
+        r"(promote|market) our (ai agent|trading bot|saas|automation tool)",
+    ],
+    "Exchange / Wallet Promotion": [
+        r"looking for (exchange|wallet) (marketing|promotion|growth)",
+        r"need (exchange|wallet) (users|promotion|marketing|community)",
+        r"(promote|market) our (crypto )?(exchange|wallet)",
+    ],
+    "RWA / Trading Promotion": [
+        r"looking for (rwa|tokenization|forex|trading) (marketing|promotion|community)",
+        r"need (rwa|tokenization|forex|trading) (marketing|promotion|growth)",
+    ],
+    "GameFi / Casino Promotion": [
+        r"looking for (gamefi|gaming|metaverse|casino) (marketing|promotion|kol|community)",
+        r"need (gamefi|gaming|metaverse|casino) (promotion|marketing|users|community)",
+    ],
+    "Mining / Staking Promotion": [
+        r"looking for (mining|staking) (marketing|promotion|community)",
+        r"need (mining|staking) (users|promotion|marketing|community)",
+    ],
 }
 COMPILED = {name: [re.compile(p, re.I) for p in patterns] for name, patterns in SIGNALS.items()}
 BUYING_CONTEXT = re.compile(r"\b(looking for|need|seeking|hiring|searching for|want to hire|any recommendation|recommend a|partner with|agency|service provider)\b", re.I)
