@@ -6,7 +6,7 @@ This worker scans only Telegram group conversations that the account owner has a
 It looks for public messages that appear to request AENZO LABS services, then stores:
 - the original message text as evidence and its UTC date;
 - a Telegram message link when that group type supports one;
-- the sender's public Telegram username only when Telegram exposes it;
+- the sender's public Telegram username and any explicitly posted X, WhatsApp, email, Telegram, or website contact details; each is labelled as sourced from the message or author and is not independently verified;
 - detected service categories, a conservative priority score, and English outreach with a Bengali meaning;
 - a stable deduplication key that suppresses the same author's identical cross-posted request across groups, while keeping different authors and different requests separate.
 
