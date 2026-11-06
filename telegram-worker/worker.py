@@ -131,7 +131,7 @@ SIGNALS = {
     ],
 }
 COMPILED = {name: [re.compile(p, re.I) for p in patterns] for name, patterns in SIGNALS.items()}
-BUYING_CONTEXT = re.compile(r"\b(looking for|looking to work with|in search of|trying to find|need|needs|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|can anyone help|could use|need help with|help us|partner with|any agency|suggest a)\b", re.I)
+BUYING_CONTEXT = re.compile(r"\b(looking for|looking to work with|looking to grow|looking to increase|looking to boost|in search of|trying to find|trying to grow|trying to increase|want to grow|want to increase|want to boost|need|needs|need more|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|need a hand|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|can anyone help|anyone able to|someone who can|anyone experienced in|could use|need help with|help us|partner with|any agency|suggest a)\b", re.I)
 CRYPTO_CONTEXT = re.compile(r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet)\b", re.I)
 NON_BUYER_CONTEXT = re.compile(
     r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
@@ -186,7 +186,7 @@ def is_human_sender(sender):
 def priority(text, hits):
     """Conservative 0-100 ranking; score reflects evidence, not certainty."""
     score = 35
-    if re.search(r"\b(looking for|looking to work with|in search of|trying to find|need|needs|seeking|hiring|want to hire|want someone to|need someone to|searching for|anyone know|does anyone know|can anyone recommend|need help with|help us|partner with)\b", text, re.I):
+    if re.search(r"\b(looking for|looking to work with|looking to grow|looking to increase|trying to find|trying to grow|want to grow|want to increase|need|needs|seeking|hiring|want to hire|want someone to|need someone to|searching for|anyone know|does anyone know|can anyone recommend|can anyone help|anyone able to|need help with|help us|partner with)\b", text, re.I):
         score += 20
     if re.search(r"\b(budget|paid|payment|pricing|quote|rates|cost)\b", text, re.I):
         score += 15
