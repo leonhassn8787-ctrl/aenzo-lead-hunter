@@ -258,6 +258,8 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("Project Promotion", self.classify("We are preparing a Web3 launch and could use a marketing partner."))
         self.assertIn("Project Promotion", self.classify("We want to grow our Web3 user base before launch. Anyone able to help?"))
         self.assertIn("Project Promotion", self.classify("Trying to increase visibility for our crypto project before launch."))
+        self.assertIn("Project Promotion", self.classify("We need more traction for our Web3 launch. Can anyone help?"))
+        self.assertIn("Project Promotion", self.classify("Looking for someone who can help us grow the project audience."))
 
     def test_kol_request(self):
         self.assert_signal("KOL & Influencer Marketing", "We are looking for KOLs for our Web3 launch")
