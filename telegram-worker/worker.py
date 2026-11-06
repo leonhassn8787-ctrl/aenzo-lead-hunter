@@ -146,6 +146,11 @@ def classify(text):
         return []
     return hits
 
+def is_human_sender(sender):
+    """Return False for bot accounts; unknown senders remain reviewable."""
+    return not bool(sender and getattr(sender, "bot", False))
+
+
 def priority(text, hits):
     score = 48 + min(24, 8 * len(hits))
     if re.search(r"\b(budget|paid|payment|urgent|asap|ready to hire|dm me)\b", text, re.I):
@@ -274,7 +279,7 @@ async def run(once=False):
                         continue
                     # Ignore bot-authored posts: they are often automated ads or
                     # scraper output, not a reliable expression of a buyer's intent.
-                    if sender and bool(getattr(sender, "bot", False)):
+                    if not is_human_sender(sender):
                         continue
                     username = getattr(sender, "username", None) if sender else None
                     group_name = (getattr(entity, "title", None) or "Telegram group").strip()
