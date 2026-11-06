@@ -190,15 +190,96 @@ def priority(text, hits):
 def dedupe(group_id, message_id):
     return hashlib.sha256(f"telegram:{group_id}:{message_id}".encode()).hexdigest()
 
-def make_outreach(project, services):
-    service_text = ", ".join(services[:3])
-    en = (f"Hi! I noticed your message about {service_text}. "
-          "AENZO LABS helps Web3 and crypto projects with growth, community promotion, "
-          "KOL campaigns, PR, AMAs and tailored marketing. Would you be open to discussing "
-          "your current goals and requirements?")
-    bn = (f"হ্যালো! {service_text} বিষয়ে আপনার পোস্টটি দেখেছি। "
-          "AENZO LABS Web3 ও ক্রিপ্টো প্রজেক্টকে কমিউনিটি প্রমোশন, KOL ক্যাম্পেইন, PR, AMA "
-          "এবং কাস্টম মার্কেটিংয়ে সহায়তা করে। আপনার বর্তমান প্রয়োজন ও লক্ষ্য নিয়ে কি কথা বলা যাবে?")
+def make_outreach(services):
+    """Create a concise service-specific opener without inventing project details."""
+    primary = services[0] if services else "Web3 marketing"
+    openers = {
+        "KOL & Influencer Marketing": (
+            "your KOL and influencer campaign",
+            "আপনার KOL ও ইনফ্লুয়েন্সার ক্যাম্পেইন",
+        ),
+        "Community Promotion": (
+            "Telegram community growth and promotion",
+            "Telegram কমিউনিটি গ্রোথ ও প্রমোশন",
+        ),
+        "AMA Hosting & Engagement": (
+            "AMA hosting and community engagement",
+            "AMA আয়োজন ও কমিউনিটি এনগেজমেন্ট",
+        ),
+        "PR & Media Visibility": (
+            "PR and media visibility",
+            "PR ও মিডিয়া প্রচার",
+        ),
+        "Giveaways & Airdrops": (
+            "a giveaway or airdrop campaign",
+            "গিভঅ্যাওয়ে বা এয়ারড্রপ ক্যাম্পেইন",
+        ),
+        "Content Distribution & Marketing": (
+            "content distribution and marketing",
+            "কনটেন্ট ডিস্ট্রিবিউশন ও মার্কেটিং",
+        ),
+        "Social Media Marketing": (
+            "social media marketing and management",
+            "সোশ্যাল মিডিয়া মার্কেটিং ও ম্যানেজমেন্ট",
+        ),
+        "Project Promotion": (
+            "project promotion and growth marketing",
+            "প্রজেক্ট প্রমোশন ও গ্রোথ মার্কেটিং",
+        ),
+        "Website Design & Development": (
+            "website design and development",
+            "ওয়েবসাইট ডিজাইন ও ডেভেলপমেন্ট",
+        ),
+        "Recruitment": (
+            "community, moderation or developer recruitment",
+            "কমিউনিটি, মডারেশন বা ডেভেলপার নিয়োগ",
+        ),
+        "Video & Creative Production": (
+            "promotional video and creative production",
+            "প্রমোশনাল ভিডিও ও ক্রিয়েটিভ তৈরি",
+        ),
+        "Project Review / VERDICT": (
+            "product testing and structured user feedback",
+            "প্রোডাক্ট টেস্টিং ও পরিকল্পিত ইউজার ফিডব্যাক",
+        ),
+        "Fundraising / Launch Promotion": (
+            "launch and fundraising visibility",
+            "লঞ্চ ও ফান্ডরেইজিং প্রচার",
+        ),
+        "AI / Automation Promotion": (
+            "AI and automation product promotion",
+            "AI ও অটোমেশন প্রোডাক্ট প্রমোশন",
+        ),
+        "Exchange / Wallet Promotion": (
+            "exchange or wallet user acquisition and promotion",
+            "এক্সচেঞ্জ বা ওয়ালেটের ইউজার সংগ্রহ ও প্রমোশন",
+        ),
+        "RWA / Trading Promotion": (
+            "RWA and trading-sector marketing",
+            "RWA ও ট্রেডিং-সেক্টর মার্কেটিং",
+        ),
+        "GameFi / Casino Promotion": (
+            "GameFi and gaming project promotion",
+            "GameFi ও গেমিং প্রজেক্ট প্রমোশন",
+        ),
+        "Mining / Staking Promotion": (
+            "mining and staking user growth",
+            "মাইনিং ও স্টেকিং ইউজার গ্রোথ",
+        ),
+    }
+    english_need, bengali_need = openers.get(
+        primary, ("Web3 marketing and growth", "Web3 মার্কেটিং ও গ্রোথ")
+    )
+    en = (
+        f"Hi! I came across your message about {english_need}. "
+        "AENZO LABS provides Web3 and crypto marketing support, including targeted campaigns "
+        "and community growth. Would you be open to receiving a short proposal based on your requirements?"
+    )
+    bn = (
+        f"হ্যালো! {bengali_need} বিষয়ে আপনার পোস্টটি দেখেছি। "
+        "AENZO LABS Web3 ও ক্রিপ্টো মার্কেটিং, টার্গেটেড ক্যাম্পেইন এবং কমিউনিটি গ্রোথে সহায়তা করে। "
+        "আপনার প্রয়োজন অনুযায়ী একটি সংক্ষিপ্ত প্রস্তাব পেতে কি আগ্রহী?"
+    )
     return en, bn
 
 async def save_lead(client_http, payload):
@@ -316,7 +397,7 @@ async def run(once=False):
                     group_url = make_message_url(entity, msg.id)
                     sender_contact = f"https://t.me/{username}" if username else None
                     project = f"Potential project (verify) — {group_name}"[:250]
-                    en, bn = make_outreach(project, services)
+                    en, bn = make_outreach(services)
                     payload = {
                         "owner_id": SUPABASE_OWNER_ID,
                         "company_name": project,
