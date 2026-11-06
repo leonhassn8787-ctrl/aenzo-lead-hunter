@@ -130,7 +130,7 @@ NON_BUYER_CONTEXT = re.compile(
     r"hire me|anyone hiring me|free airdrop|airdrop claim|claim (my )?airdrop|"
     r"token price prediction|price prediction|trading signals|wallet (is )?(not working|stuck)|"
     r"account (is )?(locked|suspended)|"
-    r"we (are|offer|provide|specialize in)|our (agency|company) (offers|provides|specializes in)|"
+    r"we (offer|provide|specialize in)|we are (a|an) [a-z -]{1,50}(agency|service provider|marketing team)|our (agency|company) (offers|provides|specializes in)|"
     r"we help (web3|crypto|blockchain) projects)\b",
     re.I,
 )
