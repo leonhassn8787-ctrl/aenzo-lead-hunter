@@ -48,12 +48,31 @@ class LeadSignalTests(unittest.TestCase):
         sender_namespace = {}
         exec(compile(ast.Module(body=[sender_node], type_ignores=[]), str(WORKER), "exec"), sender_namespace)
         cls.is_human_sender = staticmethod(sender_namespace["is_human_sender"])
+        url_node = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "make_message_url"
+        )
+        url_namespace = {}
+        exec(compile(ast.Module(body=[url_node], type_ignores=[]), str(WORKER), "exec"), url_namespace)
+        cls.make_message_url = staticmethod(url_namespace["make_message_url"])
 
     def assert_signal(self, category, message):
         self.assertTrue(
             any(pattern.search(message) for pattern in self.patterns[category]),
             msg=f"No pattern in {category!r} matched: {message!r}",
         )
+
+    def test_public_group_message_link(self):
+        entity = type("Entity", (), {"username": "publicgroup", "megagroup": True, "id": 123})()
+        self.assertEqual(self.make_message_url(entity, 45), "https://t.me/publicgroup/45")
+
+    def test_private_supergroup_message_link(self):
+        entity = type("Entity", (), {"username": None, "megagroup": True, "id": 123})()
+        self.assertEqual(self.make_message_url(entity, 45), "https://t.me/c/123/45")
+
+    def test_private_basic_group_has_no_fabricated_link(self):
+        entity = type("Entity", (), {"username": None, "megagroup": False, "id": 123})()
+        self.assertIsNone(self.make_message_url(entity, 45))
 
     def test_bot_sender_is_excluded(self):
         self.assertFalse(self.is_human_sender(type("Sender", (), {"bot": True})()))
