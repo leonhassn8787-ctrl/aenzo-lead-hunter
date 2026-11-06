@@ -49,13 +49,23 @@ jobs:
               "TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_SESSION_STRING",
               "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_OWNER_ID",
           ]
-          missing = [name for name in required if not os.getenv(name)]
+          missing = [name for name in required if not os.getenv(name, "").strip()]
           if missing:
-              print("Scan safely skipped; private GitHub Actions secrets are not configured: " + ", ".join(missing))
+              print("Scan safely skipped; missing private GitHub Actions secrets: " + ", ".join(missing))
               configured = "false"
           else:
-              print("All required private credentials are configured.")
-              configured = "true"
+              try:
+                  int(os.environ["TELEGRAM_API_ID"])
+              except ValueError:
+                  print("Scan safely skipped: TELEGRAM_API_ID must be numeric.")
+                  configured = "false"
+              else:
+                  if not os.environ["SUPABASE_URL"].startswith("https://"):
+                      print("Scan safely skipped: SUPABASE_URL must use HTTPS.")
+                      configured = "false"
+                  else:
+                      print("Required credentials are present; format and live access checks follow.")
+                      configured = "true"
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"configured={configured}\n")
           PY
@@ -79,15 +89,72 @@ jobs:
           except Exception:
               print(
                   "Telegram scan safely skipped: TELEGRAM_SESSION_STRING is malformed or truncated. "
-                  "Replace it only with a fresh private StringSession generated in a trusted environment. "
+                  "Replace it only with a fresh private StringSession generated on the account owner's device. "
                   "Never share the session in chat or commit it to the repository."
               )
               valid = "false"
           else:
-              print("Telegram session string format is valid.")
+              print("Telegram session string format is valid; live authorization check follows.")
               valid = "true"
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"valid={valid}\n")
+          PY
+
+      - name: Verify Telegram authorization and Supabase access
+        if: steps.preflight.outputs.configured == 'true' && steps.session.outputs.valid == 'true'
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          TELEGRAM_SESSION_STRING: ${{ secrets.TELEGRAM_SESSION_STRING }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_OWNER_ID: ${{ secrets.SUPABASE_OWNER_ID }}
+        run: |
+          python - <<'PY'
+          import asyncio
+          import os
+          import httpx
+          from telethon import TelegramClient
+          from telethon.sessions import StringSession
+
+          async def check_telegram():
+              client = TelegramClient(
+                  StringSession(os.environ["TELEGRAM_SESSION_STRING"].strip()),
+                  int(os.environ["TELEGRAM_API_ID"]),
+                  os.environ["TELEGRAM_API_HASH"],
+              )
+              try:
+                  await client.connect()
+                  if not await client.is_user_authorized():
+                      raise RuntimeError("Telegram session is not authorized. Create a fresh session on the owner's Android device.")
+                  me = await client.get_me()
+                  if me is None:
+                      raise RuntimeError("Telegram returned no authorized account.")
+                  print("PASS: Telegram session is authorized.")
+              finally:
+                  if client.is_connected():
+                      await client.disconnect()
+
+          asyncio.run(check_telegram())
+
+          url = os.environ["SUPABASE_URL"].rstrip("/") + "/rest/v1/leads"
+          headers = {
+              "apikey": os.environ["SUPABASE_SERVICE_ROLE_KEY"],
+              "Accept": "application/json",
+          }
+          params = {
+              "select": "id",
+              "owner_id": "eq." + os.environ["SUPABASE_OWNER_ID"],
+              "limit": "1",
+          }
+          response = httpx.get(url, headers=headers, params=params, timeout=30)
+          if response.status_code != 200:
+              raise RuntimeError(
+                  "Supabase access check failed (HTTP "
+                  + str(response.status_code)
+                  + "). Check SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_OWNER_ID, and public.leads table access."
+              )
+          print("PASS: Supabase public.leads is reachable with the configured key.")
           PY
 
       - name: Scan Telegram groups once
