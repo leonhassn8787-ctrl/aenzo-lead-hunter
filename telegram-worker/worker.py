@@ -356,8 +356,18 @@ async def login(client):
 
 async def run(once=False):
     SESSION_FILE.parent.mkdir(parents=True, exist_ok=True)
-    client = (TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
-              if SESSION_STRING else TelegramClient(str(SESSION_FILE), API_ID, API_HASH))
+    if SESSION_STRING:
+        try:
+            session = StringSession(SESSION_STRING)
+        except Exception as exc:
+            raise RuntimeError(
+                "TELEGRAM_SESSION_STRING is invalid or truncated. Generate a fresh "
+                "Telethon StringSession with telegram-worker/session_login.py and "
+                "replace the GitHub Actions secret. Never paste the session into chat."
+            ) from exc
+        client = TelegramClient(session, API_ID, API_HASH)
+    else:
+        client = TelegramClient(str(SESSION_FILE), API_ID, API_HASH)
     await client.connect()
     if not await client.is_user_authorized():
         await client.disconnect()
