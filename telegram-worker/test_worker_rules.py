@@ -42,7 +42,9 @@ class LeadSignalTests(unittest.TestCase):
                 r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
                 r"hire me|anyone hiring me|free airdrop|airdrop claim|claim (my )?airdrop|"
                 r"token price prediction|price prediction|trading signals|wallet (is )?(not working|stuck)|"
-                r"account (is )?(locked|suspended))\b",
+                r"account (is )?(locked|suspended)|"
+                r"we (are|offer|provide|specialize in)|our (agency|company) (offers|provides|specializes in)|"
+                r"we help (web3|crypto|blockchain) projects)\b",
                 re.I,
             ),
         }
@@ -214,6 +216,12 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_service_provider_description_is_not_a_client_lead(self):
         self.assertEqual(self.classify("Our crypto agency provides community growth services"), [])
+
+    def test_first_person_agency_advertisement_is_not_a_client_lead(self):
+        self.assertEqual(self.classify("We provide KOL marketing and Telegram promotion for Web3 projects"), [])
+
+    def test_agency_offer_post_is_not_a_client_lead(self):
+        self.assertEqual(self.classify("Our company offers crypto PR and influencer campaigns"), [])
 
     def test_classifier_accepts_real_buying_intent(self):
         self.assertIn("Giveaways & Airdrops", self.classify("Need a giveaway campaign for our token launch"))
