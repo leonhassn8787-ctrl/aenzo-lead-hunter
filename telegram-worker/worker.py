@@ -272,6 +272,10 @@ async def run(once=False):
                         log.exception("Could not resolve message author in group %s, message %s.", group_id, msg.id)
                         group_write_failed = True
                         continue
+                    # Ignore bot-authored posts: they are often automated ads or
+                    # scraper output, not a reliable expression of a buyer's intent.
+                    if sender and bool(getattr(sender, "bot", False)):
+                        continue
                     username = getattr(sender, "username", None) if sender else None
                     group_name = (getattr(entity, "title", None) or "Telegram group").strip()
                     public_name = getattr(entity, "username", None)
