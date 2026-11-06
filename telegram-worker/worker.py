@@ -40,6 +40,7 @@ SIGNALS = {
     "Community Promotion": [
         r"looking for (community|telegram) (growth|promotion|marketing)",
         r"need (community|telegram) (growth|promotion|marketing)",
+        r"need telegram community (growth|promotion|marketing)",
         r"grow our (telegram )?community", r"community growth (agency|partner|service)",
         r"telegram group promotion",
     ],
@@ -53,7 +54,8 @@ SIGNALS = {
     ],
     "Giveaways & Airdrops": [
         r"looking for (airdrop|giveaway) (partner|campaign|support)",
-        r"need (airdrop|giveaway)", r"(airdrop|giveaway) campaign (manager|partner|support)",
+        r"need (airdrop|giveaway)", r"need (an? )?(airdrop|giveaway) campaign",
+        r"(airdrop|giveaway) campaign (manager|partner|support)",
     ],
     "Content Distribution & Marketing": [
         r"looking for (content distribution|content marketing)",
