@@ -57,7 +57,7 @@ jobs:
               print("All required private credentials are configured.")
               configured = "true"
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"configured={configured}\\n")
+              output.write(f"configured={configured}\n")
           PY
 
       - name: Install dependencies
@@ -87,7 +87,7 @@ jobs:
               print("Telegram session string format is valid.")
               valid = "true"
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"valid={valid}\\n")
+              output.write(f"valid={valid}\n")
           PY
 
       - name: Scan Telegram groups once
