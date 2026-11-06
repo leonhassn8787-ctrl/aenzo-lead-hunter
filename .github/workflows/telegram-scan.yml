@@ -102,7 +102,7 @@ jobs:
         run: python worker.py --once
 
       - name: Save scan progress
-        if: always() && steps.preflight.outputs.configured == 'true'
+        if: always() && steps.preflight.outputs.configured == 'true' && hashFiles('telegram-worker/scan_state.json') != ''
         uses: actions/cache/save@v4
         with:
           path: telegram-worker/scan_state.json
