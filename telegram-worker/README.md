@@ -40,7 +40,27 @@ Never send API credentials, Telegram login codes, 2-step passwords, or the Strin
 ## Telegram login helper
 `telegram-worker/session_login.py` creates a StringSession in an interactive Python environment controlled by the account owner. It prompts privately for the API ID, API Hash, phone number, login code, and (if enabled) 2-step password, then prints the StringSession for the owner to add directly to the GitHub secret.
 
-There is currently no verified phone-only, no-code login path in this repository. Do not use Codespaces, Colab, Termux, Pydroid, or a paid runtime as a workaround. If no trusted computer or suitable private runtime is available, leave `TELEGRAM_SESSION_STRING` unset until a safe login method is available. The scanner will safely skip until all six secrets exist.
+### Android phone setup using your own Termux app
+
+If you already have Termux installed from its official F-Droid or GitHub distribution, you can create the session locally on your own Android phone. This is an owner-operated terminal process, not a no-code flow. Do not install Termux APKs from random websites, and do not paste the session into ChatGPT, Telegram chats, screenshots, or public files.
+
+Run these commands one at a time in Termux:
+
+```sh
+pkg update -y
+pkg install python git -y
+git clone https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter.git
+cd aenzo-lead-hunter/telegram-worker
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python session_login.py
+```
+
+The helper asks for your Telegram API ID, API Hash, phone number, login code, and (if enabled) 2-step password. Enter them only in your own Termux terminal. It then prints a private StringSession. Copy that value directly into the GitHub Actions secret named `TELEGRAM_SESSION_STRING` at the repository's [Actions secrets page](https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter/settings/secrets/actions). Never send it to anyone. If a command fails, share only the error text with all phone numbers, codes, API values, and session strings removed.
+
+After saving the secret, run the [AENZO Telegram Group Lead Scan workflow](https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter/actions/workflows/telegram-scan.yml). A successful syntax check is not a real scan; confirm that the Telegram scan step itself completes.
+
+If Termux cannot install the pinned dependencies or the Telegram login fails, stop and share the redacted error text. Do not switch to an untrusted runtime or pay for hosting.
 
 ## Run and verify
 The workflow is:
