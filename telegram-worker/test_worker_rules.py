@@ -31,7 +31,7 @@ class LeadSignalTests(unittest.TestCase):
         namespace = {
             "COMPILED": cls.patterns,
             "BUYING_CONTEXT": re.compile(
-                r"\b(looking for|need|seeking|hiring|searching for|want to hire|any recommendation|recommend a|partner with)\b",
+                r"\b(looking for|looking to work with|in search of|trying to find|need|needs|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|could use help|need help with|help us|partner with|any agency|suggest a)\b",
                 re.I,
             ),
             "CRYPTO_CONTEXT": re.compile(
@@ -241,6 +241,15 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_classifier_accepts_partner_with_intent(self):
         self.assertIn("Project Promotion", self.classify("We want to partner with a Web3 marketing agency"))
+
+    def test_classifier_understands_natural_group_writing(self):
+        self.assertIn("KOL & Influencer Marketing", self.classify("Anyone know a good KOL team for our token launch?"))
+        self.assertIn("Community Promotion", self.classify("Can someone help us grow our Telegram community?"))
+        self.assertIn("Website Design & Development", self.classify("We need someone to build our website for the crypto project"))
+        self.assertIn("Project Promotion", self.classify("Does anyone know a marketing agency for our Web3 launch?"))
+
+    def test_classifier_does_not_promote_vague_support_request(self):
+        self.assertEqual(self.classify("Anyone know how to fix my crypto wallet?"), [])
 
     def test_kol_request(self):
         self.assert_signal("KOL & Influencer Marketing", "We are looking for KOLs for our Web3 launch")
