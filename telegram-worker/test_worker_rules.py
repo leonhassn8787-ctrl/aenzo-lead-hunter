@@ -235,6 +235,13 @@ class LeadSignalTests(unittest.TestCase):
     def test_classifier_accepts_generic_crypto_agency_request(self):
         self.assertIn("Project Promotion", self.classify("Looking for a marketing agency for our crypto wallet"))
 
+    def test_classifier_accepts_searching_for_and_want_to_hire_intent(self):
+        self.assertIn("KOL & Influencer Marketing", self.classify("Searching for KOLs for our Web3 launch"))
+        self.assertIn("KOL & Influencer Marketing", self.classify("We want to hire KOLs for our crypto launch"))
+
+    def test_classifier_accepts_partner_with_intent(self):
+        self.assertIn("Project Promotion", self.classify("We want to partner with a Web3 marketing agency"))
+
     def test_kol_request(self):
         self.assert_signal("KOL & Influencer Marketing", "We are looking for KOLs for our Web3 launch")
 
