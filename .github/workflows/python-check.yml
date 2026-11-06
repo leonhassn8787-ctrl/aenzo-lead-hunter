@@ -35,7 +35,7 @@ jobs:
           if not scripts:
               raise SystemExit("No inline dashboard script found")
           Path("/tmp/aenzo-dashboard.js").write_text("\n".join(scripts), encoding="utf-8")
-          if "lead-discovery-scan" in html or "RSS feeds" in html:
+          if "lead-discovery-scan" in html or "Run discovery scan" in html or "Review candidates" in html:
               raise SystemExit("Legacy RSS dashboard references remain")
           print("Telegram dashboard source checks passed")
           PY
