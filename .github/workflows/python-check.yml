@@ -25,3 +25,18 @@ jobs:
       - name: Test AENZO lead detection patterns
         working-directory: telegram-worker
         run: python -m unittest -v test_worker_rules.py
+      - name: Validate Telegram dashboard JavaScript
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          html = Path("index.html").read_text(encoding="utf-8")
+          scripts = re.findall(r"<script>(.*?)</script>", html, flags=re.S)
+          if not scripts:
+              raise SystemExit("No inline dashboard script found")
+          Path("/tmp/aenzo-dashboard.js").write_text("\n".join(scripts), encoding="utf-8")
+          if "lead-discovery-scan" in html or "RSS feeds" in html:
+              raise SystemExit("Legacy RSS dashboard references remain")
+          print("Telegram dashboard source checks passed")
+          PY
+          node --check /tmp/aenzo-dashboard.js
