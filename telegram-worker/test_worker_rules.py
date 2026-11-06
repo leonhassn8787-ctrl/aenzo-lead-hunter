@@ -29,6 +29,7 @@ class LeadSignalTests(unittest.TestCase):
             if isinstance(node, ast.FunctionDef) and node.name == "classify"
         )
         namespace = {
+            "re": re,
             "COMPILED": cls.patterns,
             "BUYING_CONTEXT": re.compile(
                 r"\b(looking for|looking to work with|in search of|trying to find|need|needs|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|could use help|need help with|help us|partner with|any agency|suggest a)\b",
