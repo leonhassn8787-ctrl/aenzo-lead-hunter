@@ -146,6 +146,16 @@ def classify(text):
         return []
     return hits
 
+def make_message_url(entity, message_id):
+    """Build only Telegram permalink formats supported by the group type."""
+    public_name = getattr(entity, "username", None)
+    if public_name:
+        return f"https://t.me/{public_name}/{message_id}"
+    if bool(getattr(entity, "megagroup", False)):
+        return f"https://t.me/c/{entity.id}/{message_id}"
+    return None
+
+
 def is_human_sender(sender):
     """Return False for bot accounts; unknown senders remain reviewable."""
     return not bool(sender and getattr(sender, "bot", False))
@@ -284,14 +294,8 @@ async def run(once=False):
                     username = getattr(sender, "username", None) if sender else None
                     group_name = (getattr(entity, "title", None) or "Telegram group").strip()
                     public_name = getattr(entity, "username", None)
-                    if public_name:
-                        group_url = f"https://t.me/{public_name}/{msg.id}"
-                    elif bool(getattr(entity, "megagroup", False)):
-                        # Private supergroups support /c/ message links. Basic
-                        # groups do not have a reliable public permalink format.
-                        group_url = f"https://t.me/c/{entity.id}/{msg.id}"
-                    else:
-                        group_url = None
+                    # Private basic groups have no reliable permalink format.
+                    group_url = make_message_url(entity, msg.id)
                     sender_contact = f"https://t.me/{username}" if username else None
                     project = f"Potential project (verify) — {group_name}"[:250]
                     en, bn = make_outreach(project, services)
