@@ -22,3 +22,6 @@ jobs:
         run: python -m py_compile telegram-worker/worker.py telegram-worker/session_login.py
       - name: Verify required imports
         run: python -c "import telethon, httpx; print('Telethon and httpx imports OK')"
+      - name: Test AENZO lead detection patterns
+        working-directory: telegram-worker
+        run: python -m unittest -v test_worker_rules.py
