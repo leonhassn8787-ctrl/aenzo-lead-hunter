@@ -35,7 +35,7 @@ The Supabase secret key is sent only in the `apikey` header. It is not a JWT and
 Add or update secrets here:
 https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter/settings/secrets/actions
 
-Never send API credentials, Telegram login codes, 2-step passwords, or the StringSession to ChatGPT, a public file, a screenshot, or a chat. A Telegram StringSession grants access to the Telegram account and must be treated like a password. A green preflight check only confirms the secret is present; the workflow separately validates its format and Telegram authorization.
+Never send API credentials, Telegram login codes, 2-step passwords, or the StringSession to ChatGPT, a public file, a screenshot, or a chat. A Telegram StringSession grants access to the Telegram account and must be treated like a password. The workflow checks that all required secrets are present, validates the Telegram session format, then performs live checks that the Telegram account is authorized and the Supabase `public.leads` table is reachable with the configured key. The group scan runs only if those checks pass. A successful preflight is not itself proof that messages were scanned or leads were saved; confirm the scan log and inspect `public.leads` for new records.
 
 ## Telegram login helper
 `telegram-worker/session_login.py` creates a StringSession in an interactive Python environment controlled by the account owner. It prompts privately for the API ID, API Hash, phone number, login code, and (if enabled) 2-step password, then prints the StringSession for the owner to add directly to the GitHub secret.
