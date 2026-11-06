@@ -86,6 +86,31 @@ class LeadSignalTests(unittest.TestCase):
         headers_namespace = {}
         exec(compile(ast.Module(body=[helper_nodes["supabase_headers"]], type_ignores=[]), str(WORKER), "exec"), headers_namespace)
         cls.supabase_headers = staticmethod(headers_namespace["supabase_headers"])
+        dedupe_node = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "dedupe"
+        )
+        dedupe_namespace = {"hashlib": __import__("hashlib"), "re": re}
+        exec(compile(ast.Module(body=[dedupe_node], type_ignores=[]), str(WORKER), "exec"), dedupe_namespace)
+        cls.dedupe = staticmethod(dedupe_namespace["dedupe"])
+
+    def test_same_author_cross_post_is_deduplicated(self):
+        first = self.dedupe("group-a", 100, 42, "Need KOLs for our crypto launch!")
+        second = self.dedupe("group-b", 900, 42, "NEED KOLS FOR OUR CRYPTO LAUNCH")
+        self.assertEqual(first, second)
+
+    def test_different_authors_are_not_merged(self):
+        first = self.dedupe("group-a", 100, 42, "Need KOLs for our crypto launch")
+        second = self.dedupe("group-a", 101, 43, "Need KOLs for our crypto launch")
+        self.assertNotEqual(first, second)
+
+    def test_distinct_requests_from_same_author_are_kept(self):
+        first = self.dedupe("group-a", 100, 42, "Need KOLs for our crypto launch")
+        second = self.dedupe("group-a", 101, 42, "Need website design for our crypto launch")
+        self.assertNotEqual(first, second)
+
+    def test_dedupe_falls_back_to_message_identity_without_author(self):
+        self.assertEqual(self.dedupe("group-a", 100), self.dedupe("group-a", 100))
 
     def test_message_batches_are_oldest_first(self):
         options = self.message_scan_kwargs(120, "cutoff")
