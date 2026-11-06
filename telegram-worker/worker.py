@@ -155,7 +155,7 @@ def classify(text):
     hits = [name for name, patterns in COMPILED.items() if any(p.search(text) for p in patterns)]
     if not hits and BUYING_CONTEXT.search(text) and CRYPTO_CONTEXT.search(text):
         hits = ["Project Promotion"]
-    if not hits or not (BUYING_CONTEXT.search(text) or any(x in text.lower() for x in ("looking for", "need ", "seeking", "hiring", "recommend"))):
+    if not hits or not BUYING_CONTEXT.search(text):
         return []
     return hits
 
