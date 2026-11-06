@@ -187,7 +187,14 @@ def priority(text, hits):
     score += min(10, max(0, len(hits) - 1) * 3)
     return min(score, 95)
 
-def dedupe(group_id, message_id):
+def dedupe(group_id, message_id, sender_id=None, message_text=None):
+    """Deduplicate identical requests cross-posted by the same Telegram author."""
+    if sender_id is not None and message_text:
+        normalized = re.sub(r"\s+", " ", message_text.casefold()).strip()
+        normalized = re.sub(r"[^\w ]", "", normalized)
+        if normalized:
+            identity = f"telegram-author:{sender_id}:{normalized}"
+            return hashlib.sha256(identity.encode()).hexdigest()
     return hashlib.sha256(f"telegram:{group_id}:{message_id}".encode()).hexdigest()
 
 def make_outreach(services):
@@ -449,7 +456,7 @@ async def run(once=False):
                             + ("Direct message permalink unavailable for this group type. " if not group_url else "Message permalink recorded. ")
                             + "Verify the sender's role, project identity, and current service need before outreach."
                         ),
-                        "dedupe_key": dedupe(group_id, msg.id),
+                        "dedupe_key": dedupe(group_id, msg.id, getattr(sender, "id", None), text_body),
                     }
                     save_status = await save_lead(http, payload)
                     if save_status == "saved":
