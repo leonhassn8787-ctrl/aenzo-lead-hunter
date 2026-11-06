@@ -32,7 +32,7 @@ class LeadSignalTests(unittest.TestCase):
             "re": re,
             "COMPILED": cls.patterns,
             "BUYING_CONTEXT": re.compile(
-                r"\b(looking for|looking to work with|in search of|trying to find|need|needs|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|can anyone help|could use|need help with|help us|partner with|any agency|suggest a)\b",
+                r"\b(looking for|looking to work with|looking to grow|looking to increase|looking to boost|in search of|trying to find|trying to grow|trying to increase|want to grow|want to increase|want to boost|need|needs|need more|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|need a hand|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|can anyone help|anyone able to|someone who can|anyone experienced in|could use|need help with|help us|partner with|any agency|suggest a)\b",
                 re.I,
             ),
             "CRYPTO_CONTEXT": re.compile(
@@ -255,6 +255,8 @@ class LeadSignalTests(unittest.TestCase):
     def test_service_intent_examples_are_not_just_exact_keyword_phrases(self):
         self.assertIn("Community Promotion", self.classify("Our Telegram group is quiet and we want to attract more real users. Can anyone help?"))
         self.assertIn("Project Promotion", self.classify("We are preparing a Web3 launch and could use a marketing partner."))
+        self.assertIn("Project Promotion", self.classify("We want to grow our Web3 user base before launch. Anyone able to help?"))
+        self.assertIn("Project Promotion", self.classify("Trying to increase visibility for our crypto project before launch."))
 
     def test_kol_request(self):
         self.assert_signal("KOL & Influencer Marketing", "We are looking for KOLs for our Web3 launch")
