@@ -160,7 +160,7 @@ def classify(text):
     if NON_BUYER_CONTEXT.search(text):
         return []
     hits = [name for name, patterns in COMPILED.items() if any(p.search(text) for p in patterns)]
-    commercial_need = re.compile(r"\\b(agency|agencies|team|partner|service|services|marketing|promotion|growth|users|user acquisition|visibility|exposure|launch|campaign|community|content|kol|influencer|pr|media|advertising|advertisement|developer|development|website|moderator|ama|airdrop|giveaway|video|design|fundraising)\\b", re.I)
+    commercial_need = re.compile(r"\b(agency|agencies|team|partner|service|services|marketing|promotion|growth|users|user acquisition|visibility|exposure|launch|campaign|community|content|kol|influencer|pr|media|advertising|advertisement|developer|development|website|moderator|ama|airdrop|giveaway|video|design|fundraising)\b", re.I)
     if not hits and BUYING_CONTEXT.search(text) and CRYPTO_CONTEXT.search(text) and commercial_need.search(text):
         hits = ["Project Promotion"]
     if not hits or not BUYING_CONTEXT.search(text):
