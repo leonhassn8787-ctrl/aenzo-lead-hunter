@@ -173,11 +173,18 @@ def is_human_sender(sender):
 
 
 def priority(text, hits):
-    score = 48 + min(24, 8 * len(hits))
-    if re.search(r"\b(budget|paid|payment|urgent|asap|ready to hire|dm me)\b", text, re.I):
+    """Conservative 0-100 ranking; score reflects evidence, not certainty."""
+    score = 35
+    if re.search(r"\b(looking for|need|seeking|hiring|want to hire|searching for)\b", text, re.I):
+        score += 20
+    if re.search(r"\b(budget|paid|payment|pricing|quote|rates|cost)\b", text, re.I):
         score += 15
-    if re.search(r"\b(looking for|need|hiring|seeking)\b", text, re.I):
-        score += 8
+    if re.search(r"\b(urgent|asap|this week|immediately|ready to hire)\b", text, re.I):
+        score += 10
+    if re.search(r"\b(dm me|contact me|send proposal|share your portfolio)\b", text, re.I):
+        score += 10
+    # Multiple independently matched service categories add only a small bonus.
+    score += min(10, max(0, len(hits) - 1) * 3)
     return min(score, 95)
 
 def dedupe(group_id, message_id):
@@ -326,7 +333,13 @@ async def run(once=False):
                         "contacts": ([{"type": "telegram", "username": username, "url": sender_contact, "source": "message author"}] if username else []),
                         "outreach_english": en,
                         "outreach_bengali": bn,
-                        "notes": "Automatically detected from a member-written Telegram group message. Verify project identity and need before outreach.",
+                        "notes": (
+                            "Auto-detected buying-intent candidate; not independently verified. "
+                            f"Source group: {group_name}. Message ID: {msg.id}. "
+                            + (f"Public sender username: @{username}. " if username else "Public sender username unavailable. ")
+                            + ("Direct message permalink unavailable for this group type. " if not group_url else "Message permalink recorded. ")
+                            + "Verify the sender's role, project identity, and current service need before outreach."
+                        ),
                         "dedupe_key": dedupe(group_id, msg.id),
                     }
                     save_status = await save_lead(http, payload)
