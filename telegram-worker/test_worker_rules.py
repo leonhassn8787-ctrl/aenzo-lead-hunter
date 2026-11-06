@@ -60,6 +60,42 @@ class LeadSignalTests(unittest.TestCase):
     def test_verdict_testing_request(self):
         self.assert_signal("Project Review / VERDICT", "Looking for beta testers for our app")
 
+    def test_ama_request(self):
+        self.assert_signal("AMA Hosting & Engagement", "Need AMA hosting partner")
+
+    def test_pr_request(self):
+        self.assert_signal("PR & Media Visibility", "Looking for PR agency")
+
+    def test_airdrop_request(self):
+        self.assert_signal("Giveaways & Airdrops", "Need a giveaway campaign")
+
+    def test_content_marketing_request(self):
+        self.assert_signal("Content Distribution & Marketing", "Looking for content marketing")
+
+    def test_social_media_request(self):
+        self.assert_signal("Social Media Marketing", "Need social media management")
+
+    def test_project_marketing_request(self):
+        self.assert_signal("Project Promotion", "Looking for promotion agency")
+
+    def test_video_request(self):
+        self.assert_signal("Video & Creative Production", "Need promo video production")
+
+    def test_fundraising_request(self):
+        self.assert_signal("Fundraising / Launch Promotion", "Need launch promotion")
+
+    def test_automation_request(self):
+        self.assert_signal("AI / Automation Promotion", "Promote our automation tool")
+
+    def test_wallet_user_acquisition(self):
+        self.assert_signal("Exchange / Wallet Promotion", "Need wallet users and community")
+
+    def test_metaverse_request(self):
+        self.assert_signal("GameFi / Casino Promotion", "Looking for metaverse marketing")
+
+    def test_mining_request(self):
+        self.assert_signal("Mining / Staking Promotion", "Looking for mining marketing")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
