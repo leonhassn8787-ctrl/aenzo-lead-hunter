@@ -252,6 +252,10 @@ class LeadSignalTests(unittest.TestCase):
     def test_classifier_does_not_promote_vague_support_request(self):
         self.assertEqual(self.classify("Anyone know how to fix my crypto wallet?"), [])
 
+    def test_service_intent_examples_are_not_just_exact_keyword_phrases(self):
+        self.assertIn("Community Promotion", self.classify("Our Telegram group is quiet and we want to attract more real users. Can anyone help?"))
+        self.assertIn("Project Promotion", self.classify("We are preparing a Web3 launch and could use a marketing partner."))
+
     def test_kol_request(self):
         self.assert_signal("KOL & Influencer Marketing", "We are looking for KOLs for our Web3 launch")
 
