@@ -32,7 +32,7 @@ class LeadSignalTests(unittest.TestCase):
             "re": re,
             "COMPILED": cls.patterns,
             "BUYING_CONTEXT": re.compile(
-                r"\b(looking for|looking to work with|looking to grow|looking to increase|looking to boost|in search of|trying to find|trying to grow|trying to increase|want to grow|want to increase|want to boost|need|needs|need more|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|need a hand|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|can anyone help|anyone able to|someone who can|anyone experienced in|could use|need help with|help us|partner with|any agency|suggest a)\b",
+                r"\b(struggling to (get|attract|reach|grow|increase)|having trouble (getting|attracting|reaching|growing)|not getting (enough|many) (users|registrations|signups|members|engagement|traction)|could use more|how can we (get|attract|reach|grow|increase)|what.s the best way to (get|attract|reach|grow|increase)|looking for|looking to work with|looking to grow|looking to increase|looking to boost|in search of|trying to find|trying to grow|trying to increase|want to grow|want to increase|want to boost|need|needs|need more|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|need a hand|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|can anyone help|anyone able to|someone who can|anyone experienced in|could use|need help with|help us|partner with|any agency|suggest a)\b",
                 re.I,
             ),
             "CRYPTO_CONTEXT": re.compile(
@@ -347,6 +347,26 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_mining_request(self):
         self.assert_signal("Mining / Staking Promotion", "Looking for mining marketing")
+
+
+    def test_classifier_recognizes_indirect_growth_pain(self):
+        self.assertIn("Project Promotion", self.classify(
+            "Our Web3 project is struggling to attract users before launch."
+        ))
+        self.assertIn("Project Promotion", self.classify(
+            "We are not getting enough users for our crypto wallet."
+        ))
+        self.assertIn("Project Promotion", self.classify(
+            "What's the best way to increase visibility for our blockchain launch?"
+        ))
+
+    def test_classifier_does_not_promote_unrelated_indirect_complaints(self):
+        self.assertEqual(self.classify(
+            "Our local cafe is struggling to attract customers."
+        ), [])
+        self.assertEqual(self.classify(
+            "I'm not getting enough members for my gaming chat."
+        ), [])
 
 
 if __name__ == "__main__":
