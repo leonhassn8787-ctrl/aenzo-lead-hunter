@@ -16,21 +16,22 @@
 - A public sender username is recorded only when Telegram exposes one. No usernames or project identities are invented.
 - The worker is not operational until the required GitHub Actions secrets are configured and a manual scan succeeds.
 
-## One-time Telegram authorization (Android alternative to Colab)
+## One-time Telegram authorization — browser only
 
-If Google Colab is inconvenient, an Android phone can run the login helper locally with **Pydroid 3**. Pydroid 3 is listed on Google Play as an Android Python IDE with a pip package manager; the app listing also mentions in-app purchases, so do not buy Premium or any add-on for this project.
+Use GitHub Codespaces in your phone's browser. No Python app needs to be installed on the phone.
 
-1. Install/open Pydroid 3 from Google Play: https://play.google.com/store/apps/details?id=ru.iiec.pydroid3
-2. In Pydroid 3, open its **Pip** menu and install the exact package `Telethon==1.42.0`. Do not install optional native speed-up packages.
-3. Download this repository file to your phone: https://raw.githubusercontent.com/leonhassn8787-ctrl/aenzo-lead-hunter/main/telegram-worker/session_login.py
-4. Open the downloaded `session_login.py` in Pydroid 3 and run it.
-5. Enter your Telegram API ID, API Hash, phone number with country code, and the login code in the local Pydroid console. Enter your Telegram 2-step password only if requested.
-6. After successful login, the script prints a **Telegram StringSession**. Copy it directly into the GitHub Actions secret named `TELEGRAM_SESSION_STRING`.
+**Free-use warning:** GitHub personal accounts currently include a monthly Codespaces allowance (120 core-hours and 15 GB-month storage for Free accounts). If the allowance is exhausted, GitHub blocks additional usage unless billing is enabled. Do not add a payment method or enable spending for this project. If GitHub says the free allowance is unavailable, stop; do not pay.
 
-The Pydroid route is a practical Android alternative, but it has not yet been tested on this specific phone. If Pydroid asks for a paid Premium feature, stop and do not pay. Do not send the login code, 2-step password, API Hash, or Session string in ChatGPT, Telegram chats, screenshots, or public files.
+1. Open this direct link while signed in to GitHub:
+   https://github.com/codespaces/new?repo=1447576201
+2. If GitHub offers a machine type, choose the smallest available option. Do not enable paid spending.
+3. Wait for the browser-based VS Code workspace to open. The repository's devcontainer installs the Python dependencies automatically.
+4. In the bottom Terminal panel, run:
+   `python telegram-worker/session_login.py`
+5. Enter your Telegram API ID, API Hash, phone number with country code, and the login code in the terminal. Enter your Telegram 2-step password only if requested.
+6. The script prints a **Telegram StringSession**. Copy it directly into the GitHub Actions secret named `TELEGRAM_SESSION_STRING`.
 
-The optional Colab route remains available if preferred:
-https://colab.research.google.com/github/leonhassn8787-ctrl/aenzo-lead-hunter/blob/main/telegram-worker/AENZO_Telegram_Login.ipynb
+If Codespaces fails to open or asks for payment, stop and tell us the exact message. Do not retry paid machine options. Do not send the login code, 2-step password, API Hash, or Session string in ChatGPT, Telegram chats, screenshots, or public files.
 
 A Telegram StringSession grants access to the Telegram account and must be treated like a password. Never send it in chat, put it in a public file, or commit it to this repository.
 
@@ -64,4 +65,4 @@ After adding secrets:
 A successful syntax check is not proof that Telegram login or scanning works. Do not describe the system as active until a manual scan succeeds.
 
 ## Cost guard
-The free GitHub Actions route is the intended setup. The root `render.yaml` describes an optional paid worker and is not required. Do not deploy it or enable paid services without the owner's explicit approval.
+The root `render.yaml` describes an optional paid worker and is not required. Do not deploy it or enable paid services without the owner's explicit approval.
