@@ -194,6 +194,10 @@ async def save_lead(client_http, payload):
         response = await client_http.post(url, headers=headers, json=payload, timeout=30)
         if response.status_code in (200, 201):
             return "saved"
+        # A concurrent scan may insert the same unique dedupe key after our
+        # lookup. Treat the database's unique-conflict response as a duplicate.
+        if response.status_code == 409:
+            return "duplicate"
         log.warning("Supabase insert failed (%s): %s", response.status_code, response.text[:500])
         return "error"
     except Exception:
@@ -258,7 +262,14 @@ async def run(once=False):
                     services = classify(text_body)
                     if not services:
                         continue
-                    sender = await msg.get_sender()
+                    try:
+                        sender = await msg.get_sender()
+                    except Exception:
+                        # Do not silently lose a lead if Telegram temporarily
+                        # cannot resolve its author; retry this group's cursor.
+                        log.exception("Could not resolve message author in group %s, message %s.", group_id, msg.id)
+                        group_write_failed = True
+                        continue
                     username = getattr(sender, "username", None) if sender else None
                     group_name = (getattr(entity, "title", None) or "Telegram group").strip()
                     public_name = getattr(entity, "username", None)
