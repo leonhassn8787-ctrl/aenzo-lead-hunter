@@ -41,12 +41,28 @@ class LeadSignalTests(unittest.TestCase):
         }
         exec(compile(ast.Module(body=[classify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
         cls.classify = staticmethod(namespace["classify"])
+        sender_node = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "is_human_sender"
+        )
+        sender_namespace = {}
+        exec(compile(ast.Module(body=[sender_node], type_ignores=[]), str(WORKER), "exec"), sender_namespace)
+        cls.is_human_sender = staticmethod(sender_namespace["is_human_sender"])
 
     def assert_signal(self, category, message):
         self.assertTrue(
             any(pattern.search(message) for pattern in self.patterns[category]),
             msg=f"No pattern in {category!r} matched: {message!r}",
         )
+
+    def test_bot_sender_is_excluded(self):
+        self.assertFalse(self.is_human_sender(type("Sender", (), {"bot": True})()))
+
+    def test_human_sender_is_kept(self):
+        self.assertTrue(self.is_human_sender(type("Sender", (), {"bot": False})()))
+
+    def test_unknown_sender_is_kept_for_manual_review(self):
+        self.assertTrue(self.is_human_sender(None))
 
     def test_classifier_accepts_real_buying_intent(self):
         self.assertIn("Giveaways & Airdrops", self.classify("Need a giveaway campaign for our token launch"))
