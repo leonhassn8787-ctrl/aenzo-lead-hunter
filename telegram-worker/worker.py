@@ -182,6 +182,41 @@ def make_message_url(entity, message_id):
     return None
 
 
+def extract_public_contacts(message_text, sender_username=None):
+    """Extract only contact details explicitly visible in the message or sender profile."""
+    contacts = []
+    seen = set()
+
+    def add(kind, value, url=None, source="message text"):
+        identity = (kind, value.casefold())
+        if value and identity not in seen:
+            seen.add(identity)
+            item = {"type": kind, "value": value, "source": source}
+            if url:
+                item["url"] = url
+            contacts.append(item)
+
+    if sender_username:
+        add("telegram", "@" + sender_username, "https://t.me/" + sender_username, "message author")
+
+    urls = re.findall(r"https?://[^\s<>()]+", message_text or "", flags=re.I)
+    for raw_url in urls:
+        url = raw_url.rstrip(".,;:!?)]}")
+        if re.search(r"(?:^|//)(?:www\.)?(?:x\.com|twitter\.com)/([A-Za-z0-9_]{1,15})(?:[/?#]|$)", url, re.I):
+            add("x", url, url)
+        elif re.search(r"(?:^|//)(?:www\.)?(?:wa\.me|api\.whatsapp\.com)/", url, re.I):
+            add("whatsapp", url, url)
+        elif re.search(r"(?:^|//)(?:www\.)?t\.me/([A-Za-z][A-Za-z0-9_]{4,})(?:[/?#]|$)", url, re.I):
+            add("telegram", url, url)
+        elif not re.search(r"(?:^|//)(?:www\.)?(?:x\.com|twitter\.com|t\.me|wa\.me|api\.whatsapp\.com)/", url, re.I):
+            add("website", url, url)
+
+    for email in re.findall(r"(?<![\w.+-])[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", message_text or "", flags=re.I):
+        add("email", email)
+
+    return contacts
+
+
 def is_human_sender(sender):
     """Return False for bot accounts; unknown senders remain reviewable."""
     return not bool(sender and getattr(sender, "bot", False))
@@ -461,7 +496,7 @@ async def run(once=False):
                         "evidence_url": group_url,
                         "evidence_date": msg.date.astimezone(timezone.utc).date().isoformat(),
                         "telegram_group_url": f"https://t.me/{public_name}" if public_name else group_url,
-                        "contacts": ([{"type": "telegram", "username": username, "url": sender_contact, "source": "message author"}] if username else []),
+                        "contacts": extract_public_contacts(text_body, username),
                         "outreach_english": en,
                         "outreach_bengali": bn,
                         "notes": (
