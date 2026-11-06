@@ -40,3 +40,5 @@ jobs:
           print("Telegram dashboard source checks passed")
           PY
           node --check /tmp/aenzo-dashboard.js
+      - name: Verify optional Docker build context
+        run: docker build --tag aenzo-telegram-worker-check --file telegram-worker/Dockerfile .
