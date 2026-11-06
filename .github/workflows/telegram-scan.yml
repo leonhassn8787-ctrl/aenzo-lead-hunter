@@ -53,11 +53,11 @@ jobs:
           if missing:
               print("Scan safely skipped; private GitHub Actions secrets are not configured: " + ", ".join(missing))
               with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-                  output.write("configured=false\\n")
+                  output.write("configured=false\n")
           else:
               print("All required private credentials are configured.")
               with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-                  output.write("configured=true\\n")
+                  output.write("configured=true\n")
           PY
 
       - name: Install dependencies
