@@ -76,6 +76,35 @@ class LeadSignalTests(unittest.TestCase):
         url_namespace = {}
         exec(compile(ast.Module(body=[url_node], type_ignores=[]), str(WORKER), "exec"), url_namespace)
         cls.make_message_url = staticmethod(url_namespace["make_message_url"])
+        helper_nodes = {
+            node.name: node for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+        }
+        pagination_namespace = {"MAX_MESSAGES_PER_GROUP": 200}
+        exec(compile(ast.Module(body=[helper_nodes["message_scan_kwargs"]], type_ignores=[]), str(WORKER), "exec"), pagination_namespace)
+        cls.message_scan_kwargs = staticmethod(pagination_namespace["message_scan_kwargs"])
+        headers_namespace = {}
+        exec(compile(ast.Module(body=[helper_nodes["supabase_headers"]], type_ignores=[]), str(WORKER), "exec"), headers_namespace)
+        cls.supabase_headers = staticmethod(headers_namespace["supabase_headers"])
+
+    def test_message_batches_are_oldest_first(self):
+        options = self.message_scan_kwargs(120, "cutoff")
+        self.assertTrue(options["reverse"])
+        self.assertEqual(options["min_id"], 120)
+        self.assertEqual(options["limit"], 200)
+
+    def test_first_message_batch_is_limited_to_recent_history(self):
+        options = self.message_scan_kwargs(0, "cutoff")
+        self.assertEqual(options["offset_date"], "cutoff")
+
+    def test_incremental_batch_keeps_backlog_even_after_lookback(self):
+        options = self.message_scan_kwargs(120, "cutoff")
+        self.assertNotIn("offset_date", options)
+
+    def test_supabase_secret_is_not_sent_as_bearer_jwt(self):
+        headers = self.supabase_headers("sb_secret_test")
+        self.assertEqual(headers["apikey"], "sb_secret_test")
+        self.assertNotIn("Authorization", headers)
 
     def assert_signal(self, category, message):
         self.assertTrue(
