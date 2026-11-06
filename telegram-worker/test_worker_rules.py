@@ -23,12 +23,39 @@ class LeadSignalTests(unittest.TestCase):
             name: [re.compile(pattern, re.I) for pattern in patterns]
             for name, patterns in load_signals().items()
         }
+        tree = ast.parse(WORKER.read_text(encoding="utf-8"))
+        classify_node = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "classify"
+        )
+        namespace = {
+            "COMPILED": cls.patterns,
+            "BUYING_CONTEXT": re.compile(
+                r"\b(looking for|need|seeking|hiring|searching for|want to hire|any recommendation|recommend a|partner with|agency|service provider)\b",
+                re.I,
+            ),
+            "CRYPTO_CONTEXT": re.compile(
+                r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet)\b",
+                re.I,
+            ),
+        }
+        exec(compile(ast.Module(body=[classify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
+        cls.classify = staticmethod(namespace["classify"])
 
     def assert_signal(self, category, message):
         self.assertTrue(
             any(pattern.search(message) for pattern in self.patterns[category]),
             msg=f"No pattern in {category!r} matched: {message!r}",
         )
+
+    def test_classifier_accepts_real_buying_intent(self):
+        self.assertIn("Giveaways & Airdrops", self.classify("Need a giveaway campaign for our token launch"))
+
+    def test_classifier_rejects_general_project_description(self):
+        self.assertEqual(self.classify("We are building a Web3 wallet for global users"), [])
+
+    def test_classifier_accepts_generic_crypto_agency_request(self):
+        self.assertIn("Project Promotion", self.classify("Looking for a marketing agency for our crypto wallet"))
 
     def test_kol_request(self):
         self.assert_signal("KOL & Influencer Marketing", "We are looking for KOLs for our Web3 launch")
