@@ -134,7 +134,7 @@ SIGNALS = {
     ],
 }
 COMPILED = {name: [re.compile(p, re.I) for p in patterns] for name, patterns in SIGNALS.items()}
-BUYING_CONTEXT = re.compile(r"\b(looking for|looking to work with|looking to grow|looking to increase|looking to boost|in search of|trying to find|trying to grow|trying to increase|want to grow|want to increase|want to boost|need|needs|need more|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|need a hand|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|can anyone help|anyone able to|someone who can|anyone experienced in|could use|need help with|help us|partner with|any agency|suggest a)\b", re.I)
+BUYING_CONTEXT = re.compile(r"\b(looking for|looking to work with|looking to grow|looking to increase|looking to boost|looking to attract|looking to reach|looking to get|in search of|trying to find|trying to grow|trying to increase|trying to reach|want to grow|want to increase|want to boost|want to attract|want to reach|need|needs|need more|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|need a hand|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|can anyone help|anyone able to|someone who can|anyone experienced in|could use|need help with|help us|partner with|any agency|suggest a)\b", re.I)
 CRYPTO_CONTEXT = re.compile(r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet)\b", re.I)
 NON_BUYER_CONTEXT = re.compile(
     r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
@@ -164,7 +164,7 @@ def classify(text):
     if NON_BUYER_CONTEXT.search(text):
         return []
     hits = [name for name, patterns in COMPILED.items() if any(p.search(text) for p in patterns)]
-    commercial_need = re.compile(r"\b(agency|agencies|team|partner|service|services|marketing|promotion|growth|users|user acquisition|visibility|exposure|launch|campaign|community|content|kol|influencer|pr|media|advertising|advertisement|developer|development|website|moderator|ama|airdrop|giveaway|video|design|fundraising)\b", re.I)
+    commercial_need = re.compile(r"\b(agency|agencies|team|partner|service|services|marketing|promotion|promote|grow|growth|attract|reach|audience|traction|awareness|buzz|attention|engagement|acquisition|registrations|signups|downloads|users|user acquisition|visibility|exposure|launch|campaign|community|content|kol|influencer|pr|media|advertising|advertisement|developer|development|website|moderator|ama|airdrop|giveaway|video|design|fundraising)\b", re.I)
     if not hits and BUYING_CONTEXT.search(text) and CRYPTO_CONTEXT.search(text) and commercial_need.search(text):
         hits = ["Project Promotion"]
     if not hits or not BUYING_CONTEXT.search(text):
