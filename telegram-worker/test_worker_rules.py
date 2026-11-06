@@ -65,6 +65,13 @@ class LeadSignalTests(unittest.TestCase):
         outreach_namespace = {}
         exec(compile(ast.Module(body=[outreach_node], type_ignores=[]), str(WORKER), "exec"), outreach_namespace)
         cls.make_outreach = staticmethod(outreach_namespace["make_outreach"])
+        contacts_node = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "extract_public_contacts"
+        )
+        contacts_namespace = {"re": re}
+        exec(compile(ast.Module(body=[contacts_node], type_ignores=[]), str(WORKER), "exec"), contacts_namespace)
+        cls.extract_public_contacts = staticmethod(contacts_namespace["extract_public_contacts"])
         sender_node = next(
             node for node in tree.body
             if isinstance(node, ast.FunctionDef) and node.name == "is_human_sender"
@@ -157,6 +164,20 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_human_sender_is_kept(self):
         self.assertTrue(self.is_human_sender(type("Sender", (), {"bot": False})()))
+
+    def test_public_contacts_are_extracted_without_guessing(self):
+        found = self.extract_public_contacts(
+            "Contact us at team@example.org, X: https://x.com/aenzo_team, "
+            "WhatsApp: https://wa.me/966500000000, site https://aenzo.example",
+            "founder_aenzo",
+        )
+        kinds = {item["type"] for item in found}
+        self.assertEqual(kinds, {"telegram", "email", "x", "whatsapp", "website"})
+        self.assertIn("https://t.me/founder_aenzo", [item.get("url") for item in found])
+        self.assertIn("team@example.org", [item["value"] for item in found])
+
+    def test_private_or_unmentioned_contact_is_not_invented(self):
+        self.assertEqual(self.extract_public_contacts("We are launching a Web3 project."), [])
 
     def test_unknown_sender_is_kept_for_manual_review(self):
         self.assertTrue(self.is_human_sender(None))
