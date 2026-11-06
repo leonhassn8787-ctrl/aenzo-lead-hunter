@@ -314,7 +314,7 @@ class LeadSignalTests(unittest.TestCase):
         self.assert_signal("Fundraising / Launch Promotion", "Need launch promotion")
 
     def test_automation_request(self):
-        self.assert_signal("AI / Automation Promotion", "Promote our automation tool")
+        self.assert_signal("AI / Automation Promotion", "Looking for promotion for our automation tool")
 
     def test_wallet_user_acquisition(self):
         self.assert_signal("Exchange / Wallet Promotion", "Need wallet users and community")
