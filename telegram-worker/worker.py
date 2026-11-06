@@ -246,6 +246,10 @@ async def run(once=False):
                     # Advance past every Telegram update, including service and
                     # non-text messages, so quiet groups are not rescanned forever.
                     newest_seen = max(newest_seen, int(msg.id))
+                    # Never treat messages sent by the account owner as client leads.
+                    # The cursor still advances so the same own message is not rechecked.
+                    if getattr(msg, "out", False):
+                        continue
                     if not msg.message or not msg.date:
                         continue
                     if msg.date.replace(tzinfo=timezone.utc) < cutoff:
