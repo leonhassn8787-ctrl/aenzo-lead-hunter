@@ -34,6 +34,9 @@ LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", "30"))
 SIGNALS = {
     "KOL & Influencer Marketing": [
         r"looking for (kol|kols|influencer|influencers)",
+        r"searching for (kol|kols|influencer|influencers)",
+        r"want to hire (kol|kols|influencer|influencers)",
+        r"need help with (our )?(kol|influencer) campaign",
         r"need (kols|influencers)", r"kol campaign", r"influencer campaign",
         r"(crypto|web3) influencer (marketing|campaign|promotion)",
         r"anyone know (a |any )?(good )?(kol|influencer|influencers)",
