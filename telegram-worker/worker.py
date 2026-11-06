@@ -282,13 +282,31 @@ def make_outreach(services):
     )
     return en, bn
 
-async def save_lead(client_http, payload):
-    headers = {
-        "apikey": SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+def supabase_headers(secret_key):
+    """New Supabase sb_secret keys are API keys, not JWT bearer tokens."""
+    return {
+        "apikey": secret_key,
         "Content-Type": "application/json",
         "Prefer": "return=representation",
     }
+
+
+def message_scan_kwargs(last_seen, cutoff):
+    """Fetch oldest unseen messages first so batches cannot skip busy-group traffic."""
+    kwargs = {
+        "limit": MAX_MESSAGES_PER_GROUP,
+        "min_id": last_seen,
+        "reverse": True,
+    }
+    # The initial batch is bounded to recent history. Later batches must finish
+    # any backlog even if messages have aged past LOOKBACK_DAYS.
+    if not last_seen:
+        kwargs["offset_date"] = cutoff
+    return kwargs
+
+
+async def save_lead(client_http, payload):
+    headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
     url = f"{SUPABASE_URL}/rest/v1/leads"
     try:
         lookup = await client_http.get(
@@ -360,7 +378,7 @@ async def run(once=False):
                 last_seen = int(state.get(group_id, 0))
                 newest_seen = last_seen
                 group_write_failed = False
-                async for msg in client.iter_messages(entity, limit=MAX_MESSAGES_PER_GROUP, min_id=last_seen):
+                async for msg in client.iter_messages(entity, **message_scan_kwargs(last_seen, cutoff)):
                     if not msg:
                         continue
                     # Advance past every Telegram update, including service and
@@ -372,7 +390,7 @@ async def run(once=False):
                         continue
                     if not msg.message or not msg.date:
                         continue
-                    if msg.date.replace(tzinfo=timezone.utc) < cutoff:
+                    if not last_seen and msg.date.replace(tzinfo=timezone.utc) < cutoff:
                         continue
                     text_body = msg.message.strip()
                     services = classify(text_body)
