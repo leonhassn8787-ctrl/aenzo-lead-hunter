@@ -8,7 +8,7 @@ It looks for public messages that appear to request AENZO LABS services, then st
 - a Telegram message link when that group type supports one;
 - the sender's public Telegram username only when Telegram exposes it;
 - detected service categories, a conservative priority score, and English outreach with a Bengali meaning;
-- a stable deduplication key.
+- a stable deduplication key that suppresses the same author's identical cross-posted request across groups, while keeping different authors and different requests separate.
 
 A group title is not treated as a verified company name. Unverified identities are labelled **Potential project (verify)**. Every candidate needs human review before outreach.
 
