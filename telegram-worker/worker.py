@@ -114,6 +114,7 @@ SIGNALS = {
         r"looking for (ai|automation) (marketing|promotion|growth)",
         r"need (ai agent|bot|saas) (promotion|marketing|users|growth)",
         r"(promote|market) our (ai agent|trading bot|saas|automation tool)",
+        r"looking for (promotion|marketing) for our (ai agent|trading bot|saas|automation tool)",
     ],
     "Exchange / Wallet Promotion": [
         r"looking for (exchange|wallet) (marketing|promotion|growth)",
