@@ -55,6 +55,13 @@ class LeadSignalTests(unittest.TestCase):
         priority_namespace = {"re": re}
         exec(compile(ast.Module(body=[priority_node], type_ignores=[]), str(WORKER), "exec"), priority_namespace)
         cls.priority = staticmethod(priority_namespace["priority"])
+        outreach_node = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "make_outreach"
+        )
+        outreach_namespace = {}
+        exec(compile(ast.Module(body=[outreach_node], type_ignores=[]), str(WORKER), "exec"), outreach_namespace)
+        cls.make_outreach = staticmethod(outreach_namespace["make_outreach"])
         sender_node = next(
             node for node in tree.body
             if isinstance(node, ast.FunctionDef) and node.name == "is_human_sender"
@@ -111,6 +118,21 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_real_service_request_still_matches(self):
         self.assertIn("KOL & Influencer Marketing", self.classify("Looking for KOLs for our crypto launch"))
+
+    def test_outreach_is_specific_to_detected_service(self):
+        english, bengali = self.make_outreach(["Website Design & Development"])
+        self.assertIn("website design and development", english)
+        self.assertIn("ওয়েবসাইট ডিজাইন ও ডেভেলপমেন্ট", bengali)
+
+    def test_outreach_does_not_invent_project_identity(self):
+        english, bengali = self.make_outreach(["KOL & Influencer Marketing"])
+        self.assertNotIn("Potential project", english)
+        self.assertNotIn("project —", bengali)
+
+    def test_outreach_handles_empty_service_list(self):
+        english, bengali = self.make_outreach([])
+        self.assertIn("Web3 marketing", english)
+        self.assertTrue(bengali)
 
     def test_priority_rewards_explicit_budget_and_urgency(self):
         low = self.priority("Looking for KOLs for our crypto project", ["KOL & Influencer Marketing"])
