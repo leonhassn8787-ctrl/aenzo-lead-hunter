@@ -36,6 +36,8 @@ SIGNALS = {
         r"looking for (kol|kols|influencer|influencers)",
         r"need (kols|influencers)", r"kol campaign", r"influencer campaign",
         r"(crypto|web3) influencer (marketing|campaign|promotion)",
+        r"anyone know (a |any )?(good )?(kol|influencer|influencers)",
+        r"(need|looking for) someone to (run|manage) (our )?(kol|influencer) campaign",
     ],
     "Community Promotion": [
         r"looking for (community|telegram) (growth|promotion|marketing)",
@@ -43,6 +45,8 @@ SIGNALS = {
         r"need telegram community (growth|promotion|marketing)",
         r"grow our (telegram )?community", r"community growth (agency|partner|service)",
         r"telegram group promotion",
+        r"help us grow (our )?(telegram )?community",
+        r"anyone know (a |any )?(community growth|telegram promotion) (agency|team|partner)",
     ],
     "AMA Hosting & Engagement": [
         r"looking for ama", r"need ama (host|hosting|partner)",
@@ -51,6 +55,7 @@ SIGNALS = {
     "PR & Media Visibility": [
         r"looking for pr", r"need pr (agency|service|support)",
         r"media coverage", r"press release", r"crypto pr (agency|services|campaign)",
+        r"get (our )?(project|brand|token) featured", r"need more media exposure",
     ],
     "Giveaways & Airdrops": [
         r"looking for (airdrop|giveaway) (partner|campaign|support)",
@@ -67,6 +72,7 @@ SIGNALS = {
         r"need social media (marketing|management|promotion)",
         r"looking for social media (marketing|management|agency)",
         r"(manage|grow) our (twitter|x|social media)",
+        r"help us grow our (twitter|x) account",
     ],
     "Project Promotion": [
         r"looking for (promotion|marketing) (agency|partner|service)",
@@ -78,6 +84,7 @@ SIGNALS = {
         r"looking for (web|website) (developer|development|agency)",
         r"need website (design|development)", r"build our website",
         r"website redesign (agency|developer|team)",
+        r"need someone to (build|design|develop) our website",
     ],
     "Recruitment": [
         r"looking for (community manager|moderator|developer)",
@@ -123,7 +130,7 @@ SIGNALS = {
     ],
 }
 COMPILED = {name: [re.compile(p, re.I) for p in patterns] for name, patterns in SIGNALS.items()}
-BUYING_CONTEXT = re.compile(r"\b(looking for|need|seeking|hiring|searching for|want to hire|any recommendation|recommend a|partner with)\b", re.I)
+BUYING_CONTEXT = re.compile(r"\b(looking for|looking to work with|in search of|trying to find|need|needs|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|could use help|need help with|help us|partner with|any agency|suggest a)\b", re.I)
 CRYPTO_CONTEXT = re.compile(r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet)\b", re.I)
 NON_BUYER_CONTEXT = re.compile(
     r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
@@ -153,7 +160,8 @@ def classify(text):
     if NON_BUYER_CONTEXT.search(text):
         return []
     hits = [name for name, patterns in COMPILED.items() if any(p.search(text) for p in patterns)]
-    if not hits and BUYING_CONTEXT.search(text) and CRYPTO_CONTEXT.search(text):
+    commercial_need = re.compile(r"\\b(agency|agencies|team|partner|service|services|marketing|promotion|growth|users|user acquisition|visibility|exposure|launch|campaign|community|content|kol|influencer|pr|media|advertising|advertisement|developer|development|website|moderator|ama|airdrop|giveaway|video|design|fundraising)\\b", re.I)
+    if not hits and BUYING_CONTEXT.search(text) and CRYPTO_CONTEXT.search(text) and commercial_need.search(text):
         hits = ["Project Promotion"]
     if not hits or not BUYING_CONTEXT.search(text):
         return []
