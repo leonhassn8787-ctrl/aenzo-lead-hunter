@@ -16,20 +16,23 @@
 - A public sender username is recorded only when Telegram exposes one. No usernames or project identities are invented.
 - The worker is not operational until the required GitHub Actions secrets are configured and a manual scan succeeds.
 
-## One-time Telegram authorization (free route)
-The repository includes an Android-compatible Google Colab notebook:
+## One-time Telegram authorization (Android alternative to Colab)
+
+If Google Colab is inconvenient, an Android phone can run the login helper locally with **Pydroid 3**. Pydroid 3 is listed on Google Play as an Android Python IDE with a pip package manager; the app listing also mentions in-app purchases, so do not buy Premium or any add-on for this project.
+
+1. Install/open Pydroid 3 from Google Play: https://play.google.com/store/apps/details?id=ru.iiec.pydroid3
+2. In Pydroid 3, open its **Pip** menu and install the exact package `Telethon==1.42.0`. Do not install optional native speed-up packages.
+3. Download this repository file to your phone: https://raw.githubusercontent.com/leonhassn8787-ctrl/aenzo-lead-hunter/main/telegram-worker/session_login.py
+4. Open the downloaded `session_login.py` in Pydroid 3 and run it.
+5. Enter your Telegram API ID, API Hash, phone number with country code, and the login code in the local Pydroid console. Enter your Telegram 2-step password only if requested.
+6. After successful login, the script prints a **Telegram StringSession**. Copy it directly into the GitHub Actions secret named `TELEGRAM_SESSION_STRING`.
+
+The Pydroid route is a practical Android alternative, but it has not yet been tested on this specific phone. If Pydroid asks for a paid Premium feature, stop and do not pay. Do not send the login code, 2-step password, API Hash, or Session string in ChatGPT, Telegram chats, screenshots, or public files.
+
+The optional Colab route remains available if preferred:
 https://colab.research.google.com/github/leonhassn8787-ctrl/aenzo-lead-hunter/blob/main/telegram-worker/AENZO_Telegram_Login.ipynb
 
-The notebook uses ordinary input prompts (not ipywidgets). Run its code cell. It asks privately for:
-- Telegram API ID
-- Telegram API Hash (hidden input)
-- Phone number with country code
-- Telegram login code (hidden input)
-- Telegram 2-step verification password only if Telegram requests it
-
-After successful authorization, it prints a **Telegram StringSession**. This string grants access to the Telegram account and must be treated like a password. Copy it directly into the GitHub Actions secret named `TELEGRAM_SESSION_STRING`. Never send it in chat, put it in a public file, or commit it to this repository.
-
-If the notebook cannot run on the device, stop rather than repeatedly retrying. Do not use paid Codespaces or paid hosting for this project.
+A Telegram StringSession grants access to the Telegram account and must be treated like a password. Never send it in chat, put it in a public file, or commit it to this repository.
 
 ## Required GitHub Actions secrets
 Open:
