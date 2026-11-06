@@ -48,6 +48,13 @@ class LeadSignalTests(unittest.TestCase):
         }
         exec(compile(ast.Module(body=[classify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
         cls.classify = staticmethod(namespace["classify"])
+        priority_node = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "priority"
+        )
+        priority_namespace = {"re": re}
+        exec(compile(ast.Module(body=[priority_node], type_ignores=[]), str(WORKER), "exec"), priority_namespace)
+        cls.priority = staticmethod(priority_namespace["priority"])
         sender_node = next(
             node for node in tree.body
             if isinstance(node, ast.FunctionDef) and node.name == "is_human_sender"
@@ -104,6 +111,26 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_real_service_request_still_matches(self):
         self.assertIn("KOL & Influencer Marketing", self.classify("Looking for KOLs for our crypto launch"))
+
+    def test_priority_rewards_explicit_budget_and_urgency(self):
+        low = self.priority("Looking for KOLs for our crypto project", ["KOL & Influencer Marketing"])
+        high = self.priority(
+            "Need KOLs urgently, budget approved, paid campaign, DM me",
+            ["KOL & Influencer Marketing"],
+        )
+        self.assertGreater(high, low)
+
+    def test_priority_is_capped(self):
+        score = self.priority(
+            "Need urgent paid budget ASAP DM me send proposal",
+            ["A", "B", "C", "D", "E", "F"],
+        )
+        self.assertLessEqual(score, 95)
+
+    def test_priority_does_not_treat_multiple_categories_as_proof(self):
+        one = self.priority("Need marketing", ["A"])
+        many = self.priority("Need marketing", ["A", "B", "C", "D"])
+        self.assertLessEqual(many - one, 10)
 
     def test_classifier_accepts_real_buying_intent(self):
         self.assertIn("Giveaways & Airdrops", self.classify("Need a giveaway campaign for our token launch"))
