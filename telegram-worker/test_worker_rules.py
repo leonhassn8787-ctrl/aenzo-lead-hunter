@@ -239,6 +239,7 @@ class LeadSignalTests(unittest.TestCase):
     def test_classifier_accepts_searching_for_and_want_to_hire_intent(self):
         self.assertIn("KOL & Influencer Marketing", self.classify("Searching for KOLs for our Web3 launch"))
         self.assertIn("KOL & Influencer Marketing", self.classify("We want to hire KOLs for our crypto launch"))
+        self.assertIn("KOL & Influencer Marketing", self.classify("Need help with our KOL campaign for the token launch"))
 
     def test_classifier_accepts_partner_with_intent(self):
         self.assertIn("Project Promotion", self.classify("We want to partner with a Web3 marketing agency"))
