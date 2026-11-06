@@ -13,7 +13,7 @@ It looks for public messages that appear to request AENZO LABS services, then st
 A group title is not treated as a verified company name. Unverified identities are labelled **Potential project (verify)**. Every candidate needs human review before outreach.
 
 ## Accuracy and scan limits
-- Detection is rule-based. It can miss real requests and may flag irrelevant messages.
+- Detection uses a broader rule-based reading of natural group wording (recommendation requests, requests for help, partner searches, and service needs), not only exact service keywords. It is not a full language model: indirect, slang-heavy, multilingual, or context-dependent requests can still be missed or misclassified. Review every candidate before outreach.
 - The first scan checks up to `MAX_MESSAGES_PER_GROUP` messages from the last `LOOKBACK_DAYS` days in each group.
 - Messages are processed oldest-first. If a group has more than one batch of unseen messages, the next run continues from the saved cursor rather than skipping the backlog.
 - If saving or resolving a candidate fails, that group's cursor is held so the failed message can be retried.
