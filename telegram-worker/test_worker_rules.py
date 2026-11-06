@@ -38,6 +38,13 @@ class LeadSignalTests(unittest.TestCase):
                 r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet)\b",
                 re.I,
             ),
+            "NON_BUYER_CONTEXT": re.compile(
+                r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
+                r"hire me|anyone hiring me|free airdrop|airdrop claim|claim (my )?airdrop|"
+                r"token price prediction|price prediction|trading signals|wallet (is )?(not working|stuck)|"
+                r"account (is )?(locked|suspended))\b",
+                re.I,
+            ),
         }
         exec(compile(ast.Module(body=[classify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
         cls.classify = staticmethod(namespace["classify"])
@@ -82,6 +89,21 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_unknown_sender_is_kept_for_manual_review(self):
         self.assertTrue(self.is_human_sender(None))
+
+    def test_job_seeker_is_not_a_client_lead(self):
+        self.assertEqual(self.classify("Looking for a job in a Web3 project"), [])
+
+    def test_free_airdrop_hunter_is_not_a_client_lead(self):
+        self.assertEqual(self.classify("Anyone know how to claim a free airdrop?"), [])
+
+    def test_price_prediction_request_is_not_a_client_lead(self):
+        self.assertEqual(self.classify("Looking for token price prediction"), [])
+
+    def test_wallet_support_issue_is_not_a_client_lead(self):
+        self.assertEqual(self.classify("My wallet is not working, need help"), [])
+
+    def test_real_service_request_still_matches(self):
+        self.assertIn("KOL & Influencer Marketing", self.classify("Looking for KOLs for our crypto launch"))
 
     def test_classifier_accepts_real_buying_intent(self):
         self.assertIn("Giveaways & Airdrops", self.classify("Need a giveaway campaign for our token launch"))
