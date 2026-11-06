@@ -125,6 +125,13 @@ SIGNALS = {
 COMPILED = {name: [re.compile(p, re.I) for p in patterns] for name, patterns in SIGNALS.items()}
 BUYING_CONTEXT = re.compile(r"\b(looking for|need|seeking|hiring|searching for|want to hire|any recommendation|recommend a|partner with|agency|service provider)\b", re.I)
 CRYPTO_CONTEXT = re.compile(r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet)\b", re.I)
+NON_BUYER_CONTEXT = re.compile(
+    r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
+    r"hire me|anyone hiring me|free airdrop|airdrop claim|claim (my )?airdrop|"
+    r"token price prediction|price prediction|trading signals|wallet (is )?(not working|stuck)|"
+    r"account (is )?(locked|suspended))\b",
+    re.I,
+)
 
 def read_state():
     try:
@@ -139,6 +146,10 @@ def write_state(state):
     tmp.replace(STATE_FILE)
 
 def classify(text):
+    # Exclude common non-buyer chatter before applying service-intent rules.
+    # This is deliberately conservative; uncertain messages are not promoted.
+    if NON_BUYER_CONTEXT.search(text):
+        return []
     hits = [name for name, patterns in COMPILED.items() if any(p.search(text) for p in patterns)]
     if not hits and BUYING_CONTEXT.search(text) and CRYPTO_CONTEXT.search(text):
         hits = ["Project Promotion"]
