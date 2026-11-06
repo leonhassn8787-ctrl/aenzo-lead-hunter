@@ -185,7 +185,7 @@ def is_human_sender(sender):
 def priority(text, hits):
     """Conservative 0-100 ranking; score reflects evidence, not certainty."""
     score = 35
-    if re.search(r"\b(looking for|need|seeking|hiring|want to hire|searching for)\b", text, re.I):
+    if re.search(r"\b(looking for|looking to work with|in search of|trying to find|need|needs|seeking|hiring|want to hire|want someone to|need someone to|searching for|anyone know|does anyone know|can anyone recommend|need help with|help us|partner with)\b", text, re.I):
         score += 20
     if re.search(r"\b(budget|paid|payment|pricing|quote|rates|cost)\b", text, re.I):
         score += 15
