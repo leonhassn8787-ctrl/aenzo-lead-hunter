@@ -31,7 +31,7 @@ class LeadSignalTests(unittest.TestCase):
         namespace = {
             "COMPILED": cls.patterns,
             "BUYING_CONTEXT": re.compile(
-                r"\b(looking for|need|seeking|hiring|searching for|want to hire|any recommendation|recommend a|partner with|agency|service provider)\b",
+                r"\b(looking for|need|seeking|hiring|searching for|want to hire|any recommendation|recommend a|partner with)\b",
                 re.I,
             ),
             "CRYPTO_CONTEXT": re.compile(
@@ -182,6 +182,13 @@ class LeadSignalTests(unittest.TestCase):
         one = self.priority("Need marketing", ["A"])
         many = self.priority("Need marketing", ["A", "B", "C", "D"])
         self.assertLessEqual(many - one, 10)
+
+
+    def test_agency_self_promotion_is_not_a_client_lead(self):
+        self.assertEqual(self.classify("We are a Web3 marketing agency offering KOL services"), [])
+
+    def test_service_provider_description_is_not_a_client_lead(self):
+        self.assertEqual(self.classify("Our crypto agency provides community growth services"), [])
 
     def test_classifier_accepts_real_buying_intent(self):
         self.assertIn("Giveaways & Airdrops", self.classify("Need a giveaway campaign for our token launch"))
