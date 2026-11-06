@@ -46,6 +46,7 @@ SIGNALS = {
         r"grow our (telegram )?community", r"community growth (agency|partner|service)",
         r"telegram group promotion",
         r"help us grow (our )?(telegram )?community",
+        r"(telegram|community) (group )?(is )?(quiet|inactive|small).*(grow|users|members|engagement)",
         r"anyone know (a |any )?(community growth|telegram promotion) (agency|team|partner)",
     ],
     "AMA Hosting & Engagement": [
@@ -130,7 +131,7 @@ SIGNALS = {
     ],
 }
 COMPILED = {name: [re.compile(p, re.I) for p in patterns] for name, patterns in SIGNALS.items()}
-BUYING_CONTEXT = re.compile(r"\b(looking for|looking to work with|in search of|trying to find|need|needs|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|could use help|need help with|help us|partner with|any agency|suggest a)\b", re.I)
+BUYING_CONTEXT = re.compile(r"\b(looking for|looking to work with|in search of|trying to find|need|needs|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|can anyone help|could use help|need help with|help us|partner with|any agency|suggest a)\b", re.I)
 CRYPTO_CONTEXT = re.compile(r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet)\b", re.I)
 NON_BUYER_CONTEXT = re.compile(
     r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
