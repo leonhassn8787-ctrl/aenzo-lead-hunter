@@ -201,9 +201,14 @@ def classify(text):
     # Indirect growth-pain messages are accepted only when the text clearly
     # mentions marketing, visibility, audience, acquisition, or promotion.
     indirect_growth = (
-        re.search(r"\b(struggling to|not getting enough|trying to increase|"
-                  r"trying to grow|want to grow|want to increase|want to attract|"
-                  r"could use more)\b", text, re.I)
+        re.search(
+            r"\b(struggling to|having trouble|not getting (enough|many)|"
+            r"trying to (increase|grow|attract|reach)|want to (grow|increase|attract|reach)|"
+            r"could use more|how can we (get|attract|reach|grow|increase)|"
+            r"what.s the best way to (get|attract|reach|grow|increase))\b",
+            text,
+            re.I,
+        )
         and marketing_intent.search(text)
     )
     if not buyer_intent.search(text) and not indirect_growth:
