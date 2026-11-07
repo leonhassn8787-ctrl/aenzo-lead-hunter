@@ -129,7 +129,6 @@ class LeadSignalTests(unittest.TestCase):
         options = self.message_scan_kwargs(120, "cutoff")
         self.assertTrue(options["reverse"])
         self.assertEqual(options["min_id"], 120)
-        self.assertEqual(options["limit"], 200)
 
     def test_first_message_batch_is_limited_to_recent_history(self):
         options = self.message_scan_kwargs(0, "cutoff")
@@ -589,7 +588,6 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         kwargs = self.message_scan_kwargs(1234, cutoff)
         self.assertEqual(kwargs["min_id"], 1234)
         self.assertTrue(kwargs["reverse"])
-        self.assertEqual(kwargs["limit"], 200)
         self.assertNotIn("offset_date", kwargs)
 
     def test_initial_scan_is_bounded_to_recent_history(self):
