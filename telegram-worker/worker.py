@@ -160,16 +160,62 @@ def write_state(state):
     tmp.replace(STATE_FILE)
 
 def classify(text):
-    # Exclude common non-buyer chatter before applying service-intent rules.
-    # This is deliberately conservative; uncertain messages are not promoted.
-    if NON_BUYER_CONTEXT.search(text):
+    """Return only messages with a clear request for an AENZO-relevant service."""
+    if not text or NON_BUYER_CONTEXT.search(text):
         return []
-    hits = [name for name, patterns in COMPILED.items() if any(p.search(text) for p in patterns)]
-    commercial_need = re.compile(r"\b(agency|agencies|team|partner|service|services|marketing|promotion|promote|grow|growth|attract|reach|audience|traction|awareness|buzz|attention|engagement|acquisition|registrations|signups|downloads|users|user acquisition|visibility|exposure|launch|campaign|community|content|kol|influencer|pr|media|advertising|advertisement|developer|development|website|moderator|ama|airdrop|giveaway|video|design|fundraising)\b", re.I)
-    if not hits and BUYING_CONTEXT.search(text) and CRYPTO_CONTEXT.search(text) and commercial_need.search(text):
+
+    # Technical hiring/help (e.g. token launch specialists) is not automatically
+    # a marketing lead. Keep these out unless a separate marketing request exists.
+    technical_only = re.compile(
+        r"\b(specialist|specialists|developer|developers|programmer|programmers|"
+        r"auditor|auditors|smart contract|solidity|transfer hook|token[- ]?2022|"
+        r"rpc|node operator|liquidity provider|market maker|arbitrage|"
+        r"buy usdt|sell usdt|usdt exchange|cash deposit|cvv|carding)\b",
+        re.I,
+    )
+    marketing_intent = re.compile(
+        r"\b(kol|kols|influencer|influencers|marketing|promotion|promote|"
+        r"community growth|community promotion|pr agency|media coverage|"
+        r"press release|ama hosting|giveaway campaign|airdrop campaign|"
+        r"social media management|content marketing|content distribution|"
+        r"brand awareness|user acquisition|grow our audience|increase visibility|"
+        r"launch promotion|project promotion|advertising|paid campaign)\b",
+        re.I,
+    )
+    buyer_intent = re.compile(
+        r"\b(looking for|searching for|seeking|need|needs|want to hire|"
+        r"hiring|want to work with|looking to work with|need help with|"
+        r"can anyone recommend|does anyone know|anyone know|who can help|"
+        r"can someone help|anyone able to|partner with|could use|"
+        r"struggling to|not getting enough|trying to increase|"
+        r"trying to grow|want to grow|want to increase|want to attract)\b",
+        re.I,
+    )
+
+    hits = [
+        name for name, patterns in COMPILED.items()
+        if any(pattern.search(text) for pattern in patterns)
+    ]
+
+    # A named AENZO service plus explicit buyer language is required.
+    # Indirect growth-pain messages are accepted only when the text clearly
+    # mentions marketing, visibility, audience, acquisition, or promotion.
+    indirect_growth = (
+        re.search(r"\b(struggling to|not getting enough|trying to increase|"
+                  r"trying to grow|want to grow|want to increase|want to attract|"
+                  r"could use more)\b", text, re.I)
+        and marketing_intent.search(text)
+    )
+    if not buyer_intent.search(text) and not indirect_growth:
+        return []
+
+    # Do not turn technical token-launch requests into marketing prospects.
+    if technical_only.search(text) and not marketing_intent.search(text):
+        return []
+
+    if not hits and marketing_intent.search(text):
         hits = ["Project Promotion"]
-    if not hits or not BUYING_CONTEXT.search(text):
-        return []
+
     return hits
 
 def make_message_url(entity, message_id):
