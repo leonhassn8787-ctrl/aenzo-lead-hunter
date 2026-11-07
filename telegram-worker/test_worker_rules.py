@@ -650,16 +650,20 @@ class GroupScanningOptimizationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         tree = ast.parse(WORKER.read_text(encoding="utf-8"))
-        wanted = {"group_priority", "should_pause_group", "message_scan_kwargs"}
+        wanted = {
+            "group_priority", "should_pause_group", "message_scan_kwargs",
+            "reset_group_quality_metrics",
+        }
         nodes = [
             node for node in tree.body
             if isinstance(node, ast.FunctionDef) and node.name in wanted
         ]
-        namespace = {}
+        namespace = {"CLASSIFIER_RULES_VERSION": 3}
         exec(compile(ast.Module(body=nodes, type_ignores=[]), str(WORKER), "exec"), namespace)
         cls.group_priority = staticmethod(namespace["group_priority"])
         cls.should_pause_group = staticmethod(namespace["should_pause_group"])
         cls.message_scan_kwargs = staticmethod(namespace["message_scan_kwargs"])
+        cls.reset_group_quality_metrics = staticmethod(namespace["reset_group_quality_metrics"])
 
     def test_only_unseen_messages_are_requested_after_initial_scan(self):
         from datetime import datetime, timezone
@@ -691,3 +695,28 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         self.assertFalse(self.should_pause_group({
             "messages_seen": 199, "seller_ads": 100, "qualified_leads": 0
         }))
+
+    def test_classifier_upgrade_resets_stale_group_quality_but_keeps_cursor(self):
+        state = {
+            "version": 2,
+            "groups": {
+                "group-1": {
+                    "last_seen_id": 9876,
+                    "messages_seen": 500,
+                    "seller_ads": 180,
+                    "buyer_signals": 15,
+                    "qualified_leads": 7,
+                    "paused_until": "2026-11-15T00:00:00+00:00",
+                }
+            },
+        }
+        self.assertTrue(self.reset_group_quality_metrics(state))
+        meta = state["groups"]["group-1"]
+        self.assertEqual(meta["last_seen_id"], 9876)
+        self.assertEqual(meta["messages_seen"], 0)
+        self.assertEqual(meta["seller_ads"], 0)
+        self.assertEqual(meta["buyer_signals"], 0)
+        self.assertEqual(meta["qualified_leads"], 0)
+        self.assertIsNone(meta["paused_until"])
+        self.assertEqual(state["classifier_rules_version"], 3)
+        self.assertFalse(self.reset_group_quality_metrics(state))
