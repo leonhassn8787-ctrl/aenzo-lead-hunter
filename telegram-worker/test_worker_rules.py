@@ -538,5 +538,31 @@ class LeadSignalTests(unittest.TestCase):
         ), [])
 
 
+    def test_advertising_infrastructure_and_account_vendors_are_rejected(self):
+        posts = [
+            "HAVING TROUBLE RUNNING YOUR CAMPAIGNS? From account restrictions and rejected ads "
+            "to tracking, conversion setup, landing pages, and campaign configuration — "
+            "we help advertisers get their advertising infrastructure properly set up and ready to launch. "
+            "AVAILABLE SUPPORT Ad account setup & configuration; Campaign creation & optimization; "
+            "Tracking & conversion setup; Landing-page configuration; Technical advertising support. "
+            "For serious advertising projects: @adtech_cloaker",
+            "NEED WHATSAPP + ADS SOLUTIONS THAT CAN SCALE WITH YOU? "
+            "WhatsApp API — 10K • 100K • Unlimited; WhatsApp Messaging & Marketing Tools; "
+            "Meta & Google Ads Solutions; BM5 • BM10 • BM25 • BM50 • BM100 • BM250 • BM500 • BM1K; "
+            "TikTok Ads Accounts; Blue Tick Solutions; Fresh Facebook Accounts & Pages. "
+            "From 5 to 1,000 ad accounts. Fast Setup • Support • Scalable Solutions. "
+            "Ready to scale? @MetaBMExpert",
+        ]
+        for post in posts:
+            with self.subTest(post=post):
+                self.assertEqual(self.classify(post), [])
+
+    def test_buyer_request_for_a_real_marketing_campaign_still_passes_vendor_filter(self):
+        self.assertIn(
+            "Project Promotion",
+            self.classify("Our crypto project needs a paid marketing campaign before launch. "
+                           "We are looking for an agency to manage it."),
+        )
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
