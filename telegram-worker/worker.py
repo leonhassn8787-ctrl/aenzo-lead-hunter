@@ -957,13 +957,14 @@ async def run(once=False):
 
                 if not complete:
                     log.warning(
-                        "Global group search page limit reached for query %r; cursor retained to avoid skipping results.",
+                        "Global group search was incomplete for query %r; processing available messages "
+                        "but retaining the query cursor so remaining results are retried.",
                         query,
                     )
-                    global_search_incomplete += 1
-                    continue
 
-                query_failed = False
+                # Even an incomplete search can contain useful messages. Process
+                # the partial page set, but never advance its cursor until complete.
+                query_failed = not complete
                 for msg in global_messages:
                     if asyncio.get_running_loop().time() - scan_started >= SCAN_BUDGET_SECONDS:
                         query_failed = True
