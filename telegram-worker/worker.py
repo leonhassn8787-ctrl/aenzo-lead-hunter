@@ -35,12 +35,14 @@ LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", "30"))
 GLOBAL_SEARCH_MAX_PAGES = int(os.getenv("GLOBAL_SEARCH_MAX_PAGES", "20"))
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for marketing agency", "need marketing agency",
+    "looking for marketing partner", "looking for crypto marketing",
     "looking for KOL", "need KOL", "looking for influencers",
     "need community growth", "looking for Telegram promotion",
     "need AMA hosting", "looking for PR agency", "need project promotion",
-    "looking for social media marketing", "need giveaway campaign",
-    "looking for beta testers", "looking for launch promotion",
-    "looking for crypto marketing",
+    "promote our project", "need more users",
+    "looking for social media marketing", "looking for content marketing",
+    "need giveaway campaign", "looking for beta testers",
+    "looking for launch promotion", "need website design",
 ]
 
 # Signals that indicate a project may need one or more AENZO services.
