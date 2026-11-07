@@ -660,6 +660,9 @@ async def send_scan_report(http, stats):
         f"Groups available: {stats.get('groups_available', 0)}\n"
         f"Groups scanned: {stats.get('groups_scanned', 0)}\n"
         f"Groups paused: {stats.get('groups_paused', 0)}\n"
+        f"Non-joined public groups found: {stats.get('public_groups_found', 0)}\n"
+        f"Global search queries completed: {stats.get('global_queries_completed', 0)}\n"
+        f"Global search queries incomplete: {stats.get('global_queries_incomplete', 0)}\n"
         f"Messages checked: {stats.get('messages_checked', 0):,}\n"
         f"Seller/vendor posts: {stats.get('seller_posts', 0):,}\n"
         f"Buyer signals: {stats.get('buyer_signals', 0):,}\n"
@@ -838,6 +841,7 @@ async def run(once=False):
                         "notes": (
                             "Auto-detected buying-intent candidate; not independently verified. "
                             f"Source group: {group_name}. Message ID: {msg.id}. "
+                            + (f"Telegram User ID: {getattr(sender, 'id', None)}. " if getattr(sender, "id", None) is not None else "Telegram User ID unavailable. ")
                             + (f"Public sender username: @{username}. " if username else "Public sender username unavailable. ")
                             + ("Direct message permalink unavailable for this group type. " if not group_url else "Message permalink recorded. ")
                             + "Verify the sender's role, project identity, and current service need before outreach."
@@ -1008,6 +1012,9 @@ async def run(once=False):
                 "groups_available": groups_available,
                 "groups_scanned": checked,
                 "groups_paused": paused,
+                "public_groups_found": len(newly_discovered_groups),
+                "global_queries_completed": global_search_complete,
+                "global_queries_incomplete": global_search_incomplete,
                 "messages_checked": messages_checked,
                 "seller_posts": seller_posts,
                 "buyer_signals": buyer_signals,
