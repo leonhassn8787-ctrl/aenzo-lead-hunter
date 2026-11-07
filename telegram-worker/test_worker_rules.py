@@ -449,7 +449,7 @@ class LeadSignalTests(unittest.TestCase):
             self.classify("Our Web3 project is looking for KOLs for a paid launch campaign. Please DM with your rates."),
         )
         self.assertIn(
-            "Project Promotion",
+            "Exchange / Wallet Promotion",
             self.classify("We are looking for a marketing agency to promote our crypto wallet before launch."),
         )
 
