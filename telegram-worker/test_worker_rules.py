@@ -107,6 +107,13 @@ class LeadSignalTests(unittest.TestCase):
         exec(compile(ast.Module(body=[dedupe_node], type_ignores=[]), str(WORKER), "exec"), dedupe_namespace)
         cls.dedupe = staticmethod(dedupe_namespace["dedupe"])
 
+    def test_global_search_scans_groups_without_joining(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn("SearchGlobalRequest", source)
+        self.assertIn("groups_only=True", source)
+        self.assertIn("GLOBAL_GROUP_SEARCH_QUERIES", source)
+        self.assertIn('state.setdefault("global_search", {})', source)
+
     def test_same_author_cross_post_is_deduplicated(self):
         first = self.dedupe("group-a", 100, 42, "Need KOLs for our crypto launch!")
         second = self.dedupe("group-b", 900, 42, "NEED KOLS FOR OUR CRYPTO LAUNCH")
@@ -117,10 +124,10 @@ class LeadSignalTests(unittest.TestCase):
         second = self.dedupe("group-a", 101, 43, "Need KOLs for our crypto launch")
         self.assertNotEqual(first, second)
 
-    def test_distinct_requests_from_same_author_are_kept(self):
+    def test_same_author_is_not_sent_twice_for_a_different_request(self):
         first = self.dedupe("group-a", 100, 42, "Need KOLs for our crypto launch")
         second = self.dedupe("group-a", 101, 42, "Need website design for our crypto launch")
-        self.assertNotEqual(first, second)
+        self.assertEqual(first, second)
 
     def test_dedupe_falls_back_to_message_identity_without_author(self):
         self.assertEqual(self.dedupe("group-a", 100), self.dedupe("group-a", 100))
@@ -423,10 +430,10 @@ class LeadSignalTests(unittest.TestCase):
             [(item["value"], item.get("url")) for item in found],
         )
 
-    def test_long_identical_advertisements_dedupe_across_authors(self):
+    def test_similar_or_identical_text_from_different_authors_stays_separate(self):
         first = self.dedupe("group-a", 1, 111, "A" * 120)
         second = self.dedupe("group-b", 2, 222, "A" * 120)
-        self.assertEqual(first, second)
+        self.assertNotEqual(first, second)
 
     def test_usdt_fund_and_payment_ads_are_rejected(self):
         spam = [
@@ -576,7 +583,7 @@ class GroupScanningOptimizationTests(unittest.TestCase):
             node for node in tree.body
             if isinstance(node, ast.FunctionDef) and node.name in wanted
         ]
-        namespace = {"MAX_MESSAGES_PER_GROUP": 200}
+        namespace = {}
         exec(compile(ast.Module(body=nodes, type_ignores=[]), str(WORKER), "exec"), namespace)
         cls.group_priority = staticmethod(namespace["group_priority"])
         cls.should_pause_group = staticmethod(namespace["should_pause_group"])
@@ -595,7 +602,7 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         cutoff = datetime.now(timezone.utc)
         kwargs = self.message_scan_kwargs(0, cutoff)
         self.assertEqual(kwargs["offset_date"], cutoff)
-        self.assertEqual(kwargs["limit"], 200)
+        self.assertNotIn("limit", kwargs)
 
     def test_groups_with_real_leads_receive_higher_priority(self):
         good = {"qualified_leads": 2, "buyer_signals": 5, "seller_ads": 0}
