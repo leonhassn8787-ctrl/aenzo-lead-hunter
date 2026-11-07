@@ -566,3 +566,51 @@ class LeadSignalTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class GroupScanningOptimizationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        tree = ast.parse(WORKER.read_text(encoding="utf-8"))
+        wanted = {"group_priority", "should_pause_group", "message_scan_kwargs"}
+        nodes = [
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name in wanted
+        ]
+        namespace = {"MAX_MESSAGES_PER_GROUP": 200}
+        exec(compile(ast.Module(body=nodes, type_ignores=[]), str(WORKER), "exec"), namespace)
+        cls.group_priority = namespace["group_priority"]
+        cls.should_pause_group = namespace["should_pause_group"]
+        cls.message_scan_kwargs = namespace["message_scan_kwargs"]
+
+    def test_only_unseen_messages_are_requested_after_initial_scan(self):
+        from datetime import datetime, timezone
+        cutoff = datetime.now(timezone.utc)
+        kwargs = self.message_scan_kwargs(1234, cutoff)
+        self.assertEqual(kwargs["min_id"], 1234)
+        self.assertTrue(kwargs["reverse"])
+        self.assertEqual(kwargs["limit"], 200)
+        self.assertNotIn("offset_date", kwargs)
+
+    def test_initial_scan_is_bounded_to_recent_history(self):
+        from datetime import datetime, timezone
+        cutoff = datetime.now(timezone.utc)
+        kwargs = self.message_scan_kwargs(0, cutoff)
+        self.assertEqual(kwargs["offset_date"], cutoff)
+        self.assertEqual(kwargs["limit"], 200)
+
+    def test_groups_with_real_leads_receive_higher_priority(self):
+        good = {"qualified_leads": 2, "buyer_signals": 5, "seller_ads": 0}
+        noisy = {"qualified_leads": 0, "buyer_signals": 0, "seller_ads": 20}
+        self.assertGreater(self.group_priority(good), self.group_priority(noisy))
+
+    def test_only_vendor_heavy_groups_without_leads_are_snoozed(self):
+        self.assertTrue(self.should_pause_group({
+            "messages_seen": 200, "seller_ads": 80, "qualified_leads": 0
+        }))
+        self.assertFalse(self.should_pause_group({
+            "messages_seen": 200, "seller_ads": 80, "qualified_leads": 1
+        }))
+        self.assertFalse(self.should_pause_group({
+            "messages_seen": 199, "seller_ads": 100, "qualified_leads": 0
+        }))
