@@ -29,7 +29,6 @@ SUPABASE_OWNER_ID = os.environ["SUPABASE_OWNER_ID"]
 BOT_TOKEN = os.getenv("AENZO_BOT_TOKEN", "").strip()
 BOT_CHAT_ID = os.getenv("AENZO_BOT_CHAT_ID", "").strip()
 POLL_SECONDS = int(os.getenv("POLL_SECONDS", "600"))
-MAX_MESSAGES_PER_GROUP = int(os.getenv("MAX_MESSAGES_PER_GROUP", "200"))
 LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", "30"))
 
 # Signals that indicate a project may need one or more AENZO services.
@@ -501,7 +500,6 @@ def supabase_headers(secret_key):
 def message_scan_kwargs(last_seen, cutoff):
     """Fetch oldest unseen messages first so batches cannot skip busy-group traffic."""
     kwargs = {
-        "limit": MAX_MESSAGES_PER_GROUP,
         "min_id": last_seen,
         "reverse": True,
     }
