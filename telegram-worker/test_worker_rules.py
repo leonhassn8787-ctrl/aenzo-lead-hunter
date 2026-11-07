@@ -176,8 +176,8 @@ class LeadSignalTests(unittest.TestCase):
     def test_private_or_unmentioned_contact_is_not_invented(self):
         self.assertEqual(self.extract_public_contacts("We are launching a Web3 project."), [])
 
-    def test_unknown_sender_is_kept_for_manual_review(self):
-        self.assertTrue(self.is_human_sender(None))
+    def test_unknown_sender_is_excluded(self):
+        self.assertFalse(self.is_human_sender(None))
 
     def test_job_seeker_is_not_a_client_lead(self):
         self.assertEqual(self.classify("Looking for a job in a Web3 project"), [])
