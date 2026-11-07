@@ -13,7 +13,7 @@ It looks for public messages that appear to request AENZO LABS services, then st
 A group title is not treated as a verified company name. Unverified identities are labelled **Potential project (verify)**. Every candidate needs human review before outreach.
 
 ## Accuracy and scan limits
-- Detection uses a broader rule-based reading of natural group wording (recommendation requests, requests for help, partner searches, and service needs), not only exact service keywords. It is not a full language model: indirect, slang-heavy, multilingual, or context-dependent requests can still be missed or misclassified. Review every candidate before outreach.
+- Detection requires an AENZO-relevant service signal plus buyer intent. Generic crypto discussion, technical token-launch help, USDT/arbitrage/payment promotions, job-seeking, bot posts, and agency self-advertising are excluded. Indirect growth problems are accepted only when marketing/audience/visibility context is present. This is rule-based, not a full language model: slang-heavy, multilingual, or context-dependent requests can still be missed or misclassified. Review every candidate before outreach.
 - The first scan checks up to `MAX_MESSAGES_PER_GROUP` messages from the last `LOOKBACK_DAYS` days in each group.
 - Messages are processed oldest-first. If a group has more than one batch of unseen messages, the next run continues from the saved cursor rather than skipping the backlog.
 - If saving or resolving a candidate fails, that group's cursor is held so the failed message can be retried.
@@ -51,7 +51,6 @@ pkg update -y
 pkg install python git -y
 git clone https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter.git
 cd aenzo-lead-hunter/telegram-worker
-python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 python session_login.py
 ```
