@@ -283,6 +283,26 @@ class LeadSignalTests(unittest.TestCase):
     def test_classifier_accepts_generic_crypto_agency_request(self):
         self.assertIn("Project Promotion", self.classify("Looking for a marketing agency for our crypto wallet"))
 
+    def test_generic_user_acquisition_without_digital_project_context_is_rejected(self):
+        for message in [
+            "Looking for users",
+            "Need more audience",
+            "Searching for signups",
+            "We need more traction",
+        ]:
+            with self.subTest(message=message):
+                self.assertEqual(self.classify(message), [])
+
+    def test_indirect_growth_request_with_digital_project_context_is_accepted(self):
+        self.assertIn("Project Promotion", self.classify("Looking for more users for our new SaaS app"))
+        self.assertIn("Project Promotion", self.classify("We need more signups for our Web3 platform"))
+        self.assertIn("Project Promotion", self.classify("Trying to increase visibility for our digital product"))
+
+    def test_developer_recruitment_is_not_blocked_as_technical_only(self):
+        self.assertIn("Recruitment", self.classify("We are looking for a developer for our Web3 wallet project"))
+        self.assertIn("Recruitment", self.classify("Hiring a community manager and moderators for our crypto project"))
+        self.assertEqual(self.classify("Looking for a Solidity smart contract auditor"), [])
+
     def test_classifier_accepts_searching_for_and_want_to_hire_intent(self):
         self.assertIn("KOL & Influencer Marketing", self.classify("Searching for KOLs for our Web3 launch"))
         self.assertIn("KOL & Influencer Marketing", self.classify("We want to hire KOLs for our crypto launch"))
@@ -723,6 +743,18 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         self.assertIsNone(meta["paused_until"])
         self.assertEqual(state["classifier_rules_version"], 3)
         self.assertFalse(self.reset_group_quality_metrics(state))
+
+    def test_rejected_leads_are_excluded_from_telegram_notification_queue(self):
+        source = WORKER.read_text(encoding="utf-8")
+        start = source.index("async def notify_pending_leads")
+        end = source.index("async def send_scan_report", start)
+        notification_code = source[start:end]
+        self.assertIn("'status': 'eq.new'", notification_code)
+        self.assertIn("'telegram_notified_at': 'is.null'", notification_code)
+        self.assertIn("'owner_id': 'eq.' + SUPABASE_OWNER_ID", notification_code)
+        self.assertIn("'limit': '25'", notification_code)
+
+
 
 class GlobalSearchPaginationTests(unittest.TestCase):
     @classmethod
