@@ -46,6 +46,12 @@ class LeadSignalTests(unittest.TestCase):
                 and any(isinstance(target, ast.Name) and target.id == "NON_BUYER_CONTEXT" for target in node.targets)
             ),
         }
+        namespace["SELLER_AD_CONTEXT"] = next(
+            eval(compile(ast.Expression(body=node.value), str(WORKER), "eval"), {"re": re})
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(target.id == "SELLER_AD_CONTEXT" for target in node.targets if isinstance(target, ast.Name))
+        )
         exec(compile(ast.Module(body=[classify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
         cls.classify = staticmethod(namespace["classify"])
         priority_node = next(
@@ -488,6 +494,26 @@ class LeadSignalTests(unittest.TestCase):
         )
 
     def test_vendor_inventory_and_rental_posts_are_rejected(self):
+        posts = [
+            "Meta Ads accounts available for rent. DM me for availability.",
+            "I have TikTok advertising account rental and purchase options available.",
+            "Facebook ad accounts for sale. Message me your niche.",
+        ]
+        for message in posts:
+            with self.subTest(message=message):
+                self.assertEqual(self.classify(message), [])
+
+    def test_meta_tiktok_account_rental_ad_is_not_a_client_lead(self):
+        self.assertEqual(
+            self.classify(
+                "Still looking for a reliable Meta or TikTok advertising account for your next campaign? "
+                "I have rental + purchase options available. For legitimate businesses, agencies & media buyers. "
+                "DM me your platform + niche and let's check availability."
+            ),
+            [],
+        )
+
+    def test_vendor_account_inventory_is_rejected(self):
         posts = [
             "Meta Ads accounts available for rent. DM me for availability.",
             "I have TikTok advertising account rental and purchase options available.",
