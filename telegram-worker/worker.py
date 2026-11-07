@@ -159,6 +159,10 @@ CRYPTO_CONTEXT = re.compile(r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|e
 SELLER_AD_CONTEXT = re.compile(
     r"\b("
     r"rental\s*(\+|and|&)\s*purchase options|"
+    r"looking for (reliable )?(advertising|ad account|lead generation) (solutions|options|services) for your campaigns?|"
+    r"need help with (ad accounts?|advertising accounts?|campaign approvals?|account setup|campaign setup|tracking|performance)|"
+    r"we only deal with (verified )?accounts|"
+    r"available lead categories|high.converting.{0,40}leads|niche.targeted leads|"
     r"(meta|tiktok|facebook|google) ads? accounts? (for rent|available|for sale)|"
     r"(account|accounts) (rental|rentals|for rent|for purchase|for sale)|"
     r"(i|we) have .{0,100} (options|accounts|services|packages) available|"
@@ -182,7 +186,13 @@ SELLER_AD_CONTEXT = re.compile(
 
 SELLER_POST_CONTEXT = re.compile(
     r"\b("
-    r"we (offer|provide|specialize in|are offering|can provide|help|support|work with)|"
+    r"we (offer|provide|specialize in|are offering|can provide|help|support|work with|only deal with|deliver|supply|give you access to)|"
+    r"i (offer|provide|specialize in|help|support|work with|only deal with|deliver|supply) (advertisers|businesses|brands|clients|media buyers|agencies|accounts|leads)|"
+    r"we give you access to .{0,100}(database|data|lead|tool)|"
+    r"(our|my) (database|data|leads|accounts|services|solutions|packages) (include|are available|available)|"
+    r"serious buyers only|dm to discuss availability|reliable supplier|"
+    r"available lead categories|high.converting.{0,40}leads|niche.targeted leads|"
+    r"fresh (crypto|investor|business|consumer|email|phone) leads|"
     r"i (offer|provide|specialize in|help|support|work with) (advertisers|businesses|brands|clients|media buyers|agencies)|"
     r"i specialize in (traffic|campaign|advertising|lead|marketing|growth)|"
     r"our (agency|company|team) (offers|provides|specializes in|is offering|can provide)|"
@@ -537,43 +547,82 @@ def message_scan_kwargs(last_seen, cutoff):
     return kwargs
 
 async def fetch_global_group_messages(client, query, min_date, max_date):
-    """Search matching messages across public Telegram groups without joining them."""
-    collected = []
-    offset_rate = 0
-    offset_peer = InputPeerEmpty()
-    offset_id = 0
+    """Search public groups with recursive date windows so busy queries do not starve."""
+    async def fetch_window(window_min, window_max, depth=0):
+        collected = []
+        offset_rate = 0
+        offset_peer = InputPeerEmpty()
+        offset_id = 0
+        saturated = False
 
-    for _ in range(GLOBAL_SEARCH_MAX_PAGES):
-        result = await client(SearchGlobalRequest(
-            q=query,
-            filter=InputMessagesFilterEmpty(),
-            min_date=min_date,
-            max_date=max_date,
-            offset_rate=offset_rate,
-            offset_peer=offset_peer,
-            offset_id=offset_id,
-            limit=100,
-            groups_only=True,
-        ))
-        batch = list(getattr(result, "messages", []) or [])
-        if not batch:
-            return collected, True
-        collected.extend(batch)
+        for _ in range(GLOBAL_SEARCH_MAX_PAGES):
+            result = await client(SearchGlobalRequest(
+                q=query,
+                filter=InputMessagesFilterEmpty(),
+                min_date=window_min,
+                max_date=window_max,
+                offset_rate=offset_rate,
+                offset_peer=offset_peer,
+                offset_id=offset_id,
+                limit=100,
+                groups_only=True,
+            ))
+            batch = list(getattr(result, "messages", []) or [])
+            if not batch:
+                return collected, True
+            collected.extend(batch)
 
-        next_rate = getattr(result, "next_rate", None)
-        if len(batch) < 100 or next_rate is None:
-            return collected, True
+            next_rate = getattr(result, "next_rate", None)
+            if len(batch) < 100 or next_rate is None:
+                return collected, True
 
-        last_message = batch[-1]
-        try:
-            offset_peer = await client.get_input_entity(last_message.peer_id)
-        except Exception:
-            log.exception("Could not resolve global-search pagination peer for query %r.", query)
-            return collected, False
-        offset_id = int(last_message.id)
-        offset_rate = int(next_rate)
+            last_message = batch[-1]
+            try:
+                offset_peer = await client.get_input_entity(last_message.peer_id)
+            except Exception:
+                log.exception("Could not resolve global-search pagination peer for query %r.", query)
+                return collected, False
+            offset_id = int(last_message.id)
+            offset_rate = int(next_rate)
+        else:
+            saturated = True
 
-    return collected, False
+        # A full page limit means this time range may contain more than 300
+        # matches. Split it into overlapping halves and merge by message identity.
+        # The one-second overlap avoids gaps at Telegram's date-boundary semantics.
+        if saturated:
+            if depth >= 16 or window_max - window_min <= 1:
+                log.warning(
+                    "Global search could not fully page query %r in one-second window %s..%s.",
+                    query, window_min, window_max,
+                )
+                return collected, False
+            midpoint = (window_min + window_max) // 2
+            if midpoint <= window_min or midpoint >= window_max:
+                return collected, False
+
+            log.info(
+                "Global search result cap reached for %r; splitting date window %s..%s.",
+                query, window_min, window_max,
+            )
+            left, left_complete = await fetch_window(window_min, midpoint, depth + 1)
+            right, right_complete = await fetch_window(midpoint, window_max, depth + 1)
+            unique = {}
+            for message in left + right:
+                key = (repr(getattr(message, "peer_id", None)), int(getattr(message, "id", 0) or 0))
+                unique.setdefault(key, message)
+            merged = sorted(
+                unique.values(),
+                key=lambda message: (
+                    int(message.date.timestamp()) if getattr(message, "date", None) else 0,
+                    int(getattr(message, "id", 0) or 0),
+                ),
+            )
+            return merged, left_complete and right_complete
+
+        return collected, True
+
+    return await fetch_window(int(min_date), int(max_date))
 
 
 async def save_lead(client_http, payload):
@@ -792,7 +841,7 @@ async def run(once=False):
                 previous_scan = int(query_meta.get("last_scanned_at", 0) or 0)
                 query_min_date = max(
                     int(cutoff.timestamp()),
-                    previous_scan + 1 if previous_scan else int(cutoff.timestamp()),
+                    previous_scan - 2 if previous_scan else int(cutoff.timestamp()),
                 )
                 query_max_date = int(now.timestamp())
                 if query_min_date >= query_max_date:
