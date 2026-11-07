@@ -204,7 +204,6 @@ jobs:
           AENZO_BOT_TOKEN: ${{ secrets.AENZO_BOT_TOKEN }}
           AENZO_BOT_CHAT_ID: ${{ secrets.AENZO_BOT_CHAT_ID }}
           STATE_FILE: scan_state.json
-          MAX_MESSAGES_PER_GROUP: "200"
           LOOKBACK_DAYS: "30"
         run: python worker.py --once
 
