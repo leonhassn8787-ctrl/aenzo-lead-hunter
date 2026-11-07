@@ -601,6 +601,42 @@ async def notify_pending_leads(http):
             log.exception('Telegram notification attempt failed for lead %s; it will be retried.', lead_id)
 
 
+
+async def send_scan_report(http, stats):
+    """Send a compact per-run scan-usage report to the owner's Telegram chat."""
+    if not BOT_TOKEN or not BOT_CHAT_ID:
+        log.info("Telegram scan reports are not configured; skipping scan report.")
+        return
+    minutes = int(stats.get("duration_seconds", 0)) // 60
+    seconds = int(stats.get("duration_seconds", 0)) % 60
+    report = (
+        "📊 AENZO LABS SCAN REPORT\\n\\n"
+        f"Groups available: {stats.get('groups_available', 0)}\\n"
+        f"Groups scanned: {stats.get('groups_scanned', 0)}\\n"
+        f"Groups paused: {stats.get('groups_paused', 0)}\\n"
+        f"Messages checked: {stats.get('messages_checked', 0):,}\\n"
+        f"Seller/vendor posts: {stats.get('seller_posts', 0):,}\\n"
+        f"Buyer signals: {stats.get('buyer_signals', 0):,}\\n"
+        f"New leads saved: {stats.get('leads_saved', 0)}\\n"
+        f"Duplicate leads: {stats.get('duplicates', 0)}\\n"
+        f"Scan duration: {minutes}m {seconds}s\\n\\n"
+        "Note: message count is the number actually processed in this run; "
+        "older messages are not intentionally rescanned."
+    )
+    try:
+        response = await http.post(
+            "https://api.telegram.org/bot" + BOT_TOKEN + "/sendMessage",
+            json={"chat_id": BOT_CHAT_ID, "text": report, "disable_web_page_preview": True},
+            timeout=30,
+        )
+        if response.status_code != 200 or not response.json().get("ok"):
+            log.error("Telegram scan report failed: %s", response.text[:500])
+        else:
+            log.info("Telegram scan report delivered.")
+    except Exception:
+        log.exception("Could not send Telegram scan report.")
+
+
 async def login(client):
     await client.connect()
     if await client.is_user_authorized():
@@ -639,9 +675,14 @@ async def run(once=False):
     groups_state = state.setdefault("groups", {})
     async with httpx.AsyncClient() as http:
         while True:
+            scan_started = asyncio.get_running_loop().time()
             checked = 0
             saved = 0
             paused = 0
+            messages_checked = 0
+            seller_posts = 0
+            buyer_signals = 0
+            duplicates = 0
             cutoff = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
             now = datetime.now(timezone.utc)
             dialogs = []
@@ -651,6 +692,8 @@ async def run(once=False):
                 if not bool(getattr(dialog, "is_group", False)) or bool(getattr(entity, "broadcast", False)):
                     continue
                 dialogs.append(dialog)
+
+            groups_available = len(dialogs)
 
             # Groups with a history of genuine buyer signals are checked first.
             dialogs.sort(
@@ -706,13 +749,16 @@ async def run(once=False):
                         continue
 
                     text_body = msg.message.strip()
+                    messages_checked += 1
                     meta["messages_seen"] = int(meta.get("messages_seen", 0)) + 1
                     if SELLER_AD_CONTEXT.search(text_body) or SELLER_POST_CONTEXT.search(text_body):
+                        seller_posts += 1
                         meta["seller_ads"] = int(meta.get("seller_ads", 0)) + 1
 
                     services = classify(text_body)
                     if not services:
                         continue
+                    buyer_signals += 1
                     meta["buyer_signals"] = int(meta.get("buyer_signals", 0)) + 1
                     try:
                         sender = await msg.get_sender()
@@ -757,6 +803,7 @@ async def run(once=False):
                         saved += 1
                         meta["qualified_leads"] = int(meta.get("qualified_leads", 0)) + 1
                     elif save_status == "duplicate":
+                        duplicates += 1
                         meta["qualified_leads"] = int(meta.get("qualified_leads", 0)) + 1
                     elif save_status == "error":
                         group_write_failed = True
@@ -777,7 +824,22 @@ async def run(once=False):
 
             write_state(state)
             await notify_pending_leads(http)
-            log.info("Scan complete: %s groups checked; %s new leads saved.", checked, saved)
+            duration_seconds = asyncio.get_running_loop().time() - scan_started
+            await send_scan_report(http, {
+                "groups_available": groups_available,
+                "groups_scanned": checked,
+                "groups_paused": paused,
+                "messages_checked": messages_checked,
+                "seller_posts": seller_posts,
+                "buyer_signals": buyer_signals,
+                "leads_saved": saved,
+                "duplicates": duplicates,
+                "duration_seconds": duration_seconds,
+            })
+            log.info(
+                "Scan complete: %s/%s groups checked; %s messages checked; %s new leads saved; %.1fs.",
+                checked, groups_available, messages_checked, saved, duration_seconds
+            )
             if once:
                 break
             await asyncio.sleep(POLL_SECONDS)
