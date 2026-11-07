@@ -505,6 +505,15 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("if public_message_key in run_seen_public_messages", source)
         self.assertIn("seller_posts += 1", source)
 
+    def test_incomplete_public_search_still_processes_partial_messages_without_advancing_cursor(self):
+        source = WORKER.read_text(encoding="utf-8")
+        start = source.index("if not complete:", source.index("async def run"))
+        end = source.index("query_failed = not complete", start)
+        incomplete_branch = source[start:end]
+        self.assertIn("processing available messages", incomplete_branch)
+        self.assertNotIn("continue", incomplete_branch)
+        self.assertIn("if query_failed:", source[end:])
+
     def test_global_search_cursor_overlaps_boundary_to_avoid_missed_seconds(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("previous_scan - 2 if previous_scan", source)
@@ -753,6 +762,13 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         self.assertIn("'telegram_notified_at': 'is.null'", notification_code)
         self.assertIn("'owner_id': 'eq.' + SUPABASE_OWNER_ID", notification_code)
         self.assertIn("'limit': '25'", notification_code)
+
+    def test_worker_numeric_environment_settings_are_bounded(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn('bounded_int_env("POLL_SECONDS", 600, 60, 86400)', source)
+        self.assertIn('bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)', source)
+        self.assertIn('bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)', source)
+        self.assertIn('bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)', source)
 
 
 
