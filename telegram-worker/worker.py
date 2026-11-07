@@ -167,6 +167,14 @@ SELLER_AD_CONTEXT = re.compile(
     re.I,
 )
 
+SELLER_POST_CONTEXT = re.compile(
+    r"\b(we (offer|provide|specialize in|are offering|can provide)|"
+    r"our (agency|company|team) (offers|provides|specializes in|is offering)|"
+    r"available for paid promotions|kol services available|"
+    r"marketing packages available|dm us for rates|contact us for pricing)\b",
+    re.I,
+)
+
 NON_BUYER_CONTEXT = re.compile(
     r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
     r"hire me|anyone hiring me|free airdrop|airdrop claim|claim (my )?airdrop|"
@@ -198,16 +206,49 @@ NON_BUYER_CONTEXT = re.compile(
 )
 
 def read_state():
+    """Load versioned scan state and migrate the previous flat cursor map safely."""
     try:
-        return json.loads(STATE_FILE.read_text())
+        raw = json.loads(STATE_FILE.read_text())
     except Exception:
-        return {}
+        raw = {}
+    if isinstance(raw, dict) and raw.get("version") == 2 and isinstance(raw.get("groups"), dict):
+        return raw
+    groups = {}
+    if isinstance(raw, dict):
+        for group_id, last_seen in raw.items():
+            try:
+                groups[str(group_id)] = {
+                    "last_seen_id": max(0, int(last_seen)),
+                    "messages_seen": 0,
+                    "seller_ads": 0,
+                    "buyer_signals": 0,
+                    "qualified_leads": 0,
+                    "paused_until": None,
+                }
+            except (TypeError, ValueError):
+                continue
+    return {"version": 2, "groups": groups}
 
 def write_state(state):
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     tmp = STATE_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(state))
     tmp.replace(STATE_FILE)
+
+def group_priority(meta):
+    """Prefer groups with proven buyer signals while mildly penalizing vendor-heavy groups."""
+    return (
+        min(int(meta.get("qualified_leads", 0)), 100) * 100
+        + min(int(meta.get("buyer_signals", 0)), 200) * 10
+        - min(int(meta.get("seller_ads", 0)), 200)
+    )
+
+def should_pause_group(meta):
+    """Only snooze a group after a meaningful sample dominated by seller ads."""
+    messages = int(meta.get("messages_seen", 0))
+    sellers = int(meta.get("seller_ads", 0))
+    qualified = int(meta.get("qualified_leads", 0))
+    return qualified == 0 and messages >= 200 and sellers / max(messages, 1) >= 0.35
 
 def classify(text):
     """Return only messages with a clear request for an AENZO-relevant service."""
@@ -595,62 +636,100 @@ async def run(once=False):
         await client.disconnect()
         raise RuntimeError("Telegram session is not authorized. Run 'python worker.py --login' in an interactive shell first.")
     state = read_state()
+    groups_state = state.setdefault("groups", {})
     async with httpx.AsyncClient() as http:
         while True:
             checked = 0
             saved = 0
+            paused = 0
             cutoff = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
+            now = datetime.now(timezone.utc)
+            dialogs = []
             async for dialog in client.iter_dialogs():
                 entity = dialog.entity
-                # Only group conversations: exclude broadcast channels.
-                is_group = bool(getattr(dialog, "is_group", False))
-                if not is_group or bool(getattr(entity, "broadcast", False)):
+                # Scan every accessible group; broadcast-only channels are excluded.
+                if not bool(getattr(dialog, "is_group", False)) or bool(getattr(entity, "broadcast", False)):
                     continue
+                dialogs.append(dialog)
+
+            # Groups with a history of genuine buyer signals are checked first.
+            dialogs.sort(
+                key=lambda dialog: group_priority(
+                    groups_state.get(str(dialog.entity.id), {})
+                ),
+                reverse=True,
+            )
+
+            for dialog in dialogs:
+                entity = dialog.entity
                 group_id = str(entity.id)
-                last_seen = int(state.get(group_id, 0))
+                meta = groups_state.setdefault(group_id, {
+                    "last_seen_id": 0,
+                    "messages_seen": 0,
+                    "seller_ads": 0,
+                    "buyer_signals": 0,
+                    "qualified_leads": 0,
+                    "paused_until": None,
+                })
+                last_seen = int(meta.get("last_seen_id", 0))
+                pause_value = meta.get("paused_until")
+                if pause_value:
+                    try:
+                        pause_until = datetime.fromisoformat(pause_value)
+                        if pause_until.tzinfo is None:
+                            pause_until = pause_until.replace(tzinfo=timezone.utc)
+                    except (TypeError, ValueError):
+                        pause_until = now
+                    if pause_until > now:
+                        paused += 1
+                        continue
+                    # Re-sample a previously snoozed group instead of excluding it forever.
+                    meta.update({
+                        "messages_seen": 0,
+                        "seller_ads": 0,
+                        "buyer_signals": 0,
+                        "qualified_leads": 0,
+                        "paused_until": None,
+                    })
+
                 newest_seen = last_seen
                 group_write_failed = False
                 async for msg in client.iter_messages(entity, **message_scan_kwargs(last_seen, cutoff)):
                     if not msg:
                         continue
-                    # Advance past every Telegram update, including service and
-                    # non-text messages, so quiet groups are not rescanned forever.
                     newest_seen = max(newest_seen, int(msg.id))
-                    # Never treat messages sent by the account owner as client leads.
-                    # The cursor still advances so the same own message is not rechecked.
                     if getattr(msg, "out", False):
                         continue
                     if not msg.message or not msg.date:
                         continue
                     if not last_seen and msg.date.replace(tzinfo=timezone.utc) < cutoff:
                         continue
+
                     text_body = msg.message.strip()
+                    meta["messages_seen"] = int(meta.get("messages_seen", 0)) + 1
+                    if SELLER_AD_CONTEXT.search(text_body) or SELLER_POST_CONTEXT.search(text_body):
+                        meta["seller_ads"] = int(meta.get("seller_ads", 0)) + 1
+
                     services = classify(text_body)
                     if not services:
                         continue
+                    meta["buyer_signals"] = int(meta.get("buyer_signals", 0)) + 1
                     try:
                         sender = await msg.get_sender()
                     except Exception:
-                        # Do not silently lose a lead if Telegram temporarily
-                        # cannot resolve its author; retry this group's cursor.
                         log.exception("Could not resolve message author in group %s, message %s.", group_id, msg.id)
                         group_write_failed = True
                         continue
-                    # Ignore bot-authored posts: they are often automated ads or
-                    # scraper output, not a reliable expression of a buyer's intent.
                     if not is_human_sender(sender):
                         continue
                     username = getattr(sender, "username", None) if sender else None
                     group_name = (getattr(entity, "title", None) or "Telegram group").strip()
                     public_name = getattr(entity, "username", None)
-                    # Private basic groups have no reliable permalink format.
                     group_url = make_message_url(entity, msg.id)
-                    sender_contact = f"https://t.me/{username}" if username else None
-                    project = f"Potential project (verify) — {group_name}"[:250]
                     en, bn = make_outreach(services)
                     payload = {
                         "owner_id": SUPABASE_OWNER_ID,
-                        "company_name": project,
+                        "company_name": f"Potential project (verify) — {group_name}"[:250],
                         "website": None,
                         "industry": "Web3 / Crypto",
                         "service_need": "; ".join(services),
@@ -676,17 +755,26 @@ async def run(once=False):
                     save_status = await save_lead(http, payload)
                     if save_status == "saved":
                         saved += 1
+                        meta["qualified_leads"] = int(meta.get("qualified_leads", 0)) + 1
+                    elif save_status == "duplicate":
+                        meta["qualified_leads"] = int(meta.get("qualified_leads", 0)) + 1
                     elif save_status == "error":
                         group_write_failed = True
-                # Do not move this group's cursor past any message whose lead
-                # could not be checked/saved; the next run will retry it.
+
                 if not group_write_failed:
-                    state[group_id] = max(last_seen, newest_seen)
+                    meta["last_seen_id"] = max(last_seen, newest_seen)
                 else:
                     log.warning("Keeping cursor unchanged for group %s so failed writes can be retried.", group_id)
+
+                # Vendor-heavy groups are snoozed for seven days, then sampled again.
+                if should_pause_group(meta):
+                    meta["paused_until"] = (now + timedelta(days=7)).isoformat()
+                    log.info("Temporarily snoozing low-quality vendor-heavy group %s for 7 days.", group_id)
+
                 checked += 1
                 if checked % 10 == 0:
                     write_state(state)
+
             write_state(state)
             await notify_pending_leads(http)
             log.info("Scan complete: %s groups checked; %s new leads saved.", checked, saved)
