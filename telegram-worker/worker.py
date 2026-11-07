@@ -150,7 +150,19 @@ SELLER_AD_CONTEXT = re.compile(
     r"(i|we) have .{0,100} (options|accounts|services|packages) available|"
     r"(available|offering) (rental|rent|purchase) options|"
     r"dm me your (platform|niche).{0,80}(check|confirm) availability|"
-    r"(rent|rental|lease|purchase) options available)\b",
+    r"(rent|rental|lease|purchase) options available|"
+    # Reject advertising-infrastructure vendors and account/tool inventory ads.
+    r"we help (advertisers|businesses|brands|clients|agencies)|"
+    r"available support.{0,250}(ad account|campaign|tracking|landing.page|advertising)|"
+    r"(ad account setup|campaign creation.{0,40}optimization|tracking.{0,40}conversion setup|"
+    r"landing.page configuration|technical advertising support)|"
+    r"(whatsapp api|whatsapp messaging.{0,30}marketing tools|"
+    r"meta.{0,15}google ads solutions|tiktok ads accounts|"
+    r"blue tick solutions|fresh facebook accounts|"
+    r"bm[0-9]{1,4}\\b.{0,100}(ad accounts|accounts|scale)|"
+    r"from 5 to 1,000 ad accounts|fast setup.{0,50}scalable solutions|"
+    r"stop struggling to find the right business tools|"
+    r"for serious advertising projects)\\b",
     re.I,
 )
 
