@@ -181,11 +181,12 @@ SELLER_AD_CONTEXT = re.compile(
 )
 
 SELLER_POST_CONTEXT = re.compile(
-    r"\\b("
+    r"\b("
     r"we (offer|provide|specialize in|are offering|can provide|help|support|work with)|"
     r"i (offer|provide|specialize in|help|support|work with) (advertisers|businesses|brands|clients|media buyers|agencies)|"
+    r"i specialize in (traffic|campaign|advertising|lead|marketing|growth)|"
     r"our (agency|company|team) (offers|provides|specializes in|is offering|can provide)|"
-    r"available for paid promotions|kol services available|"
+    r"available for paid promotions|available for one-time orders|long-term business partnerships|kol services available|"
     r"marketing packages available|dm us for rates|contact us for pricing|"
     r"we'?ve got you covered|"
     r"(ad accounts?|advertising accounts?|business leads|crypto leads|targeted leads|traffic|business data|campaign data) (available|for rent|for sale|solutions)|"
@@ -194,7 +195,7 @@ SELLER_POST_CONTEXT = re.compile(
     r"lead generation (data|services|solutions) available|"
     r"our services|supported campaigns|"
     r"looking for .{0,180} (i have|we have|we offer|we provide|let'?s get you set up)"
-    r")\\b",
+    r")\b",
     re.I,
 )
 
