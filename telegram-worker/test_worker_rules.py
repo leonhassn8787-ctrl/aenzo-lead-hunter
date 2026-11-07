@@ -443,6 +443,30 @@ class LeadSignalTests(unittest.TestCase):
             with self.subTest(message=message):
                 self.assertEqual(self.classify(message), [])
 
+    def test_web3_marketing_service_sellers_are_not_client_leads(self):
+        provider_posts = [
+            "We offer KOL and influencer marketing services for Web3 projects. DM us for rates.",
+            "Our agency provides PR, AMA hosting, Telegram community management and paid promotions.",
+            "We are a crypto growth agency. Our packages include shilling, influencer campaigns and media coverage.",
+            "Promote your token with our large Telegram community and influencer network. Contact us for pricing.",
+            "Available for paid promotions, AMA hosting and community growth campaigns.",
+            "KOL services available. Message me to get packages and collaboration details.",
+            "We help Web3 projects grow. We provide marketing, PR and community services.",
+        ]
+        for message in provider_posts:
+            with self.subTest(message=message):
+                self.assertEqual(self.classify(message), [])
+
+    def test_client_buying_request_is_not_blocked_as_a_provider(self):
+        self.assertIn(
+            "KOL & Influencer Marketing",
+            self.classify("Our crypto project is looking to hire an external KOL agency for our token launch."),
+        )
+        self.assertIn(
+            "AMA & Community Engagement",
+            self.classify("We need an outside team to host AMAs and manage our Web3 Telegram community."),
+        )
+
     def test_real_explicit_marketing_request_survives_new_spam_filters(self):
         self.assertIn(
             "KOL & Influencer Marketing",
