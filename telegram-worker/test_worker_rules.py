@@ -137,6 +137,8 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_dedupe_falls_back_to_message_identity_without_author(self):
         self.assertEqual(self.dedupe("group-a", 100), self.dedupe("group-a", 100))
+        self.assertNotEqual(self.dedupe("group-a", 100), self.dedupe("group-a", 101))
+        self.assertNotEqual(self.dedupe("group-a", 100), self.dedupe("group-b", 100))
 
     def test_message_batches_are_oldest_first(self):
         options = self.message_scan_kwargs(120, "cutoff")
@@ -467,6 +469,12 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("await fetch_window(window_min, midpoint, depth + 1)", source)
         self.assertIn("await fetch_window(midpoint, window_max, depth + 1)", source)
         self.assertIn("window_max - window_min <= 1", source)
+
+    def test_public_search_deduplicates_messages_and_counts_vendor_ads(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn("run_seen_public_messages = set()", source)
+        self.assertIn("if public_message_key in run_seen_public_messages", source)
+        self.assertIn("seller_posts += 1", source)
 
     def test_global_search_cursor_overlaps_boundary_to_avoid_missed_seconds(self):
         source = WORKER.read_text(encoding="utf-8")
