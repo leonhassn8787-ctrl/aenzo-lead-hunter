@@ -178,10 +178,14 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIsNone(self.make_message_url(entity, 45))
 
     def test_bot_sender_is_excluded(self):
-        self.assertFalse(self.is_human_sender(self.telegram_user_type(bot=True)))
+        sender = self.telegram_user_type()
+        sender.bot = True
+        self.assertFalse(self.is_human_sender(sender))
 
     def test_human_sender_is_kept(self):
-        self.assertTrue(self.is_human_sender(self.telegram_user_type(bot=False)))
+        sender = self.telegram_user_type()
+        sender.bot = False
+        self.assertTrue(self.is_human_sender(sender))
 
     def test_anonymous_group_or_channel_sender_is_excluded(self):
         anonymous = type("Chat", (), {"bot": False})()
