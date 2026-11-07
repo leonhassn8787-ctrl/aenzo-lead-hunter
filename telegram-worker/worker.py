@@ -34,6 +34,7 @@ POLL_SECONDS = int(os.getenv("POLL_SECONDS", "600"))
 LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", "30"))
 GLOBAL_SEARCH_MAX_PAGES = int(os.getenv("GLOBAL_SEARCH_MAX_PAGES", "3"))
 SCAN_BUDGET_SECONDS = int(os.getenv("SCAN_BUDGET_SECONDS", "1320"))
+CLASSIFIER_RULES_VERSION = 3
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for KOL",
@@ -278,6 +279,23 @@ def write_state(state):
     tmp = STATE_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(state))
     tmp.replace(STATE_FILE)
+
+
+def reset_group_quality_metrics(state):
+    """Reset stale quality counters after classifier changes without losing scan cursors."""
+    if int(state.get("classifier_rules_version", 0) or 0) >= CLASSIFIER_RULES_VERSION:
+        return False
+    for meta in state.setdefault("groups", {}).values():
+        meta.update({
+            "messages_seen": 0,
+            "seller_ads": 0,
+            "buyer_signals": 0,
+            "qualified_leads": 0,
+            "paused_until": None,
+        })
+    state["classifier_rules_version"] = CLASSIFIER_RULES_VERSION
+    return True
+
 
 def group_priority(meta):
     """Prefer groups with proven buyer signals while mildly penalizing vendor-heavy groups."""
@@ -806,6 +824,8 @@ async def run(once=False):
         await client.disconnect()
         raise RuntimeError("Telegram session is not authorized. Run 'python worker.py --login' in an interactive shell first.")
     state = read_state()
+    if reset_group_quality_metrics(state):
+        write_state(state)
     groups_state = state.setdefault("groups", {})
     async with httpx.AsyncClient() as http:
         while True:
