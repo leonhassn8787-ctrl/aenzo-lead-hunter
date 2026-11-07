@@ -26,6 +26,8 @@ STATE_FILE = Path(os.getenv("STATE_FILE", "/data/scan_state.json"))
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 SUPABASE_OWNER_ID = os.environ["SUPABASE_OWNER_ID"]
+BOT_TOKEN = os.getenv("AENZO_BOT_TOKEN", "").strip()
+BOT_CHAT_ID = os.getenv("AENZO_BOT_CHAT_ID", "").strip()
 POLL_SECONDS = int(os.getenv("POLL_SECONDS", "600"))
 MAX_MESSAGES_PER_GROUP = int(os.getenv("MAX_MESSAGES_PER_GROUP", "200"))
 LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", "30"))
@@ -475,6 +477,62 @@ async def save_lead(client_http, payload):
         log.exception("Supabase request failed; this message will be retried.")
         return "error"
 
+def format_telegram_lead(lead):
+    contacts = lead.get('contacts') or []
+    contact_lines = []
+    for item in contacts[:8]:
+        kind = str(item.get('type') or 'contact').upper()
+        value = str(item.get('value') or '')
+        url = str(item.get('url') or '')
+        if value or url:
+            contact_lines.append('- ' + kind + ': ' + (value or url) + ((' — ' + url) if url and url != value else ''))
+    evidence = str(lead.get('evidence_summary') or '')
+    if len(evidence) > 1000:
+        evidence = evidence[:1000].rstrip() + '…'
+    return ('NEW AENZO LABS LEAD\n\n' +
+        'Project/group: ' + str(lead.get('company_name') or 'Potential project (verify)') + '\n' +
+        'Service needed: ' + str(lead.get('service_need') or 'Needs review') + '\n' +
+        'Priority: ' + str(lead.get('priority_score', '—')) + '/100\n' +
+        'Date: ' + str(lead.get('evidence_date') or '—') + '\n\n' +
+        'Evidence:\n' + (evidence or 'No message text') + '\n\n' +
+        'Source: ' + str(lead.get('evidence_url') or 'Unavailable') + '\n' +
+        'Group: ' + str(lead.get('telegram_group_url') or 'Unavailable') + '\n\n' +
+        'Public contacts:\n' + ('\n'.join(contact_lines) if contact_lines else 'No public contact found') + '\n\n' +
+        'Outreach English:\n' + str(lead.get('outreach_english') or 'Review first') + '\n\n' +
+        'বাংলা অর্থ:\n' + str(lead.get('outreach_bengali') or 'পর্যালোচনা করুন') + '\n\n' +
+        'Potential lead only. Verify the project and buyer intent before outreach.')[:3900]
+
+async def notify_pending_leads(http):
+    if not BOT_TOKEN or not BOT_CHAT_ID:
+        log.info('Telegram bot alerts not configured; scanning continues.')
+        return
+    headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
+    url = SUPABASE_URL + '/rest/v1/leads'
+    params = {'select': 'id,company_name,service_need,priority_score,evidence_date,evidence_summary,evidence_url,telegram_group_url,contacts,outreach_english,outreach_bengali', 'owner_id': 'eq.' + SUPABASE_OWNER_ID, 'status': 'eq.new', 'telegram_notified_at': 'is.null', 'order': 'created_at.asc', 'limit': '25'}
+    try:
+        response = await http.get(url, headers=headers, params=params, timeout=30)
+        if response.status_code != 200:
+            log.error('Could not load pending Telegram alerts: %s', response.text[:300])
+            return
+        pending = response.json()
+    except Exception:
+        log.exception('Could not load pending Telegram alerts.')
+        return
+    for lead in pending:
+        lead_id = lead.get('id')
+        try:
+            sent = await http.post('https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage', json={'chat_id': BOT_CHAT_ID, 'text': format_telegram_lead(lead), 'disable_web_page_preview': True}, timeout=30)
+            if sent.status_code != 200 or not sent.json().get('ok'):
+                detail = sent.text[:500]
+                log.error('Telegram alert failed for lead %s: %s', lead_id, detail)
+                await http.patch(url, headers=headers, params={'id': 'eq.' + str(lead_id)}, json={'telegram_notification_error': detail}, timeout=30)
+                continue
+            await http.patch(url, headers=headers, params={'id': 'eq.' + str(lead_id)}, json={'telegram_notified_at': datetime.now(timezone.utc).isoformat(), 'telegram_notification_error': None}, timeout=30)
+            log.info('Telegram alert delivered for lead %s.', lead_id)
+        except Exception:
+            log.exception('Telegram notification attempt failed for lead %s; it will be retried.', lead_id)
+
+
 async def login(client):
     await client.connect()
     if await client.is_user_authorized():
@@ -603,6 +661,7 @@ async def run(once=False):
                 if checked % 10 == 0:
                     write_state(state)
             write_state(state)
+            await notify_pending_leads(http)
             log.info("Scan complete: %s groups checked; %s new leads saved.", checked, saved)
             if once:
                 break
