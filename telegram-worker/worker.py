@@ -618,7 +618,7 @@ async def fetch_global_group_messages(client, query, min_date, max_date):
         # matches. Split it into overlapping halves and merge by message identity.
         # The one-second overlap avoids gaps at Telegram's date-boundary semantics.
         if saturated:
-            if depth >= 16 or window_max - window_min <= 1:
+            if depth >= 24 or window_max - window_min <= 1:
                 log.warning(
                     "Global search could not fully page query %r in one-second window %s..%s.",
                     query, window_min, window_max,
