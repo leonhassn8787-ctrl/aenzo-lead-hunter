@@ -579,9 +579,9 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         ]
         namespace = {"MAX_MESSAGES_PER_GROUP": 200}
         exec(compile(ast.Module(body=nodes, type_ignores=[]), str(WORKER), "exec"), namespace)
-        cls.group_priority = namespace["group_priority"]
-        cls.should_pause_group = namespace["should_pause_group"]
-        cls.message_scan_kwargs = namespace["message_scan_kwargs"]
+        cls.group_priority = staticmethod(namespace["group_priority"])
+        cls.should_pause_group = staticmethod(namespace["should_pause_group"])
+        cls.message_scan_kwargs = staticmethod(namespace["message_scan_kwargs"])
 
     def test_only_unseen_messages_are_requested_after_initial_scan(self):
         from datetime import datetime, timezone
