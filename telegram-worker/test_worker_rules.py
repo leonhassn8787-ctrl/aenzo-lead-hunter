@@ -770,6 +770,13 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         self.assertIn('bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)', source)
         self.assertIn('bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)', source)
 
+    def test_scan_report_separates_joined_groups_from_public_search_signals(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn("Joined groups available:", source)
+        self.assertIn("Joined groups checked:", source)
+        self.assertIn("Public groups with qualified buyer signals:", source)
+        self.assertNotIn('f"Groups scanned:', source)
+
 
 
 class GlobalSearchPaginationTests(unittest.TestCase):
