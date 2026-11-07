@@ -816,6 +816,7 @@ async def run(once=False):
             duplicates = 0
             public_duplicates = 0
             run_seen_dedupe_keys = set()
+            run_seen_public_messages = set()
             cutoff = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
             now = datetime.now(timezone.utc)
             dialogs = []
@@ -891,9 +892,19 @@ async def run(once=False):
                     if int(msg.date.timestamp()) < query_min_date:
                         continue
 
+                    public_message_key = (
+                        repr(getattr(msg, "peer_id", None)),
+                        int(getattr(msg, "id", 0) or 0),
+                    )
+                    if public_message_key in run_seen_public_messages:
+                        continue
+                    run_seen_public_messages.add(public_message_key)
+
                     text_body = msg.message.strip()
                     messages_checked += 1
                     public_messages_checked += 1
+                    if SELLER_AD_CONTEXT.search(text_body) or SELLER_POST_CONTEXT.search(text_body):
+                        seller_posts += 1
                     services = classify(text_body)
                     if not services:
                         continue
