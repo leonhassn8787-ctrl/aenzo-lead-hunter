@@ -811,11 +811,11 @@ async def send_scan_report(http, stats):
     seconds = int(stats.get("duration_seconds", 0)) % 60
     report = (
         "📊 AENZO LABS SCAN REPORT\n\n"
-        f"Groups available: {stats.get('groups_available', 0)}\n"
-        f"Groups scanned: {stats.get('groups_scanned', 0)}\n"
-        f"Groups paused: {stats.get('groups_paused', 0)}\n"
-        f"Non-joined public groups found: {stats.get('public_groups_found', 0)}\n"
-        f"Public groups scanned: {stats.get('public_groups_scanned', 0)}\n"
+        f"Joined groups available: {stats.get('joined_groups_available', 0)}\n"
+        f"Joined groups checked: {stats.get('joined_groups_scanned', 0)}\n"
+        f"Joined groups paused: {stats.get('groups_paused', 0)}\n"
+        f"Non-joined public groups with qualified signals: {stats.get('public_groups_found', 0)}\n"
+        f"Public groups with qualified buyer signals: {stats.get('public_groups_with_buyer_signals', 0)}\n"
         f"Public messages checked: {stats.get('public_messages_checked', 0):,}\n"
         f"Public buyer signals: {stats.get('public_buyer_signals', 0):,}\n"
         f"Public leads saved: {stats.get('public_leads_saved', 0)}\n"
@@ -1213,8 +1213,6 @@ async def run(once=False):
 
 
             newly_discovered_groups = global_group_ids - joined_group_ids
-            groups_available += len(newly_discovered_groups)
-            checked += len(newly_discovered_groups)
             log.info(
                 "Global public-group search: %s queries completed, %s incomplete, %s new groups discovered.",
                 global_search_complete, global_search_incomplete, len(newly_discovered_groups),
@@ -1224,13 +1222,13 @@ async def run(once=False):
             await notify_pending_leads(http)
             duration_seconds = asyncio.get_running_loop().time() - scan_started
             await send_scan_report(http, {
-                "groups_available": groups_available,
-                "groups_scanned": checked,
+                "joined_groups_available": len(dialogs),
+                "joined_groups_scanned": checked,
                 "groups_paused": paused,
                 "public_groups_found": len(newly_discovered_groups),
                 "global_queries_completed": global_search_complete,
                 "global_queries_incomplete": global_search_incomplete,
-                "public_groups_scanned": len(global_group_ids),
+                "public_groups_with_buyer_signals": len(global_group_ids),
                 "public_messages_checked": public_messages_checked,
                 "public_buyer_signals": public_buyer_signals,
                 "public_leads_saved": public_leads_saved,
@@ -1247,8 +1245,8 @@ async def run(once=False):
                 "duration_seconds": duration_seconds,
             })
             log.info(
-                "Scan complete: %s/%s groups checked; %s messages checked; %s new leads saved; %.1fs.",
-                checked, groups_available, messages_checked, saved, duration_seconds
+                "Scan complete: %s/%s joined groups checked; %s messages checked; %s new leads saved; %.1fs.",
+                checked, len(dialogs), messages_checked, saved, duration_seconds
             )
             if once:
                 break
