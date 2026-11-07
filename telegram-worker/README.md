@@ -24,7 +24,7 @@ A group title is not treated as a verified company name. Unverified identities a
 - Global public-group searches run against a list of buyer-intent phrases. A per-query timestamp is saved only after all result pages complete, so an interrupted or rate-limited query is retried rather than silently skipped.
 - The global search pass is incremental by query time and uses Telegram's regular global group search. It does not use the separate paid global public-channel post-search method.
 - If saving or resolving a candidate fails, that group's cursor is held so the failed message can be retried.
-- The worker ignores messages sent by the account owner and bot accounts.
+- The worker ignores messages sent by the account owner, bot accounts, and anonymous group/channel identities that cannot be verified as a human user.
 - No public username, project identity, or link is invented.
 
 ## Required private configuration
@@ -66,7 +66,7 @@ python session_login.py
 
 The helper asks for your Telegram API ID, API Hash, phone number, login code, and (if enabled) 2-step password. Enter them only in your own Termux terminal. It then prints a private StringSession. Copy that value directly into the GitHub Actions secret named `TELEGRAM_SESSION_STRING` at the repository's [Actions secrets page](https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter/settings/secrets/actions). Never send it to anyone. If a command fails, share only the error text with all phone numbers, codes, API values, and session strings removed.
 
-After saving the secret, run the [AENZO Telegram Group Lead Scan workflow](https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter/actions/workflows/telegram-scan.yml). A successful syntax check is not a real scan; confirm that the Telegram scan step itself completes.
+After saving the secret, run the [AENZO Telegram Group Lead Scan workflow](https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter/actions/workflows/telegram-scan.yml). A successful syntax check is not a real scan; confirm that the Telegram scan step itself completes. The GitHub Actions job tests the qualification rules before scanning. The scheduled worker currently uses `GLOBAL_SEARCH_MAX_PAGES=3` per date window and recursively splits saturated date windows.
 
 If Termux cannot install the pinned dependencies or the Telegram login fails, stop and share the redacted error text. Do not switch to an untrusted runtime or pay for hosting.
 
@@ -74,7 +74,7 @@ If Termux cannot install the pinned dependencies or the Telegram login fails, st
 The workflow is:
 https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter/actions/workflows/telegram-scan.yml
 
-It supports manual runs and a two-hour schedule. Each run scans once and exits; it does not keep a server running. When `AENZO_BOT_TOKEN` and `AENZO_BOT_CHAT_ID` are configured, it sends each new saved lead to your private Telegram bot chat with evidence, source link, public contacts, priority, and English/Bengali outreach. Unsent alerts remain pending and are retried on later scans. Existing database records are marked as already handled when bot alerts are enabled, so setup does not flood the bot with historical leads.
+It supports manual runs and a two-hour schedule. Each run scans once and exits; it does not keep a server running. Use either GitHub Actions or the optional Render worker as the active scanner, not both, to avoid duplicate Telegram scanning and unnecessary rate-limit pressure. When `AENZO_BOT_TOKEN` and `AENZO_BOT_CHAT_ID` are configured, it sends saved leads whose status is `new` and whose `telegram_notified_at` is empty, with evidence, source link, public contacts, priority, and English/Bengali outreach. It sends up to 25 pending leads per scan; unsent alerts remain pending and are retried on later scans. **Existing records are not automatically marked as handled.** Before enabling bot alerts for the first time, review old records: any historical row still marked `new` with an empty notification timestamp will be sent. Rejected records are excluded.
 
 A green **Python syntax and dependency check** proves only that the code compiles and its rule tests pass. A green **AENZO Telegram Group Lead Scan** run proves a real scan only if the log shows that all credentials were configured, dependencies installed, and the Telegram scan step completed. A safe skip is not a scan.
 
