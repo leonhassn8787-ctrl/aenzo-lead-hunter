@@ -12,7 +12,9 @@ from pathlib import Path
 import httpx
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-from telethon.errors import SessionPasswordNeededError
+from telethon.errors import SessionPasswordNeededError, FloodWaitError
+from telethon.tl.functions.messages import SearchGlobalRequest
+from telethon.tl.types import InputMessagesFilterEmpty, InputPeerEmpty
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("aenzo-telegram-worker")
@@ -30,6 +32,16 @@ BOT_TOKEN = os.getenv("AENZO_BOT_TOKEN", "").strip()
 BOT_CHAT_ID = os.getenv("AENZO_BOT_CHAT_ID", "").strip()
 POLL_SECONDS = int(os.getenv("POLL_SECONDS", "600"))
 LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", "30"))
+GLOBAL_SEARCH_MAX_PAGES = int(os.getenv("GLOBAL_SEARCH_MAX_PAGES", "20"))
+GLOBAL_GROUP_SEARCH_QUERIES = [
+    "looking for marketing agency", "need marketing agency",
+    "looking for KOL", "need KOL", "looking for influencers",
+    "need community growth", "looking for Telegram promotion",
+    "need AMA hosting", "looking for PR agency", "need project promotion",
+    "looking for social media marketing", "need giveaway campaign",
+    "looking for beta testers", "looking for launch promotion",
+    "looking for crypto marketing",
+]
 
 # Signals that indicate a project may need one or more AENZO services.
 SIGNALS = {
@@ -211,6 +223,7 @@ def read_state():
     except Exception:
         raw = {}
     if isinstance(raw, dict) and raw.get("version") == 2 and isinstance(raw.get("groups"), dict):
+        raw.setdefault("global_search", {})
         return raw
     groups = {}
     if isinstance(raw, dict):
@@ -226,7 +239,7 @@ def read_state():
                 }
             except (TypeError, ValueError):
                 continue
-    return {"version": 2, "groups": groups}
+    return {"version": 2, "groups": groups, "global_search": {}}
 
 def write_state(state):
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -384,17 +397,13 @@ def priority(text, hits):
     return min(score, 95)
 
 def dedupe(group_id, message_id, sender_id=None, message_text=None):
-    """Deduplicate repeated long advertisements globally and short requests per author."""
-    if message_text:
-        normalized = re.sub(r"\s+", " ", message_text.casefold()).strip()
-        normalized = re.sub(r"[^\w ]", "", normalized)
-        if normalized and len(normalized) >= 100:
-            identity = f"telegram-long-content:{normalized}"
-            return hashlib.sha256(identity.encode()).hexdigest()
-        if normalized and sender_id is not None:
-            identity = f"telegram-author:{sender_id}:{normalized}"
-            return hashlib.sha256(identity.encode()).hexdigest()
-    return hashlib.sha256(f"telegram:{group_id}:{message_id}".encode()).hexdigest()
+    """One lead per verified Telegram account; similar wording from other users stays separate."""
+    if sender_id is not None:
+        identity = f"telegram-user:{sender_id}"
+    else:
+        # Without a stable Telegram ID, do not infer identity from a username or text.
+        identity = f"telegram-message:{group_id}:{message_id}"
+    return hashlib.sha256(identity.encode()).hexdigest()
 
 def make_outreach(services):
     """Create a concise service-specific opener without inventing project details."""
@@ -508,6 +517,45 @@ def message_scan_kwargs(last_seen, cutoff):
     if not last_seen:
         kwargs["offset_date"] = cutoff
     return kwargs
+
+async def fetch_global_group_messages(client, query, min_date, max_date):
+    """Search matching messages across public Telegram groups without joining them."""
+    collected = []
+    offset_rate = 0
+    offset_peer = InputPeerEmpty()
+    offset_id = 0
+
+    for _ in range(GLOBAL_SEARCH_MAX_PAGES):
+        result = await client(SearchGlobalRequest(
+            q=query,
+            filter=InputMessagesFilterEmpty(),
+            min_date=min_date,
+            max_date=max_date,
+            offset_rate=offset_rate,
+            offset_peer=offset_peer,
+            offset_id=offset_id,
+            limit=100,
+            groups_only=True,
+        ))
+        batch = list(getattr(result, "messages", []) or [])
+        if not batch:
+            return collected, True
+        collected.extend(batch)
+
+        next_rate = getattr(result, "next_rate", None)
+        if len(batch) < 100 or next_rate is None:
+            return collected, True
+
+        last_message = batch[-1]
+        try:
+            offset_peer = await client.get_input_entity(last_message.peer_id)
+        except Exception:
+            log.exception("Could not resolve global-search pagination peer for query %r.", query)
+            return collected, False
+        offset_id = int(last_message.id)
+        offset_rate = int(next_rate)
+
+    return collected, False
 
 
 async def save_lead(client_http, payload):
@@ -819,6 +867,139 @@ async def run(once=False):
                 checked += 1
                 if checked % 10 == 0:
                     write_state(state)
+
+
+            # Search Telegram globally for matching messages in public groups.
+            # The joined-group scan above remains active and scans each joined group's
+            # unseen history; this pass discovers accessible public groups without joining.
+            global_search_state = state.setdefault("global_search", {})
+            global_group_ids = set()
+            joined_group_ids = {str(dialog.entity.id) for dialog in dialogs}
+            global_search_complete = 0
+            global_search_incomplete = 0
+
+            for query in GLOBAL_GROUP_SEARCH_QUERIES:
+                query_meta = global_search_state.get(query, {})
+                previous_scan = int(query_meta.get("last_scanned_at", 0) or 0)
+                query_min_date = max(
+                    int(cutoff.timestamp()),
+                    previous_scan + 1 if previous_scan else int(cutoff.timestamp()),
+                )
+                query_max_date = int(now.timestamp())
+                if query_min_date >= query_max_date:
+                    continue
+
+                try:
+                    global_messages, complete = await fetch_global_group_messages(
+                        client, query, query_min_date, query_max_date
+                    )
+                except FloodWaitError as exc:
+                    log.warning(
+                        "Telegram global group search rate-limited for %s seconds on query %r; cursor retained.",
+                        exc.seconds, query,
+                    )
+                    if exc.seconds <= 60:
+                        await asyncio.sleep(exc.seconds)
+                    global_search_incomplete += 1
+                    continue
+                except Exception:
+                    log.exception("Global public-group search failed for query %r; cursor retained.", query)
+                    global_search_incomplete += 1
+                    continue
+
+                if not complete:
+                    log.warning(
+                        "Global group search page limit reached for query %r; cursor retained to avoid skipping results.",
+                        query,
+                    )
+                    global_search_incomplete += 1
+                    continue
+
+                query_failed = False
+                for msg in global_messages:
+                    if not msg or not getattr(msg, "message", None) or not getattr(msg, "date", None):
+                        continue
+                    if getattr(msg, "out", False):
+                        continue
+                    if int(msg.date.timestamp()) < query_min_date:
+                        continue
+
+                    text_body = msg.message.strip()
+                    messages_checked += 1
+                    services = classify(text_body)
+                    if not services:
+                        continue
+                    buyer_signals += 1
+
+                    try:
+                        entity = await client.get_entity(msg.peer_id)
+                        sender = await msg.get_sender()
+                    except Exception:
+                        log.exception("Could not resolve public-group message or author %s.", getattr(msg, "id", "?"))
+                        query_failed = True
+                        continue
+
+                    if entity is None or bool(getattr(entity, "broadcast", False)):
+                        continue
+                    if not is_human_sender(sender):
+                        continue
+
+                    group_id = str(entity.id)
+                    global_group_ids.add(group_id)
+                    username = getattr(sender, "username", None)
+                    group_name = (getattr(entity, "title", None) or "Public Telegram group").strip()
+                    public_name = getattr(entity, "username", None)
+                    group_url = make_message_url(entity, msg.id)
+                    en, bn = make_outreach(services)
+                    sender_id = getattr(sender, "id", None)
+                    payload = {
+                        "owner_id": SUPABASE_OWNER_ID,
+                        "company_name": f"Potential project (verify) — {group_name}"[:250],
+                        "website": None,
+                        "industry": "Web3 / Crypto",
+                        "service_need": "; ".join(services),
+                        "lead_type": "potential_buyer",
+                        "priority_score": priority(text_body, services),
+                        "status": "new",
+                        "evidence_summary": text_body[:3500],
+                        "evidence_url": group_url,
+                        "evidence_date": msg.date.astimezone(timezone.utc).date().isoformat(),
+                        "telegram_group_url": f"https://t.me/{public_name}" if public_name else group_url,
+                        "contacts": extract_public_contacts(text_body, username),
+                        "outreach_english": en,
+                        "outreach_bengali": bn,
+                        "notes": (
+                            "Auto-detected candidate from Telegram global group search; not independently verified. "
+                            f"Source group: {group_name}. Message ID: {msg.id}. "
+                            + (f"Telegram User ID: {sender_id}. " if sender_id is not None else "Telegram User ID unavailable. ")
+                            + (f"Public sender username: @{username}. " if username else "Public sender username unavailable. ")
+                            + ("Direct message permalink unavailable for this group type. " if not group_url else "Message permalink recorded. ")
+                            + "Verify the sender's role, project identity, and current service need before outreach."
+                        ),
+                        "dedupe_key": dedupe(group_id, msg.id, sender_id, text_body),
+                    }
+                    save_status = await save_lead(http, payload)
+                    if save_status == "saved":
+                        saved += 1
+                    elif save_status == "duplicate":
+                        duplicates += 1
+                    else:
+                        query_failed = True
+
+                if query_failed:
+                    global_search_incomplete += 1
+                    continue
+
+                global_search_state[query] = {"last_scanned_at": query_max_date}
+                global_search_complete += 1
+
+            newly_discovered_groups = global_group_ids - joined_group_ids
+            groups_available += len(newly_discovered_groups)
+            checked += len(newly_discovered_groups)
+            log.info(
+                "Global public-group search: %s queries completed, %s incomplete, %s new groups discovered.",
+                global_search_complete, global_search_incomplete, len(newly_discovered_groups),
+            )
 
             write_state(state)
             await notify_pending_leads(http)
