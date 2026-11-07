@@ -405,16 +405,15 @@ def classify(text):
             re.I,
         )
         digital_project_context = re.compile(
-            r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|exchange|launchpad|"
-            r"staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|"
-            r"airdrop|dapp|testnet|project|product|app|platform|website|software|"
-            r"saas|digital product|startup|brand|launch|game)\b",
+            r"\b(project|product|app|platform|website|software|saas|digital product|"
+            r"startup|brand|launch|game)\b",
             re.I,
         )
         # Generic "looking for users" posts are not enough. Accept indirect
         # growth requests only when the post identifies a digital/Web3 project.
         if strong_marketing_intent.search(text) or (
-            growth_demand.search(text) and digital_project_context.search(text)
+            growth_demand.search(text)
+            and (CRYPTO_CONTEXT.search(text) or digital_project_context.search(text))
         ):
             hits = ["Project Promotion"]
         else:
@@ -774,10 +773,29 @@ async def notify_pending_leads(http):
             if sent.status_code != 200 or not sent.json().get('ok'):
                 detail = sent.text[:500]
                 log.error('Telegram alert failed for lead %s: %s', lead_id, detail)
-                await http.patch(url, headers=headers, params={'id': 'eq.' + str(lead_id)}, json={'telegram_notification_error': detail}, timeout=30)
+                await http.patch(
+                    url,
+                    headers=headers,
+                    params={'id': 'eq.' + str(lead_id), 'owner_id': 'eq.' + SUPABASE_OWNER_ID},
+                    json={'telegram_notification_error': detail},
+                    timeout=30,
+                )
                 continue
-            await http.patch(url, headers=headers, params={'id': 'eq.' + str(lead_id)}, json={'telegram_notified_at': datetime.now(timezone.utc).isoformat(), 'telegram_notification_error': None}, timeout=30)
-            log.info('Telegram alert delivered for lead %s.', lead_id)
+            marked = await http.patch(
+                url,
+                headers=headers,
+                params={'id': 'eq.' + str(lead_id), 'owner_id': 'eq.' + SUPABASE_OWNER_ID},
+                json={'telegram_notified_at': datetime.now(timezone.utc).isoformat(), 'telegram_notification_error': None},
+                timeout=30,
+            )
+            if marked.status_code not in (200, 204):
+                log.error(
+                    'Telegram delivered lead %s, but notification timestamp could not be saved (%s). '
+                    'It may be sent again on a later scan.',
+                    lead_id, marked.status_code,
+                )
+                continue
+            log.info('Telegram alert delivered and recorded for lead %s.', lead_id)
         except Exception:
             log.exception('Telegram notification attempt failed for lead %s; it will be retried.', lead_id)
 
