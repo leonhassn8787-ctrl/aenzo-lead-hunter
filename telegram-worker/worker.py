@@ -123,8 +123,9 @@ SIGNALS = {
         r"need someone to (build|design|develop) our website",
     ],
     "Recruitment": [
-        r"looking for (community manager|moderator|developer)",
-        r"hiring (community manager|moderator|developer)",
+        r"looking for (a |an )?(community manager|moderator|developer|blockchain developer|frontend developer|backend developer)",
+        r"hiring (a |an )?(community manager|moderator|developer|blockchain developer|frontend developer|backend developer)",
+        r"need (a |an )?(community manager|moderator|developer)",
         r"need moderators", r"recruiting (community|telegram) moderators",
     ],
     "Video & Creative Production": [
