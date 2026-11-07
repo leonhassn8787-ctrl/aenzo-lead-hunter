@@ -178,7 +178,7 @@ def classify(text):
         r"community growth|community promotion|pr agency|media coverage|"
         r"press release|ama hosting|giveaway campaign|airdrop campaign|"
         r"social media management|content marketing|content distribution|"
-        r"brand awareness|user acquisition|grow our audience|increase visibility|audience|traction|attract users|more users|signups|registrations|"
+        r"brand awareness|user acquisition|grow our audience|increase visibility|audience|user base|users|traction|attract users|more users|signups|registrations|"
         r"launch promotion|project promotion|advertising|paid campaign)\b",
         re.I,
     )
