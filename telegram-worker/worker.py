@@ -36,6 +36,7 @@ SIGNALS = {
         r"looking for (kol|kols|influencer|influencers)",
         r"searching for (kol|kols|influencer|influencers)",
         r"want to hire (kol|kols|influencer|influencers)",
+        r"looking to hire (an? )?(external )?(kol|influencer|marketing|growth) (agency|team)",
         r"need help with (our )?(kol|influencer) campaign",
         r"need (kols|influencers)", r"kol campaign", r"influencer campaign",
         r"(crypto|web3) influencer (marketing|campaign|promotion)",
