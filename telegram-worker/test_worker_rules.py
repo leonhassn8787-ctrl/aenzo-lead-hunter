@@ -52,13 +52,13 @@ class LeadSignalTests(unittest.TestCase):
             if isinstance(node, ast.Assign)
             and any(target.id == "SELLER_AD_CONTEXT" for target in node.targets if isinstance(target, ast.Name))
         )
-        exec(compile(ast.Module(body=[classify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
         namespace["SELLER_POST_CONTEXT"] = next(
             eval(compile(ast.Expression(body=node.value), str(WORKER), "eval"), {"re": re})
             for node in tree.body
             if isinstance(node, ast.Assign)
             and any(target.id == "SELLER_POST_CONTEXT" for target in node.targets if isinstance(target, ast.Name))
         )
+        exec(compile(ast.Module(body=[classify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
         cls.classify = staticmethod(namespace["classify"])
         priority_node = next(
             node for node in tree.body
