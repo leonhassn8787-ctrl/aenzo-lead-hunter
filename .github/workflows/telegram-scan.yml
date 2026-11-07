@@ -2,6 +2,12 @@ name: AENZO Telegram Group Lead Scan
 
 on:
   workflow_dispatch:
+    inputs:
+      test_bot:
+        description: 'Send a one-time Telegram bot connection test'
+        required: false
+        type: boolean
+        default: false
   schedule:
     - cron: "17 */6 * * *"
 
@@ -159,6 +165,30 @@ jobs:
                   + "). Check SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_OWNER_ID, and public.leads table access."
               )
           print("PASS: Supabase public.leads is reachable with the configured key.")
+          PY
+
+      - name: Test AENZO Telegram bot delivery
+        if: github.event_name == 'workflow_dispatch' && inputs.test_bot
+        env:
+          AENZO_BOT_TOKEN: ${{ secrets.AENZO_BOT_TOKEN }}
+          AENZO_BOT_CHAT_ID: ${{ secrets.AENZO_BOT_CHAT_ID }}
+        run: |
+          python - <<'PY'
+          import os
+          import httpx
+          token = os.getenv("AENZO_BOT_TOKEN", "").strip()
+          chat_id = os.getenv("AENZO_BOT_CHAT_ID", "").strip()
+          if not token or not chat_id:
+              raise SystemExit("Missing AENZO_BOT_TOKEN or AENZO_BOT_CHAT_ID repository secret.")
+          response = httpx.post(
+              f"https://api.telegram.org/bot{token}/sendMessage",
+              json={"chat_id": chat_id, "text": "AENZO LABS Lead Hunter bot connection test: SUCCESS. New saved leads will be sent here automatically."},
+              timeout=30,
+          )
+          data = response.json()
+          if response.status_code != 200 or not data.get("ok"):
+              raise SystemExit("Telegram bot test failed: " + response.text[:500])
+          print("PASS: Telegram bot delivered the test message.")
           PY
 
       - name: Scan Telegram groups once
