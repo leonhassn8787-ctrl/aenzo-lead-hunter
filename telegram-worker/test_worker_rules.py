@@ -419,6 +419,48 @@ class LeadSignalTests(unittest.TestCase):
             [],
         )
 
+    def test_ad_account_and_campaign_support_vendors_are_rejected(self):
+        examples = [
+            "Need help with ad accounts, campaign approvals, or performance? Google, Meta & TikTok Ads. Contact @Maxi_solution",
+            "Looking for reliable advertising solutions for your campaigns? Meta Ads, Google Ads, landing pages and account support. DM to discuss availability.",
+            "Premium Advertising Accounts. We only deal with verified accounts for rental and purchase across Google, Meta and TikTok.",
+            "Looking to buy advertising accounts? Purchase options, rental solutions and account setup support for agencies and media buyers.",
+            "Advertising account solutions available. Serious buyers only. Inbox me to discuss your requirements and pricing.",
+        ]
+        for message in examples:
+            with self.subTest(message=message):
+                self.assertEqual(self.classify(message), [])
+
+    def test_lead_database_and_campaign_data_vendors_are_rejected(self):
+        examples = [
+            "Fresh Crypto, investors, business and depositor leads just landed. We give you access to our private database tool with custom filters.",
+            "Looking for high-converting, niche-targeted leads? Available lead categories include crypto, forex and Binance. Order today.",
+            "Targeted business data and campaign-ready leads available by country and industry. Contact us for pricing.",
+        ]
+        for message in examples:
+            with self.subTest(message=message):
+                self.assertEqual(self.classify(message), [])
+
+    def test_real_web3_buyers_are_not_blocked_by_vendor_filter(self):
+        self.assertIn(
+            "KOL & Influencer Marketing",
+            self.classify("We are looking for KOLs for our Web3 launch and have an approved campaign budget."),
+        )
+        self.assertIn(
+            "Project Promotion",
+            self.classify("Our crypto wallet needs a marketing agency for its upcoming launch."),
+        )
+
+    def test_busy_public_search_windows_are_recursively_split(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn("await fetch_window(window_min, midpoint, depth + 1)", source)
+        self.assertIn("await fetch_window(midpoint, window_max, depth + 1)", source)
+        self.assertIn("window_max - window_min <= 1", source)
+
+    def test_global_search_cursor_overlaps_boundary_to_avoid_missed_seconds(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn("previous_scan - 2 if previous_scan", source)
+
     def test_pinksale_tokenomics_support_is_not_a_marketing_client_lead(self):
         self.assertEqual(
             self.classify(
