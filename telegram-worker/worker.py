@@ -14,7 +14,7 @@ from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError, FloodWaitError
 from telethon.tl.functions.messages import SearchGlobalRequest
-from telethon.tl.types import InputMessagesFilterEmpty, InputPeerEmpty
+from telethon.tl.types import InputMessagesFilterEmpty, InputPeerEmpty, User
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("aenzo-telegram-worker")
@@ -432,8 +432,8 @@ def extract_public_contacts(message_text, sender_username=None):
 
 
 def is_human_sender(sender):
-    """Only accept a resolved, non-bot Telegram sender."""
-    return sender is not None and not bool(getattr(sender, "bot", False))
+    """Only accept a real Telegram user, excluding bots and anonymous group/channel identities."""
+    return isinstance(sender, User) and not bool(getattr(sender, "bot", False))
 
 
 def priority(text, hits):
