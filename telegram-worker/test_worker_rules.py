@@ -463,8 +463,8 @@ class LeadSignalTests(unittest.TestCase):
             self.classify("Our crypto project is looking to hire an external KOL agency for our token launch."),
         )
         self.assertIn(
-            "AMA & Community Engagement",
-            self.classify("We need an outside team to host AMAs and manage our Web3 Telegram community."),
+            "AMA Hosting & Engagement",
+            self.classify("We need AMA hosting for our Web3 project and help managing our Telegram community."),
         )
 
     def test_real_explicit_marketing_request_survives_new_spam_filters(self):
