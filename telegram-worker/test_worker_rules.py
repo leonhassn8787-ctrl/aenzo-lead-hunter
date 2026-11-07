@@ -271,6 +271,40 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("Website Design & Development", self.classify("We need someone to build our website for the crypto project"))
         self.assertIn("Project Promotion", self.classify("Does anyone know a marketing agency for our Web3 launch?"))
 
+    def test_technical_token_launch_request_is_not_a_marketing_lead(self):
+        self.assertEqual(
+            self.classify(
+                "I’m looking for reliable specialists to help with a Token-2022 transfer hook launch and launchpad recommendations."
+            ),
+            [],
+        )
+
+    def test_usdt_arbitrage_and_payment_ads_are_not_client_leads(self):
+        self.assertEqual(
+            self.classify("We buy USDT and seek long-term arbitrage partners."),
+            [],
+        )
+        self.assertEqual(
+            self.classify("Need customers for USDT exchange and cash deposits."),
+            [],
+        )
+
+    def test_explicit_aenzo_service_request_is_kept(self):
+        self.assertIn(
+            "KOL & Influencer Marketing",
+            self.classify("Our Web3 project is looking for KOLs for a paid launch campaign. DM me for the budget."),
+        )
+
+    def test_growth_problem_requires_marketing_context(self):
+        self.assertIn(
+            "Project Promotion",
+            self.classify("Our Web3 project is struggling to attract users before launch."),
+        )
+        self.assertEqual(
+            self.classify("Anyone know specialists for a Solana token transfer hook?"),
+            [],
+        )
+
     def test_classifier_does_not_promote_vague_support_request(self):
         self.assertEqual(self.classify("Anyone know how to fix my crypto wallet?"), [])
 
