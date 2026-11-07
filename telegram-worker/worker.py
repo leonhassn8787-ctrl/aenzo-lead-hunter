@@ -181,10 +181,20 @@ SELLER_AD_CONTEXT = re.compile(
 )
 
 SELLER_POST_CONTEXT = re.compile(
-    r"\b(we (offer|provide|specialize in|are offering|can provide)|"
-    r"our (agency|company|team) (offers|provides|specializes in|is offering)|"
+    r"\\b("
+    r"we (offer|provide|specialize in|are offering|can provide|help|support|work with)|"
+    r"i (offer|provide|specialize in|help|support|work with) (advertisers|businesses|brands|clients|media buyers|agencies)|"
+    r"our (agency|company|team) (offers|provides|specializes in|is offering|can provide)|"
     r"available for paid promotions|kol services available|"
-    r"marketing packages available|dm us for rates|contact us for pricing)\b",
+    r"marketing packages available|dm us for rates|contact us for pricing|"
+    r"we'?ve got you covered|"
+    r"(ad accounts?|advertising accounts?|business leads|crypto leads|targeted leads|traffic|business data|campaign data) (available|for rent|for sale|solutions)|"
+    r"available (ad accounts?|advertising accounts?|targeted traffic|business leads|crypto leads|business data|campaign data|services|solutions|packages)|"
+    r"get (targeted|campaign.ready|organized) (leads|business data|campaign data)|"
+    r"lead generation (data|services|solutions) available|"
+    r"our services|supported campaigns|"
+    r"looking for .{0,180} (i have|we have|we offer|we provide|let'?s get you set up)"
+    r")\\b",
     re.I,
 )
 
@@ -266,7 +276,12 @@ def should_pause_group(meta):
 
 def classify(text):
     """Return only messages with a clear request for an AENZO-relevant service."""
-    if not text or NON_BUYER_CONTEXT.search(text) or SELLER_AD_CONTEXT.search(text):
+    if (
+        not text
+        or NON_BUYER_CONTEXT.search(text)
+        or SELLER_AD_CONTEXT.search(text)
+        or SELLER_POST_CONTEXT.search(text)
+    ):
         return []
 
     # Technical hiring/help (e.g. token launch specialists) is not automatically
