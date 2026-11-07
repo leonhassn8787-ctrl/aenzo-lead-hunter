@@ -144,13 +144,13 @@ CRYPTO_CONTEXT = re.compile(r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|e
 # This catches ads that contain phrases such as "looking for an account" while
 # the author is actually offering rentals or inventory.
 SELLER_AD_CONTEXT = re.compile(
-    r"\\b(rental\\s*(\\+|and|&)\\s*purchase options|"
+    r"\b(rental\s*(\+|and|&)\s*purchase options|"
     r"(meta|tiktok|facebook|google) ads? accounts? (for rent|available|for sale)|"
     r"(account|accounts) (rental|rentals|for rent|for purchase|for sale)|"
     r"(i|we) have .{0,100} (options|accounts|services|packages) available|"
     r"(available|offering) (rental|rent|purchase) options|"
     r"dm me your (platform|niche).{0,80}(check|confirm) availability|"
-    r"(rent|rental|lease|purchase) options available)\\b",
+    r"(rent|rental|lease|purchase) options available)\b",
     re.I,
 )
 
