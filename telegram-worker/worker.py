@@ -19,6 +19,21 @@ from telethon.tl.types import InputMessagesFilterEmpty, InputPeerEmpty, User
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("aenzo-telegram-worker")
 
+
+def bounded_int_env(name, default, minimum, maximum):
+    """Parse numeric worker settings safely and keep them inside supported limits."""
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        log.warning("Invalid %s; using default %s.", name, default)
+        return default
+    if value < minimum or value > maximum:
+        clamped = max(minimum, min(value, maximum))
+        log.warning("%s=%s is outside %s..%s; using %s.", name, value, minimum, maximum, clamped)
+        return clamped
+    return value
+
+
 API_ID = int(os.environ["TELEGRAM_API_ID"])
 API_HASH = os.environ["TELEGRAM_API_HASH"]
 PHONE = os.getenv("TELEGRAM_PHONE", "").strip()
@@ -30,10 +45,10 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 SUPABASE_OWNER_ID = os.environ["SUPABASE_OWNER_ID"]
 BOT_TOKEN = os.getenv("AENZO_BOT_TOKEN", "").strip()
 BOT_CHAT_ID = os.getenv("AENZO_BOT_CHAT_ID", "").strip()
-POLL_SECONDS = int(os.getenv("POLL_SECONDS", "600"))
-LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", "30"))
-GLOBAL_SEARCH_MAX_PAGES = int(os.getenv("GLOBAL_SEARCH_MAX_PAGES", "3"))
-SCAN_BUDGET_SECONDS = int(os.getenv("SCAN_BUDGET_SECONDS", "1320"))
+POLL_SECONDS = bounded_int_env("POLL_SECONDS", 600, 60, 86400)
+LOOKBACK_DAYS = bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)
+GLOBAL_SEARCH_MAX_PAGES = bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)
+SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
 CLASSIFIER_RULES_VERSION = 3
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
@@ -325,8 +340,7 @@ def classify(text):
     # Technical hiring/help (e.g. token launch specialists) is not automatically
     # a marketing lead. Keep these out unless a separate marketing request exists.
     technical_only = re.compile(
-        r"\b(specialist|specialists|developer|developers|programmer|programmers|"
-        r"auditor|auditors|smart contract|solidity|transfer hook|token[- ]?2022|"
+        r"\b(auditor|auditors|smart contract|solidity|transfer hook|token[- ]?2022|"
         r"rpc|node operator|liquidity provider|market maker|arbitrage|"
         r"buy usdt|sell usdt|usdt exchange|cash deposit|cvv|carding)\b",
         re.I,
@@ -377,7 +391,34 @@ def classify(text):
         return []
 
     if not hits and marketing_intent.search(text):
-        hits = ["Project Promotion"]
+        strong_marketing_intent = re.compile(
+            r"\b(kol|kols|influencer|influencers|marketing|promotion|promote|"
+            r"advertising|pr agency|media coverage|press release|ama hosting|"
+            r"giveaway campaign|airdrop campaign|social media management|"
+            r"content marketing|content distribution|brand awareness|"
+            r"user acquisition|launch promotion|project promotion|paid campaign)\b",
+            re.I,
+        )
+        growth_demand = re.compile(
+            r"\b(users?|user base|audience|traction|signups|registrations|"
+            r"engagement|members|visibility)\b",
+            re.I,
+        )
+        digital_project_context = re.compile(
+            r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|exchange|launchpad|"
+            r"staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|"
+            r"airdrop|dapp|testnet|project|product|app|platform|website|software|"
+            r"saas|digital product|startup|brand|launch|game)\b",
+            re.I,
+        )
+        # Generic "looking for users" posts are not enough. Accept indirect
+        # growth requests only when the post identifies a digital/Web3 project.
+        if strong_marketing_intent.search(text) or (
+            growth_demand.search(text) and digital_project_context.search(text)
+        ):
+            hits = ["Project Promotion"]
+        else:
+            return []
 
     return hits
 
