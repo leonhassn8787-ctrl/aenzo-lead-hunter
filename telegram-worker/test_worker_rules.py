@@ -85,9 +85,10 @@ class LeadSignalTests(unittest.TestCase):
             node for node in tree.body
             if isinstance(node, ast.FunctionDef) and node.name == "is_human_sender"
         )
-        sender_namespace = {}
+        sender_namespace = {"User": type("User", (), {})}
         exec(compile(ast.Module(body=[sender_node], type_ignores=[]), str(WORKER), "exec"), sender_namespace)
         cls.is_human_sender = staticmethod(sender_namespace["is_human_sender"])
+        cls.telegram_user_type = sender_namespace["User"]
         url_node = next(
             node for node in tree.body
             if isinstance(node, ast.FunctionDef) and node.name == "make_message_url"
@@ -177,10 +178,14 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIsNone(self.make_message_url(entity, 45))
 
     def test_bot_sender_is_excluded(self):
-        self.assertFalse(self.is_human_sender(type("Sender", (), {"bot": True})()))
+        self.assertFalse(self.is_human_sender(self.telegram_user_type(bot=True)))
 
     def test_human_sender_is_kept(self):
-        self.assertTrue(self.is_human_sender(type("Sender", (), {"bot": False})()))
+        self.assertTrue(self.is_human_sender(self.telegram_user_type(bot=False)))
+
+    def test_anonymous_group_or_channel_sender_is_excluded(self):
+        anonymous = type("Chat", (), {"bot": False})()
+        self.assertFalse(self.is_human_sender(anonymous))
 
     def test_public_contacts_are_extracted_without_guessing(self):
         found = self.extract_public_contacts(
