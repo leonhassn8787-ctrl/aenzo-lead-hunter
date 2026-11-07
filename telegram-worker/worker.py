@@ -610,16 +610,16 @@ async def send_scan_report(http, stats):
     minutes = int(stats.get("duration_seconds", 0)) // 60
     seconds = int(stats.get("duration_seconds", 0)) % 60
     report = (
-        "📊 AENZO LABS SCAN REPORT\\n\\n"
-        f"Groups available: {stats.get('groups_available', 0)}\\n"
-        f"Groups scanned: {stats.get('groups_scanned', 0)}\\n"
-        f"Groups paused: {stats.get('groups_paused', 0)}\\n"
-        f"Messages checked: {stats.get('messages_checked', 0):,}\\n"
-        f"Seller/vendor posts: {stats.get('seller_posts', 0):,}\\n"
-        f"Buyer signals: {stats.get('buyer_signals', 0):,}\\n"
-        f"New leads saved: {stats.get('leads_saved', 0)}\\n"
-        f"Duplicate leads: {stats.get('duplicates', 0)}\\n"
-        f"Scan duration: {minutes}m {seconds}s\\n\\n"
+        "📊 AENZO LABS SCAN REPORT\n\n"
+        f"Groups available: {stats.get('groups_available', 0)}\n"
+        f"Groups scanned: {stats.get('groups_scanned', 0)}\n"
+        f"Groups paused: {stats.get('groups_paused', 0)}\n"
+        f"Messages checked: {stats.get('messages_checked', 0):,}\n"
+        f"Seller/vendor posts: {stats.get('seller_posts', 0):,}\n"
+        f"Buyer signals: {stats.get('buyer_signals', 0):,}\n"
+        f"New leads saved: {stats.get('leads_saved', 0)}\n"
+        f"Duplicate leads: {stats.get('duplicates', 0)}\n"
+        f"Scan duration: {minutes}m {seconds}s\n\n"
         "Note: message count is the number actually processed in this run; "
         "older messages are not intentionally rescanned."
     )
