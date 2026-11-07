@@ -21,7 +21,7 @@ A group title is not treated as a verified company name. Unverified identities a
 - No public username, project identity, or link is invented.
 
 ## Required private configuration
-The scheduled GitHub Actions workflow needs these six repository secrets:
+The scheduled GitHub Actions workflow needs these six repository secrets for scanning, plus two optional secrets for Telegram lead alerts:
 
 - `TELEGRAM_API_ID`
 - `TELEGRAM_API_HASH`
@@ -29,6 +29,8 @@ The scheduled GitHub Actions workflow needs these six repository secrets:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY` — the modern Supabase `sb_secret_...` key, server-side only
 - `SUPABASE_OWNER_ID`
+- `AENZO_BOT_TOKEN` — BotFather token for your private AENZO notification bot
+- `AENZO_BOT_CHAT_ID` — your private chat ID with that bot
 
 The Supabase secret key is sent only in the `apikey` header. It is not a JWT and must not be sent as `Authorization: Bearer`.
 
@@ -65,7 +67,7 @@ If Termux cannot install the pinned dependencies or the Telegram login fails, st
 The workflow is:
 https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter/actions/workflows/telegram-scan.yml
 
-It supports manual runs and a six-hour schedule. Each run scans once and exits; it does not keep a server running.
+It supports manual runs and a six-hour schedule. Each run scans once and exits; it does not keep a server running. When `AENZO_BOT_TOKEN` and `AENZO_BOT_CHAT_ID` are configured, it sends each new saved lead to your private Telegram bot chat with evidence, source link, public contacts, priority, and English/Bengali outreach. Unsent alerts remain pending and are retried on later scans. Existing database records are marked as already handled when bot alerts are enabled, so setup does not flood the bot with historical leads.
 
 A green **Python syntax and dependency check** proves only that the code compiles and its rule tests pass. A green **AENZO Telegram Group Lead Scan** run proves a real scan only if the log shows that all credentials were configured, dependencies installed, and the Telegram scan step completed. A safe skip is not a scan.
 
