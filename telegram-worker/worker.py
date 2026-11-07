@@ -140,6 +140,20 @@ SIGNALS = {
 COMPILED = {name: [re.compile(p, re.I) for p in patterns] for name, patterns in SIGNALS.items()}
 BUYING_CONTEXT = re.compile(r"\b(struggling to (get|attract|reach|grow|increase)|having trouble (getting|attracting|reaching|growing)|not getting (enough|many) (users|registrations|signups|members|engagement|traction)|could use more|how can we (get|attract|reach|grow|increase)|what.s the best way to (get|attract|reach|grow|increase)|looking for|looking to work with|looking to grow|looking to increase|looking to boost|looking to attract|looking to reach|looking to get|in search of|trying to find|trying to grow|trying to increase|trying to reach|want to grow|want to increase|want to boost|want to attract|want to reach|need|needs|need more|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|need a hand|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|can anyone help|anyone able to|someone who can|anyone experienced in|could use|need help with|help us|partner with|any agency|suggest a)\b", re.I)
 CRYPTO_CONTEXT = re.compile(r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet)\b", re.I)
+# Posts selling tools, accounts, traffic, or services are vendors—not buyers.
+# This catches ads that contain phrases such as "looking for an account" while
+# the author is actually offering rentals or inventory.
+SELLER_AD_CONTEXT = re.compile(
+    r"\\b(rental\\s*(\\+|and|&)\\s*purchase options|"
+    r"(meta|tiktok|facebook|google) ads? accounts? (for rent|available|for sale)|"
+    r"(account|accounts) (rental|rentals|for rent|for purchase|for sale)|"
+    r"(i|we) have .{0,100} (options|accounts|services|packages) available|"
+    r"(available|offering) (rental|rent|purchase) options|"
+    r"dm me your (platform|niche).{0,80}(check|confirm) availability|"
+    r"(rent|rental|lease|purchase) options available)\\b",
+    re.I,
+)
+
 NON_BUYER_CONTEXT = re.compile(
     r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
     r"hire me|anyone hiring me|free airdrop|airdrop claim|claim (my )?airdrop|"
@@ -184,7 +198,7 @@ def write_state(state):
 
 def classify(text):
     """Return only messages with a clear request for an AENZO-relevant service."""
-    if not text or NON_BUYER_CONTEXT.search(text):
+    if not text or NON_BUYER_CONTEXT.search(text) or SELLER_AD_CONTEXT.search(text):
         return []
 
     # Technical hiring/help (e.g. token launch specialists) is not automatically
