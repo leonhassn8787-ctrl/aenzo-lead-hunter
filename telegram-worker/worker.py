@@ -203,7 +203,7 @@ def classify(text):
         re.I,
     )
     buyer_intent = re.compile(
-        r"\b(looking for|searching for|seeking|need|needs|want to hire|"
+        r"\b(looking for|looking to hire|searching for|seeking|need|needs|want to hire|"
         r"hiring|want to work with|looking to work with|need help with|"
         r"can anyone recommend|does anyone know|anyone know|who can help|"
         r"can someone help|anyone able to|partner with|could use|"
