@@ -667,9 +667,11 @@ async def send_scan_report(http, stats):
         f"Public messages checked: {stats.get('public_messages_checked', 0):,}\n"
         f"Public buyer signals: {stats.get('public_buyer_signals', 0):,}\n"
         f"Public leads saved: {stats.get('public_leads_saved', 0)}\n"
+        f"Public duplicate leads: {stats.get('public_duplicates', 0)}\n"
         f"Joined-group messages checked: {stats.get('joined_messages_checked', 0):,}\n"
         f"Joined-group buyer signals: {stats.get('joined_buyer_signals', 0):,}\n"
         f"Joined-group leads saved: {stats.get('joined_leads_saved', 0)}\n"
+        f"Joined-group duplicate leads: {stats.get('joined_duplicates', 0)}\n"
         f"Global search queries completed: {stats.get('global_queries_completed', 0)}\n"
         f"Global search queries incomplete: {stats.get('global_queries_incomplete', 0)}\n"
         f"Messages checked: {stats.get('messages_checked', 0):,}\n"
@@ -741,6 +743,8 @@ async def run(once=False):
             seller_posts = 0
             buyer_signals = 0
             duplicates = 0
+            public_duplicates = 0
+            run_seen_dedupe_keys = set()
             cutoff = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
             now = datetime.now(timezone.utc)
             dialogs = []
@@ -872,12 +876,18 @@ async def run(once=False):
                         ),
                         "dedupe_key": dedupe(group_id, msg.id, sender_id, text_body),
                     }
-                    save_status = await save_lead(http, payload)
+                    if payload["dedupe_key"] in run_seen_dedupe_keys:
+                        save_status = "duplicate"
+                    else:
+                        save_status = await save_lead(http, payload)
+                        if save_status in ("saved", "duplicate"):
+                            run_seen_dedupe_keys.add(payload["dedupe_key"])
                     if save_status == "saved":
                         saved += 1
                         public_leads_saved += 1
                     elif save_status == "duplicate":
                         duplicates += 1
+                        public_duplicates += 1
                     else:
                         query_failed = True
 
@@ -1000,7 +1010,12 @@ async def run(once=False):
                         ),
                         "dedupe_key": dedupe(group_id, msg.id, getattr(sender, "id", None), text_body),
                     }
-                    save_status = await save_lead(http, payload)
+                    if payload["dedupe_key"] in run_seen_dedupe_keys:
+                        save_status = "duplicate"
+                    else:
+                        save_status = await save_lead(http, payload)
+                        if save_status in ("saved", "duplicate"):
+                            run_seen_dedupe_keys.add(payload["dedupe_key"])
                     if save_status == "saved":
                         saved += 1
                         meta["qualified_leads"] = int(meta.get("qualified_leads", 0)) + 1
@@ -1056,6 +1071,8 @@ async def run(once=False):
                 "joined_messages_checked": messages_checked - public_messages_checked,
                 "joined_buyer_signals": buyer_signals - public_buyer_signals,
                 "joined_leads_saved": saved - public_leads_saved,
+                "public_duplicates": public_duplicates,
+                "joined_duplicates": duplicates - public_duplicates,
                 "messages_checked": messages_checked,
                 "seller_posts": seller_posts,
                 "buyer_signals": buyer_signals,
