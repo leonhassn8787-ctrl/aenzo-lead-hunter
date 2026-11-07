@@ -640,10 +640,6 @@ class LeadSignalTests(unittest.TestCase):
                            "We are looking for an agency to manage it."),
         )
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
-
-
 class GroupScanningOptimizationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -718,3 +714,131 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         self.assertIsNone(meta["paused_until"])
         self.assertEqual(state["classifier_rules_version"], 3)
         self.assertFalse(self.reset_group_quality_metrics(state))
+
+class GlobalSearchPaginationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        tree = ast.parse(WORKER.read_text(encoding="utf-8"))
+        node = next(
+            node for node in tree.body
+            if isinstance(node, ast.AsyncFunctionDef)
+            and node.name == "fetch_global_group_messages"
+        )
+
+        class Request:
+            def __init__(self, **kwargs):
+                self.__dict__.update(kwargs)
+
+        class EmptyPeer:
+            pass
+
+        class EmptyFilter:
+            pass
+
+        class QuietLog:
+            def info(self, *args, **kwargs):
+                pass
+
+            def warning(self, *args, **kwargs):
+                pass
+
+            def exception(self, *args, **kwargs):
+                pass
+
+        namespace = {
+            "SearchGlobalRequest": Request,
+            "InputPeerEmpty": EmptyPeer,
+            "InputMessagesFilterEmpty": EmptyFilter,
+            "GLOBAL_SEARCH_MAX_PAGES": 3,
+            "log": QuietLog(),
+        }
+        exec(
+            compile(ast.Module(body=[node], type_ignores=[]), str(WORKER), "exec"),
+            namespace,
+        )
+        cls.fetch = staticmethod(namespace["fetch_global_group_messages"])
+
+    def test_saturated_public_search_recursively_splits_and_merges(self):
+        import asyncio
+        from datetime import datetime, timezone
+        from types import SimpleNamespace
+
+        class Message:
+            def __init__(self, peer_id, message_id, timestamp):
+                self.peer_id = peer_id
+                self.id = message_id
+                self.date = datetime.fromtimestamp(timestamp, timezone.utc)
+
+        class Client:
+            def __init__(self):
+                self.calls = []
+
+            async def __call__(self, request):
+                self.calls.append((request.min_date, request.max_date, request.offset_rate))
+                if request.max_date - request.min_date > 10:
+                    page = int(request.offset_rate)
+                    messages = [
+                        Message("wide-window", page * 100 + i + 1, request.min_date + 1)
+                        for i in range(100)
+                    ]
+                    return SimpleNamespace(messages=messages, next_rate=page + 1)
+                message = Message(
+                    f"peer-{request.min_date}",
+                    request.min_date + 10000,
+                    request.min_date,
+                )
+                return SimpleNamespace(messages=[message], next_rate=None)
+
+            async def get_input_entity(self, peer_id):
+                return peer_id
+
+        client = Client()
+        messages, complete = asyncio.run(
+            self.fetch(client, "looking for KOL", 0, 100)
+        )
+        identities = {
+            (repr(message.peer_id), message.id)
+            for message in messages
+        }
+        self.assertTrue(complete)
+        self.assertGreater(len(client.calls), 3)
+        self.assertGreater(len(messages), 1)
+        self.assertEqual(len(messages), len(identities))
+
+    def test_one_second_overflow_is_reported_incomplete_without_infinite_recursion(self):
+        import asyncio
+        from datetime import datetime, timezone
+        from types import SimpleNamespace
+
+        class Message:
+            def __init__(self, message_id):
+                self.peer_id = "same-peer"
+                self.id = message_id
+                self.date = datetime.fromtimestamp(1, timezone.utc)
+
+        class Client:
+            def __init__(self):
+                self.calls = 0
+
+            async def __call__(self, request):
+                self.calls += 1
+                page = int(request.offset_rate)
+                return SimpleNamespace(
+                    messages=[Message(page * 100 + i) for i in range(100)],
+                    next_rate=page + 1,
+                )
+
+            async def get_input_entity(self, peer_id):
+                return peer_id
+
+        client = Client()
+        messages, complete = asyncio.run(
+            self.fetch(client, "looking for KOL", 1, 2)
+        )
+        self.assertFalse(complete)
+        self.assertEqual(client.calls, 3)
+        self.assertEqual(len(messages), 300)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
