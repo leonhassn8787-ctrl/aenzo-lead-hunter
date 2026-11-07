@@ -39,14 +39,11 @@ class LeadSignalTests(unittest.TestCase):
                 r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet)\b",
                 re.I,
             ),
-            "NON_BUYER_CONTEXT": re.compile(
-                r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
-                r"hire me|anyone hiring me|free airdrop|airdrop claim|claim (my )?airdrop|"
-                r"token price prediction|price prediction|trading signals|wallet (is )?(not working|stuck)|"
-                r"account (is )?(locked|suspended)|"
-                r"we (offer|provide|specialize in)|we are (a|an) [a-z -]{1,50}(agency|service provider|marketing team)|our (agency|company) (offers|provides|specializes in)|"
-                r"we help (web3|crypto|blockchain) projects)\b",
-                re.I,
+            "NON_BUYER_CONTEXT": next(
+                eval(compile(ast.Expression(body=node.value), str(WORKER), "eval"), {"re": re})
+                for node in tree.body
+                if isinstance(node, ast.Assign)
+                and any(isinstance(target, ast.Name) and target.id == "NON_BUYER_CONTEXT" for target in node.targets)
             ),
         }
         exec(compile(ast.Module(body=[classify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
@@ -425,6 +422,36 @@ class LeadSignalTests(unittest.TestCase):
         first = self.dedupe("group-a", 1, 111, "A" * 120)
         second = self.dedupe("group-b", 2, 222, "A" * 120)
         self.assertEqual(first, second)
+
+    def test_usdt_fund_and_payment_ads_are_rejected(self):
+        spam = [
+            "We buy USDT across the entire network. Profit through USDT arbitrage.",
+            "Needs a large number of Indian customers. Large daily demand for USDT. Hacker Fund, Cash Deposits, Equity Funds, UPI/IMPS.",
+            "Cash App Transfer, PayPal Transfer, cloned cards and bank drops available.",
+        ]
+        for message in spam:
+            with self.subTest(message=message):
+                self.assertEqual(self.classify(message), [])
+
+    def test_pinksale_promotion_and_token_support_posts_are_rejected(self):
+        posts = [
+            "No mate you need a PinkSale presale to be able to promote here.",
+            "Please see this to learn about available tokens on PinkSale. The marketing tax goes to the developer. Seek assistance with recommended developers.",
+            "Welcome to Solama as they partner with PinkSale for their Fairlaunch. Recognized with KYC, Audit and Doxx badge.",
+        ]
+        for message in posts:
+            with self.subTest(message=message):
+                self.assertEqual(self.classify(message), [])
+
+    def test_real_explicit_marketing_request_survives_new_spam_filters(self):
+        self.assertIn(
+            "KOL & Influencer Marketing",
+            self.classify("Our Web3 project is looking for KOLs for a paid launch campaign. Please DM with your rates."),
+        )
+        self.assertIn(
+            "Project Promotion",
+            self.classify("We are looking for a marketing agency to promote our crypto wallet before launch."),
+        )
 
     def test_classifier_does_not_promote_unrelated_indirect_complaints(self):
         self.assertEqual(self.classify(
