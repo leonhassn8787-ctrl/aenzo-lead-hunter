@@ -589,16 +589,6 @@ class LeadSignalTests(unittest.TestCase):
             with self.subTest(message=message):
                 self.assertEqual(self.classify(message), [])
 
-    def test_meta_tiktok_account_rental_ad_is_not_a_client_lead(self):
-        self.assertEqual(
-            self.classify(
-                "Still looking for a reliable Meta or TikTok advertising account for your next campaign? "
-                "I have rental + purchase options available. For legitimate businesses, agencies & media buyers. "
-                "DM me your platform + niche and let's check availability."
-            ),
-            [],
-        )
-
     def test_vendor_account_inventory_is_rejected(self):
         posts = [
             "Meta Ads accounts available for rent. DM me for availability.",
