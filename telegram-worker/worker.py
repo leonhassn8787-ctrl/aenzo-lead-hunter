@@ -143,7 +143,11 @@ NON_BUYER_CONTEXT = re.compile(
     r"token price prediction|price prediction|trading signals|wallet (is )?(not working|stuck)|"
     r"account (is )?(locked|suspended)|"
     r"we (offer|provide|specialize in)|we are (a|an) [a-z -]{1,50}(agency|service provider|marketing team)|our (agency|company) (offers|provides|specializes in)|"
-    r"we help (web3|crypto|blockchain) projects)\b",
+    r"we help (web3|crypto|blockchain) projects|"
+    r"verified leads|high-converting.*leads|lead categories|country-targeted leads|"
+    r"phone and email leads|phone & email leads|order today.*leads|"
+    r"available tokens on pinksale|pinksale presale|marketing tax|marketing wallet|"
+    r"recommended developers|create a (standard|baby|buyback) token)\b",
     re.I,
 )
 
@@ -250,6 +254,11 @@ def extract_public_contacts(message_text, sender_username=None):
     if sender_username:
         add("telegram", "@" + sender_username, "https://t.me/" + sender_username, "message author")
 
+    # Capture explicitly written Telegram handles in the message body as well
+    # as the author; never infer handles from project or company names.
+    for handle in re.findall(r"(?<![\w/])@([A-Za-z][A-Za-z0-9_]{4,31})", message_text or ""):
+        add("telegram", "@" + handle, "https://t.me/" + handle, "message text")
+
     urls = re.findall(r"https?://[^\s<>()]+", message_text or "", flags=re.I)
     for raw_url in urls:
         url = raw_url.rstrip(".,;:!?)]}")
@@ -289,11 +298,14 @@ def priority(text, hits):
     return min(score, 95)
 
 def dedupe(group_id, message_id, sender_id=None, message_text=None):
-    """Deduplicate identical requests cross-posted by the same Telegram author."""
-    if sender_id is not None and message_text:
+    """Deduplicate repeated long advertisements globally and short requests per author."""
+    if message_text:
         normalized = re.sub(r"\s+", " ", message_text.casefold()).strip()
         normalized = re.sub(r"[^\w ]", "", normalized)
-        if normalized:
+        if normalized and len(normalized) >= 100:
+            identity = f"telegram-long-content:{normalized}"
+            return hashlib.sha256(identity.encode()).hexdigest()
+        if normalized and sender_id is not None:
             identity = f"telegram-author:{sender_id}:{normalized}"
             return hashlib.sha256(identity.encode()).hexdigest()
     return hashlib.sha256(f"telegram:{group_id}:{message_id}".encode()).hexdigest()
