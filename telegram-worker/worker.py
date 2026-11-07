@@ -144,25 +144,26 @@ CRYPTO_CONTEXT = re.compile(r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|e
 # This catches ads that contain phrases such as "looking for an account" while
 # the author is actually offering rentals or inventory.
 SELLER_AD_CONTEXT = re.compile(
-    r"\b(rental\s*(\+|and|&)\s*purchase options|"
+    r"\b("
+    r"rental\s*(\+|and|&)\s*purchase options|"
     r"(meta|tiktok|facebook|google) ads? accounts? (for rent|available|for sale)|"
     r"(account|accounts) (rental|rentals|for rent|for purchase|for sale)|"
     r"(i|we) have .{0,100} (options|accounts|services|packages) available|"
     r"(available|offering) (rental|rent|purchase) options|"
     r"dm me your (platform|niche).{0,80}(check|confirm) availability|"
     r"(rent|rental|lease|purchase) options available|"
-    # Reject advertising-infrastructure vendors and account/tool inventory ads.
     r"we help (advertisers|businesses|brands|clients|agencies)|"
     r"available support.{0,250}(ad account|campaign|tracking|landing.page|advertising)|"
-    r"(ad account setup|campaign creation.{0,40}optimization|tracking.{0,40}conversion setup|"
-    r"landing.page configuration|technical advertising support)|"
-    r"(whatsapp api|whatsapp messaging.{0,30}marketing tools|"
-    r"meta.{0,15}google ads solutions|tiktok ads accounts|"
-    r"blue tick solutions|fresh facebook accounts|"
-    r"bm[0-9]{1,4}\\b.{0,100}(ad accounts|accounts|scale)|"
-    r"from 5 to 1,000 ad accounts|fast setup.{0,50}scalable solutions|"
+    r"ad account setup|campaign creation.{0,40}optimization|"
+    r"tracking.{0,40}conversion setup|landing.page configuration|"
+    r"technical advertising support|whatsapp api|"
+    r"whatsapp messaging.{0,30}marketing tools|meta.{0,15}google ads solutions|"
+    r"tiktok ads accounts|blue tick solutions|fresh facebook accounts|"
+    r"bm[0-9]{1,4}\b|from 5 to 1,000 ad accounts|"
+    r"fast setup.{0,50}scalable solutions|"
     r"stop struggling to find the right business tools|"
-    r"for serious advertising projects)\\b",
+    r"for serious advertising projects"
+    r")\b",
     re.I,
 )
 
