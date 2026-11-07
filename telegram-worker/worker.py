@@ -147,7 +147,15 @@ NON_BUYER_CONTEXT = re.compile(
     r"verified leads|high-converting.*leads|lead categories|country-targeted leads|"
     r"phone and email leads|phone & email leads|order today.*leads|"
     r"available tokens on pinksale|pinksale presale|marketing tax|marketing wallet|"
-    r"recommended developers|create a (standard|baby|buyback) token)\b",
+    r"recommended developers|create a (standard|baby|buyback) token|"
+    r"buy(s|ing)? usdt|sell(ing)? usdt|usdt arbitrage|arbitrage partner|"
+    r"cash deposits|hacker funds?|mixed funds?|equity funds?|gaming funds?|"
+    r"upi/?imps|cash app transfer|paypal transfer|bank transfer|"
+    r"cloned cards?|linkables?|fullz|bank drops?|carding|cvv|"
+    r"exchange rate premium|daily demand for usdt|daily earnings|"
+    r"large number of (indian )?customers|"
+    r"welcome to .{0,80}partner.{0,40}pinksale|"
+    r"recognized with kyc,? audit and doxx badge)\b",
     re.I,
 )
 
