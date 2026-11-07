@@ -53,6 +53,12 @@ class LeadSignalTests(unittest.TestCase):
             and any(target.id == "SELLER_AD_CONTEXT" for target in node.targets if isinstance(target, ast.Name))
         )
         exec(compile(ast.Module(body=[classify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
+        namespace["SELLER_POST_CONTEXT"] = next(
+            eval(compile(ast.Expression(body=node.value), str(WORKER), "eval"), {"re": re})
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(target.id == "SELLER_POST_CONTEXT" for target in node.targets if isinstance(target, ast.Name))
+        )
         cls.classify = staticmethod(namespace["classify"])
         priority_node = next(
             node for node in tree.body
@@ -468,6 +474,19 @@ class LeadSignalTests(unittest.TestCase):
         for message in provider_posts:
             with self.subTest(message=message):
                 self.assertEqual(self.classify(message), [])
+
+    def test_realistic_service_seller_ads_are_rejected(self):
+        seller_posts = [
+            "Professional communication and telecom services. Looking for reliable solutions? Our services include Bulk SMS, VoIP and SIP trunking.",
+            "Crypto Advertising & Traffic Optimization Solutions. Looking to improve your campaigns? I specialize in traffic acquisition and conversion-focused campaigns.",
+            "Looking for a few users? I have paid testing options available.",
+            "Need advertising accounts or campaign support? We've got you covered. DM for pricing.",
+            "DATA WORLD — FRESH DATA & LEADS AVAILABLE. Looking for the right audience? Get targeted business data and campaign-ready leads.",
+            "Looking for reliable advertising solutions? Available for one-time orders and long-term business partnerships.",
+        ]
+        for post in seller_posts:
+            with self.subTest(post=post):
+                self.assertEqual(self.classify(post), [])
 
     def test_client_buying_request_is_not_blocked_as_a_provider(self):
         self.assertIn(
