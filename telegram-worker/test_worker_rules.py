@@ -451,6 +451,17 @@ class LeadSignalTests(unittest.TestCase):
             self.classify("Our crypto wallet needs a marketing agency for its upcoming launch."),
         )
 
+    def test_kol_network_and_project_promotion_vendors_are_rejected(self):
+        examples = [
+            "Need KOLs? We have a large influencer network and can promote your token.",
+            "We can promote your project through our Telegram community. DM for paid promotion.",
+            "Looking for new projects to promote with our KOL network.",
+            "Need KOL marketing? I can provide influencer campaigns and packages.",
+        ]
+        for message in examples:
+            with self.subTest(message=message):
+                self.assertEqual(self.classify(message), [])
+
     def test_busy_public_search_windows_are_recursively_split(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("await fetch_window(window_min, midpoint, depth + 1)", source)
