@@ -205,6 +205,8 @@ jobs:
           AENZO_BOT_CHAT_ID: ${{ secrets.AENZO_BOT_CHAT_ID }}
           STATE_FILE: scan_state.json
           LOOKBACK_DAYS: "30"
+          GLOBAL_SEARCH_MAX_PAGES: "3"
+          SCAN_BUDGET_SECONDS: "1320"
         run: python worker.py --once
 
       - name: Save scan progress
