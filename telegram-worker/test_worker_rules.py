@@ -394,6 +394,38 @@ class LeadSignalTests(unittest.TestCase):
             "What's the best way to increase visibility for our blockchain launch?"
         ))
 
+    def test_lead_seller_ad_is_not_a_client_lead(self):
+        self.assertEqual(
+            self.classify(
+                "Looking for High-Converting, Niche-Targeted Leads? "
+                "AVAILABLE LEAD CATEGORIES: Crypto Leads, Binance Leads, Forex Leads. "
+                "Order Today & Get Premium Leads."
+            ),
+            [],
+        )
+
+    def test_pinksale_tokenomics_support_is_not_a_marketing_client_lead(self):
+        self.assertEqual(
+            self.classify(
+                "Please see this to learn about the available tokens on PinkSale. "
+                "The marketing tax goes to the developer. For further assistance, "
+                "seek assistance with our recommended developers."
+            ),
+            [],
+        )
+
+    def test_message_body_telegram_handles_are_extracted(self):
+        found = self.extract_public_contacts("DM @NomissianHUB for details")
+        self.assertIn(
+            ("@NomissianHUB", "https://t.me/NomissianHUB"),
+            [(item["value"], item.get("url")) for item in found],
+        )
+
+    def test_long_identical_advertisements_dedupe_across_authors(self):
+        first = self.dedupe("group-a", 1, 111, "A" * 120)
+        second = self.dedupe("group-b", 2, 222, "A" * 120)
+        self.assertEqual(first, second)
+
     def test_classifier_does_not_promote_unrelated_indirect_complaints(self):
         self.assertEqual(self.classify(
             "Our local cafe is struggling to attract customers."
