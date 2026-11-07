@@ -74,6 +74,11 @@ jobs:
         if: steps.preflight.outputs.configured == 'true'
         run: python -m pip install -r telegram-worker/requirements.txt
 
+      - name: Test lead qualification rules
+        if: steps.preflight.outputs.configured == 'true'
+        working-directory: telegram-worker
+        run: python -m unittest -v test_worker_rules.py
+
       - name: Validate Telegram session format
         id: session
         if: steps.preflight.outputs.configured == 'true'
