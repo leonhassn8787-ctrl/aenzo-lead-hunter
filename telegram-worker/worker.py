@@ -910,7 +910,6 @@ async def run(once=False):
                     continue
                 dialogs.append(dialog)
 
-            groups_available = len(dialogs)
             public_messages_checked = 0
             public_buyer_signals = 0
             public_leads_saved = 0
