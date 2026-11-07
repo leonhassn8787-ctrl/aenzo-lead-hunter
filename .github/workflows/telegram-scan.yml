@@ -171,6 +171,8 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_OWNER_ID: ${{ secrets.SUPABASE_OWNER_ID }}
+          AENZO_BOT_TOKEN: ${{ secrets.AENZO_BOT_TOKEN }}
+          AENZO_BOT_CHAT_ID: ${{ secrets.AENZO_BOT_CHAT_ID }}
           STATE_FILE: scan_state.json
           MAX_MESSAGES_PER_GROUP: "200"
           LOOKBACK_DAYS: "30"
