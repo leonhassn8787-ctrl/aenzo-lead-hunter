@@ -1,21 +1,28 @@
 # AENZO LABS — Telegram Group Lead Hunter
 
 ## Purpose
-This worker scans only Telegram group conversations that the account owner has already joined and can access. It excludes broadcast channels and does not bypass membership, privacy, or access controls.
+This worker has two Telegram group discovery paths:
 
-It looks for public messages that appear to request AENZO LABS services, then stores:
+- **Joined groups:** scans new accessible messages in every group the account owner has already joined.
+- **Non-joined public groups:** uses Telegram's user-only global group message search (messages.searchGlobal, with groups_only) to discover matching messages from accessible public groups without joining them. Search queries are focused on AENZO buyer-intent phrases; this is not an exhaustive dump of every public group or every message.
+
+It does not bypass membership, privacy, or access controls. Private groups remain inaccessible unless the account is a member. Telegram may rate-limit global searches, and some public groups/messages may not appear in search.
+
+It looks for messages that appear to request AENZO LABS services, then stores:
 - the original message text as evidence and its UTC date;
 - a Telegram message link when that group type supports one;
 - the sender's public Telegram username and any explicitly posted X, WhatsApp, email, Telegram, or website contact details; each is labelled as sourced from the message or author and is not independently verified;
 - detected service categories, a conservative priority score, and English outreach with a Bengali meaning;
-- a stable deduplication key that suppresses the same author's identical cross-posted request across groups, while keeping different authors and different requests separate.
+- a stable deduplication key based on Telegram's numeric user ID: the same account is not sent as a second new lead, even if it changes username or posts again; different user IDs remain separate even when their wording is identical. If no numeric sender ID is available, the message is kept separate rather than guessing identity from a username.
 
 A group title is not treated as a verified company name. Unverified identities are labelled **Potential project (verify)**. Every candidate needs human review before outreach.
 
 ## Accuracy and scan limits
 - Detection requires an AENZO-relevant service signal plus buyer intent. Generic crypto discussion, technical token-launch help, USDT/arbitrage/payment promotions, job-seeking, bot posts, and agency self-advertising are excluded. Indirect growth problems are accepted only when marketing/audience/visibility context is present. This is rule-based, not a full language model: slang-heavy, multilingual, or context-dependent requests can still be missed or misclassified. Review every candidate before outreach.
-- The first scan checks up to `MAX_MESSAGES_PER_GROUP` messages from the last `LOOKBACK_DAYS` days in each group.
-- Messages are processed oldest-first. If a group has more than one batch of unseen messages, the next run continues from the saved cursor rather than skipping the backlog.
+- The first joined-group scan checks accessible history from the last `LOOKBACK_DAYS` days; there is no fixed per-group message-count cap. Each GitHub Actions run still has a 30-minute job timeout.
+- Joined-group messages are processed oldest-first. The saved per-group message cursor resumes any remaining backlog on the next run.
+- Global public-group searches run against a list of buyer-intent phrases. A per-query timestamp is saved only after all result pages complete, so an interrupted or rate-limited query is retried rather than silently skipped.
+- The global search pass is incremental by query time and uses Telegram's regular global group search. It does not use the separate paid global public-channel post-search method.
 - If saving or resolving a candidate fails, that group's cursor is held so the failed message can be retried.
 - The worker ignores messages sent by the account owner and bot accounts.
 - No public username, project identity, or link is invented.
@@ -67,7 +74,7 @@ If Termux cannot install the pinned dependencies or the Telegram login fails, st
 The workflow is:
 https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter/actions/workflows/telegram-scan.yml
 
-It supports manual runs and a six-hour schedule. Each run scans once and exits; it does not keep a server running. When `AENZO_BOT_TOKEN` and `AENZO_BOT_CHAT_ID` are configured, it sends each new saved lead to your private Telegram bot chat with evidence, source link, public contacts, priority, and English/Bengali outreach. Unsent alerts remain pending and are retried on later scans. Existing database records are marked as already handled when bot alerts are enabled, so setup does not flood the bot with historical leads.
+It supports manual runs and a two-hour schedule. Each run scans once and exits; it does not keep a server running. When `AENZO_BOT_TOKEN` and `AENZO_BOT_CHAT_ID` are configured, it sends each new saved lead to your private Telegram bot chat with evidence, source link, public contacts, priority, and English/Bengali outreach. Unsent alerts remain pending and are retried on later scans. Existing database records are marked as already handled when bot alerts are enabled, so setup does not flood the bot with historical leads.
 
 A green **Python syntax and dependency check** proves only that the code compiles and its rule tests pass. A green **AENZO Telegram Group Lead Scan** run proves a real scan only if the log shows that all credentials were configured, dependencies installed, and the Telegram scan step completed. A safe skip is not a scan.
 
