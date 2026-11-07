@@ -286,8 +286,8 @@ def extract_public_contacts(message_text, sender_username=None):
 
 
 def is_human_sender(sender):
-    """Return False for bot accounts; unknown senders remain reviewable."""
-    return not bool(sender and getattr(sender, "bot", False))
+    """Only accept a resolved, non-bot Telegram sender."""
+    return sender is not None and not bool(getattr(sender, "bot", False))
 
 
 def priority(text, hits):
