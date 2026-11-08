@@ -104,6 +104,8 @@ class ScannerTests(unittest.TestCase):
         self.assertIsNone(scanner.classify({"title":"Bitcoin price today","summary":"Market is moving."}, "news_signal"))
         self.assertIsNone(scanner.classify({"title":"Web3 marketing packages available","summary":"We offer services for projects."}, "news_signal"))
         self.assertIsNone(scanner.classify({"title":"Gnosis Pay breach exposes crypto wallets","summary":"A security incident."}, "news_signal"))
+        self.assertIsNone(scanner.classify({"title":"Web3 startup funding round announced","summary":"The company disclosed a data breach and compromised customer wallets."}, "news_signal"))
+        self.assertIsNone(scanner.classify({"title":"Crypto platform raises seed funding","summary":"The platform was hacked and user funds were drained."}, "funding_signal"))
         self.assertIsNone(scanner.classify({"title":"CRYMBO Funding Rounds, Token Sale Review & Tokenomics Analysis - CryptoRank","summary":"CryptoRank project profile."}, "funding_signal"))
 
 if __name__ == "__main__":
