@@ -88,8 +88,6 @@ create table if not exists public.user_settings (
 );
 
 -- Supporting indexes and the database-level identity/evidence dedupe guards.
-create index if not exists discovery_candidates_created_idx
-  on public.discovery_candidates (created_at desc);
 create index if not exists discovery_candidates_owner_status_idx
   on public.discovery_candidates (owner_id, review_status, signal_score desc);
 create index if not exists discovery_candidates_source_id_idx
