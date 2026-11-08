@@ -121,6 +121,20 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("GLOBAL_GROUP_SEARCH_QUERIES", source)
         self.assertIn('state.setdefault("global_search", {})', source)
 
+    def test_public_queries_cover_verdict_recruitment_and_website_services(self):
+        source = WORKER.read_text(encoding="utf-8")
+        for query in (
+            "looking for beta testers",
+            "looking for influencer marketing",
+            "need community manager",
+            "looking for website developer",
+            "need AMA host",
+            "looking for airdrop partner",
+            "looking for launch promotion",
+        ):
+            with self.subTest(query=query):
+                self.assertIn(query, source)
+
     def test_same_author_cross_post_is_deduplicated(self):
         first = self.dedupe("group-a", 100, 42, "Need KOLs for our crypto launch!")
         second = self.dedupe("group-b", 900, 42, "NEED KOLS FOR OUR CRYPTO LAUNCH")
