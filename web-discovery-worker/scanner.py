@@ -136,7 +136,7 @@ def classify(item, kind):
     text = title + " " + item["summary"]
     if not RELEVANT.search(text) or not POSITIVE.search(text):
         return None
-    if VENDOR.search(text) or INCIDENT.search(title) or GENERIC_DIRECTORY.search(title):
+    if VENDOR.search(text) or INCIDENT.search(text) or GENERIC_DIRECTORY.search(title):
         return None
     score = 38
     if re.search(r"\b(raised|raises|funding|seed round|series [a-d]|grant|accelerator)\b", text, re.I):
