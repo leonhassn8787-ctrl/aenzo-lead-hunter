@@ -136,8 +136,10 @@ class LeadSignalTests(unittest.TestCase):
                 self.assertIn(query, source)
 
     def test_new_web3_marketing_partner_request_is_detected(self):
+        # A general marketing-partner request is classified under the broad
+        # Content Distribution & Marketing service signal.
         self.assertIn(
-            "Project Promotion",
+            "Content Distribution & Marketing",
             self.classify("We are seeking a Web3 marketing partner for our blockchain launch"),
         )
 
