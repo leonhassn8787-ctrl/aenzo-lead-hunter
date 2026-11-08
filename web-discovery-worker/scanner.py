@@ -61,9 +61,13 @@ RELEVANT = re.compile(
     r"metaverse|stablecoin|launchpad|onchain|bitcoin|ethereum|solana)\b", re.I
 )
 BUYING = re.compile(
-    r"\b(looking for (kol|marketing|growth|community|pr|influencer)|"
-    r"need (kol|marketing|growth|community|pr|influencer)|"
-    r"hiring (marketing|growth|community)|seeking (marketing|growth|community))\b", re.I
+    r"\\b(looking for (?:a |an |the )?(?:kol|kols|marketing|growth|community|pr|influencer|agency|team|partner|promotion)|"
+    r"need (?:a |an |the )?(?:kol|kols|marketing|growth|community|pr|influencer|agency|team|partner|promotion)|"
+    r"need help with (?:our )?(?:marketing|growth|community|promotion)|"
+    r"hiring (?:a |an )?(?:marketing|growth|community|pr|influencer)|"
+    r"seeking (?:a |an )?(?:marketing|growth|community|pr|influencer|agency|partner)|"
+    r"want to hire (?:a |an )?(?:marketing|growth|community|pr|influencer)|"
+    r"looking to hire (?:a |an )?(?:marketing|growth|community|pr|influencer))\\b", re.I
 )
 INCIDENT = re.compile(r"\\b(breach|hack|exploit|attack|scam|fraud|lawsuit|vulnerability|outage|liquidation|liquidated|price prediction|market update)\\b", re.I)
 GENERIC_DIRECTORY = re.compile(r"funding rounds, token sale review & tokenomics analysis", re.I)
@@ -145,6 +149,10 @@ def classify(item, kind):
         score += 5
     return min(score, 90)
 
+def extract_marketing_need(text):
+    match = BUYING.search(text or "")
+    return match.group(0) if match else None
+
 def telegram_send(text):
     if not BOT_TOKEN or not BOT_CHAT_ID:
         return
@@ -190,6 +198,10 @@ def main():
                     "published_at": item["published"].isoformat() if item["published"] else None,
                     "signal_type": source["kind"],
                     "signal_score": score,
+                    "buyer_intent_status": "explicit_need" if extract_marketing_need(item["title"] + " " + item["summary"]) else "no_explicit_need",
+                    "marketing_need": extract_marketing_need(item["title"] + " " + item["summary"]),
+                    "public_contacts": [],
+                    "enrichment_status": "pending",
                     "review_status": "new",
                     "dedupe_key": dedupe,
                 })
@@ -220,7 +232,7 @@ def main():
         f"Sources checked: {checked}/{len(SOURCES)}",
         f"Potential signals found: {len(candidates)}",
         f"New candidates saved: {len(inserted)}",
-        "These are discovery candidates, NOT confirmed clients.",
+        "Only explicit marketing requests are buyer-intent signals; funding/launch news remains unverified.",
     ]
     for row in inserted[:8]:
         lines.append("• " + row["source_name"] + ": " + row["title"][:100] + "\n" + row["evidence_url"])
