@@ -1116,7 +1116,16 @@ async def run(once=False):
                         break
                     if not msg:
                         continue
+
+                    # Checkpoint only the previous batch before processing this message.
+                    # If the worker stops mid-message, this message remains eligible for retry.
+                    if messages_since_checkpoint >= 25 and not group_write_failed:
+                        meta["last_seen_id"] = max(last_seen, newest_seen)
+                        write_state(state)
+                        messages_since_checkpoint = 0
+
                     newest_seen = max(newest_seen, int(msg.id))
+                    messages_since_checkpoint += 1
                     if getattr(msg, "out", False):
                         continue
                     if not msg.message or not msg.date:
@@ -1189,12 +1198,6 @@ async def run(once=False):
                         meta["qualified_leads"] = int(meta.get("qualified_leads", 0)) + 1
                     elif save_status == "error":
                         group_write_failed = True
-
-                    messages_since_checkpoint += 1
-                    if not group_write_failed and messages_since_checkpoint >= 25:
-                        meta["last_seen_id"] = max(last_seen, newest_seen)
-                        write_state(state)
-                        messages_since_checkpoint = 0
 
                 if not group_write_failed:
                     meta["last_seen_id"] = max(last_seen, newest_seen)
