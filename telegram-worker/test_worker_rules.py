@@ -403,8 +403,16 @@ class LeadSignalTests(unittest.TestCase):
     def test_recruitment_request(self):
         self.assert_signal("Recruitment", "Hiring community manager for our crypto project")
 
-    def test_verdict_testing_request(self):
-        self.assert_signal("Project Review / VERDICT", "Looking for beta testers for our app")
+    def test_beta_tester_recruitment_is_not_a_paid_client_lead(self):
+        self.assertEqual(self.classify("Looking for beta testers for our app"), [])
+        self.assertEqual(self.classify("We are opening early access and need app testers"), [])
+        self.assertEqual(self.classify("Looking for product feedback from early users"), [])
+
+    def test_verdict_testing_service_buyer_request(self):
+        self.assert_signal(
+            "Project Review / VERDICT",
+            "We need a beta testing team to test our Web3 app and provide structured feedback.",
+        )
 
     def test_ama_request(self):
         self.assert_signal("AMA Hosting & Engagement", "Need AMA hosting partner")
