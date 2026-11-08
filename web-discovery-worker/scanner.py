@@ -491,7 +491,7 @@ def enrich_candidate(candidate):
                     seen.add(key)
                     contacts.append(contact)
         result["public_contacts"] = contacts[:40]
-        result["enrichment_status"] = "completed" if contacts else "partial"
+        result["enrichment_status"] = "completed"
         # Explicit buyer intent must be supported by a real request in the fetched public evidence.
         combined = candidate.get("title","") + " " + candidate.get("summary","")
         need = extract_marketing_need(combined)
@@ -562,7 +562,8 @@ def main():
     pending_query = "discovery_candidates?select=id,title,summary,evidence_url,source_name,buyer_intent_status&owner_id=eq." + OWNER_ID + "&review_status=eq.new&order=created_at.desc&limit=" + str(MAX_ENRICH_PER_RUN)
     pending = api("GET", pending_query + "&enrichment_status=eq.pending") or []
     failed = api("GET", pending_query + "&enrichment_status=eq.failed") or []
-    pending = (pending + failed)[:MAX_ENRICH_PER_RUN]
+    partial = api("GET", pending_query + "&enrichment_status=eq.partial&project_website=is.null") or []
+    pending = (pending + failed + partial)[:MAX_ENRICH_PER_RUN]
     enriched_count = 0
     enriched_rows = []
     for candidate in (pending or []):
