@@ -50,6 +50,7 @@ class ScannerTests(unittest.TestCase):
         contacts = scanner.extract_contacts("https://soter.example/team", page)
         kinds = {item["type"] for item in contacts}
         self.assertTrue({"person","email","telegram","x"}.issubset(kinds))
+        self.assertIn(("John Doe", "Founder"), scanner.role_people(page["text"]))
         self.assertTrue(all(item["verification"] == "found_on_official_site" for item in contacts))
 
     def test_end_to_end_enrichment_links_official_site_and_public_contacts(self):
@@ -76,6 +77,21 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(result["enrichment_status"], "completed")
         self.assertEqual({c["type"] for c in result["public_contacts"]}, {"person","email","telegram","x"})
         self.assertEqual(result["buyer_intent_status"], "no_explicit_need")
+
+    def test_alternate_news_publisher_can_reveal_official_site(self):
+        rss = b"""<rss><channel><item><title>Soter funding announcement</title><link>https://news.google.com/rss/articles/123</link><description>Soter funding</description></item></channel></rss>"""
+        article = b'<html><body><p>More information about Soter</p><a href="https://www.soter.insure/">soter.insure</a></body></html>'
+        def fake_fetch(url, limit=scanner.MAX_PAGE_BYTES):
+            if "news.google.com/rss/search" in url:
+                return url, "application/rss+xml", rss
+            if "news.google.com/rss/articles/123" in url:
+                return "https://prnewswire.com/news-releases/soter.html", "text/html", article
+            raise OSError("unexpected URL")
+        title = "Standard Chartered and SBI back crypto insurer Soter as funding reaches $23.5 million"
+        with patch.object(scanner, "safe_fetch", side_effect=fake_fetch):
+            official, evidence = scanner.find_official_site_from_related_news(title, "https://www.coindesk.com/story", "CoinDesk")
+        self.assertEqual(official, "https://www.soter.insure/")
+        self.assertIn("prnewswire.com", evidence)
 
     def test_private_and_local_urls_are_blocked(self):
         with self.assertRaises(ValueError):
