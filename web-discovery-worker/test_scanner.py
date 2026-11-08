@@ -33,6 +33,30 @@ class ScannerTests(unittest.TestCase):
         self.assertIsNotNone(scanner.extract_marketing_need("Need help with our community growth."))
         self.assertIsNone(scanner.extract_marketing_need("Our Web3 startup raised $8 million."))
     
+    def test_official_site_requires_named_source_link(self):
+        source_html = b'<html><body><a href="https://soter.example/">Soter</a><a href="https://random.example/">Click</a></body></html>'
+        page = scanner.parse_page("https://news.example/story", source_html)
+        self.assertEqual(scanner.choose_official_site("https://news.example/story", page, "Soter crypto insurer raises funding", "CoinDesk"), "https://soter.example/")
+
+    def test_product_hunt_website_cta_is_recognized(self):
+        source_html = b'<html><body><a href="https://launch.example/">Visit website</a></body></html>'
+        page = scanner.parse_page("https://producthunt.com/posts/app", source_html)
+        self.assertEqual(scanner.choose_official_site("https://producthunt.com/posts/app", page, "App - Web3 wallet launch", "Product Hunt"), "https://launch.example/")
+
+    def test_public_contacts_are_extracted_with_official_page_evidence(self):
+        html = b'<html><head><meta property="og:title" content="Soter"></head><body><p>John Doe, Founder</p><a href="mailto:bd@soter.example">Email BD</a><a href="https://t.me/soter">Telegram</a><a href="https://x.com/soter">X</a></body></html>'
+        page = scanner.parse_page("https://soter.example/team", html)
+        contacts = scanner.extract_contacts("https://soter.example/team", page)
+        kinds = {item["type"] for item in contacts}
+        self.assertTrue({"person","email","telegram","x"}.issubset(kinds))
+        self.assertTrue(all(item["verification"] == "found_on_official_site" for item in contacts))
+
+    def test_private_and_local_urls_are_blocked(self):
+        with self.assertRaises(ValueError):
+            scanner.validate_public_url("http://127.0.0.1/admin")
+        with self.assertRaises(ValueError):
+            scanner.validate_public_url("file:///etc/passwd")
+
     def test_irrelevant_vendor_incident_and_generic_directory_posts_are_filtered(self):
         self.assertIsNone(scanner.classify({"title":"Bitcoin price today","summary":"Market is moving."}, "news_signal"))
         self.assertIsNone(scanner.classify({"title":"Web3 marketing packages available","summary":"We offer services for projects."}, "news_signal"))
