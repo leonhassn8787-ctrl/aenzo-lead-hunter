@@ -316,6 +316,7 @@ def role_people(text):
     patterns = [
         re.compile(r"\b([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){1,3})\s*(?:,|[-–|])\s*(Founder|Co-Founder|CEO|Chief Executive Officer|Head of Marketing|Marketing Director|Marketing Manager|Business Development|BD Lead|BD Manager)\b"),
         re.compile(r"\b(Founder|Co-Founder|CEO|Chief Executive Officer|Head of Marketing|Marketing Director|Marketing Manager|Business Development|BD Lead|BD Manager)\s*[:\-–]\s*([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){1,3})\b"),
+        re.compile(r"\b([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){1,3})\s+(Founder(?:\s*&\s*CEO)?|Co-Founder|CEO|Head of Marketing|Marketing Director|Marketing Manager|Business Development|BD Lead|BD Manager)\b"),
     ]
     for pattern in patterns:
         for match in pattern.finditer(text or ""):
@@ -363,6 +364,8 @@ def extract_contacts(page_url, page):
         elif host and ("x.com" in host or "twitter.com" in host):
             if not re.search(r"/(share|intent|search)(/|$)", parsed.path, re.I):
                 add("x", target, page_url, None, "Linked from official website")
+        elif host and "linkedin.com" in host:
+            add("linkedin", target, page_url, None, "Linked from official website")
     return contacts
 
 def choose_official_site(source_url, source_page, title, source_name):
@@ -391,6 +394,34 @@ def choose_official_site(source_url, source_page, title, source_name):
     if score < (3 if source_name == "Product Hunt" else 2):
         return None
     return href
+
+def find_official_site_from_related_news(title, original_url, source_name):
+    """Use another public publisher's copy when the primary article blocks crawlers."""
+    terms = project_terms(title)
+    focus = terms[-1] if terms else title.split()[0]
+    query = '"' + focus + '" (crypto OR blockchain OR digital asset) (funding OR announcement OR press release)'
+    rss_url = "https://news.google.com/rss/search?" + urllib.parse.urlencode({"q":query,"hl":"en-US","gl":"US","ceid":"US:en"})
+    try:
+        _, _, rss_body = safe_fetch(rss_url, 900000)
+        items = parse_feed(rss_body)
+    except Exception:
+        return None, None
+    original_host = (urlsplit(original_url).hostname or "").lower()
+    for item in items[:8]:
+        try:
+            article_url, content_type, body = safe_fetch(item["url"], 900000)
+            article_host = (urlsplit(article_url).hostname or "").lower()
+            if not article_host or article_host == original_host:
+                continue
+            if "html" not in content_type and not body.lstrip().lower().startswith((b"<!doctype html",b"<html")):
+                continue
+            page = parse_page(article_url, body)
+            official = choose_official_site(article_url, page, title, source_name)
+            if official:
+                return official, article_url
+        except Exception:
+            continue
+    return None, None
 
 def search_official_site(title):
     """Try public search result pages; candidate domains are verified again by site metadata."""
@@ -451,6 +482,10 @@ def enrich_candidate(candidate):
         except Exception as exc:
             result["enrichment_error"] = "Source page fetch failed: " + str(exc)[:150]
         official_url = choose_official_site(resolved_url, source_page, candidate.get("title",""), candidate.get("source_name",""))
+        if not official_url:
+            official_url, alternate_evidence = find_official_site_from_related_news(candidate.get("title",""), resolved_url, candidate.get("source_name",""))
+            if alternate_evidence:
+                result["resolved_evidence_url"] = alternate_evidence
         if not official_url:
             official_url = search_official_site(candidate.get("title",""))
         if not official_url:
