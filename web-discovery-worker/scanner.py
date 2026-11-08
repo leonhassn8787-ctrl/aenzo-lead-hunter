@@ -392,16 +392,55 @@ def choose_official_site(source_url, source_page, title, source_name):
         return None
     return href
 
+def search_official_site(title):
+    """Fallback discovery when a publisher blocks article fetches."""
+    query = urllib.parse.urlencode({"q": (title + " official website").strip()})
+    search_url = "https://html.duckduckgo.com/html/?" + query
+    try:
+        final_url, content_type, body = safe_fetch(search_url, 700000)
+        page = parse_page(final_url, body)
+    except Exception:
+        return None
+    terms = project_terms(title)
+    scored = {}
+    for item in page["anchors"]:
+        href = urljoin(final_url, item["href"])
+        parsed = urlsplit(href)
+        params = urllib.parse.parse_qs(parsed.query)
+        if "uddg" in params:
+            href = urllib.parse.unquote(params["uddg"][0])
+            parsed = urlsplit(href)
+        host = (parsed.hostname or "").lower()
+        if parsed.scheme not in ("http","https") or not host or is_social_host(host):
+            continue
+        if any(x in host for x in ("duckduckgo.com","google.com","bing.com","coindesk.com","producthunt.com","crunchbase.com","rootdata.com","cryptorank.io","vcbacked.co","dappradar.com","tgeindex.com","projectstartups.com","meridial.io","grants.watch","hacklist.io","openvc.app")):
+            continue
+        label = clean_text(item["text"]).lower()
+        score = sum(2 for term in terms if term in label)
+        score += sum(2 for term in terms if term in host.split("."))
+        if score:
+            scored[host] = max(scored.get(host,(0,href)),(score,href))
+    if not scored:
+        return None
+    host, (score, href) = max(scored.items(),key=lambda item:item[1][0])
+    return href if score >= 2 else None
+
 def enrich_candidate(candidate):
     result = {"project_website":None,"project_name":None,"resolved_evidence_url":None,"public_contacts":[],"enrichment_status":"failed","buyer_intent_status":candidate.get("buyer_intent_status","unverified")}
     try:
-        resolved_url, content_type, body = safe_fetch(candidate["evidence_url"])
-        if "html" not in content_type and not body.lstrip().lower().startswith((b"<!doctype html",b"<html")):
-            result["enrichment_status"] = "partial"
-            return result
-        result["resolved_evidence_url"] = resolved_url
-        source_page = parse_page(resolved_url, body)
+        resolved_url = candidate["evidence_url"]
+        source_page = {"title":"","site_name":"","description":"","anchors":[],"jsonld":[],"text":""}
+        try:
+            resolved_url, content_type, body = safe_fetch(candidate["evidence_url"])
+            if "html" in content_type or body.lstrip().lower().startswith((b"<!doctype html",b"<html")):
+                result["resolved_evidence_url"] = resolved_url
+                source_page = parse_page(resolved_url, body)
+        except Exception:
+            # Publisher anti-bot/rate limits must not stop project-site discovery.
+            pass
         official_url = choose_official_site(resolved_url, source_page, candidate.get("title",""), candidate.get("source_name",""))
+        if not official_url:
+            official_url = search_official_site(candidate.get("title",""))
         if not official_url:
             result["enrichment_status"] = "partial"
             return result
@@ -422,7 +461,7 @@ def enrich_candidate(candidate):
         result["project_name"] = official_page["site_name"] or official_page["title"] or None
         pages = [(official_url, official_page)]
         base = urlsplit(official_url)
-        for path in ("/about","/team","/contact","/company"):
+        for path in ("/about","/about-us","/team","/our-team","/leadership","/contact","/contact-us","/company"):
             target = urlunsplit((base.scheme,base.netloc,path,"",""))
             try:
                 u, ct, data = safe_fetch(target, 450000)
@@ -507,7 +546,7 @@ def main():
 
     # Enrich newly inserted and previously pending candidates with public official-site evidence.
     # Contact details are only kept when found on a site linked by the source page.
-    pending = api("GET", "discovery_candidates?select=id,title,summary,evidence_url,source_name,buyer_intent_status&owner_id=eq." + OWNER_ID + "&enrichment_status=eq.pending&order=created_at.desc&limit=" + str(MAX_ENRICH_PER_RUN))
+    pending = api("GET", "discovery_candidates?select=id,title,summary,evidence_url,source_name,buyer_intent_status&owner_id=eq." + OWNER_ID + "&enrichment_status=eq.pending&review_status=eq.new&order=created_at.desc&limit=" + str(MAX_ENRICH_PER_RUN))
     enriched_count = 0
     enriched_rows = []
     for candidate in (pending or []):
