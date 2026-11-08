@@ -228,7 +228,8 @@ def main():
         lines.append("Feed errors: " + "; ".join(errors[:5]))
     report = "\n".join(lines)
     print(report)
-    telegram_send(report)
+    if inserted or errors:
+        telegram_send(report)
     if checked == 0:
         raise SystemExit("No web sources could be checked; inspect feed/network errors.")
 
