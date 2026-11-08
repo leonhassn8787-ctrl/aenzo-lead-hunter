@@ -59,6 +59,13 @@ GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for PR or AMA",
     "looking for project promotion",
     "need social media marketing",
+    "looking for beta testers",
+    "looking for influencer marketing",
+    "need community manager",
+    "looking for website developer",
+    "need AMA host",
+    "looking for airdrop partner",
+    "looking for launch promotion",
 ]
 
 # Signals that indicate a project may need one or more AENZO services.
