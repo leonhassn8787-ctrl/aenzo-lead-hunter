@@ -546,7 +546,10 @@ def main():
 
     # Enrich newly inserted and previously pending candidates with public official-site evidence.
     # Contact details are only kept when found on a site linked by the source page.
-    pending = api("GET", "discovery_candidates?select=id,title,summary,evidence_url,source_name,buyer_intent_status&owner_id=eq." + OWNER_ID + "&enrichment_status=in.(pending,failed)&review_status=eq.new&order=created_at.desc&limit=" + str(MAX_ENRICH_PER_RUN))
+    pending_query = "discovery_candidates?select=id,title,summary,evidence_url,source_name,buyer_intent_status&owner_id=eq." + OWNER_ID + "&review_status=eq.new&order=created_at.desc&limit=" + str(MAX_ENRICH_PER_RUN)
+    pending = api("GET", pending_query + "&enrichment_status=eq.pending") or []
+    failed = api("GET", pending_query + "&enrichment_status=eq.failed") or []
+    pending = (pending + failed)[:MAX_ENRICH_PER_RUN]
     enriched_count = 0
     enriched_rows = []
     for candidate in (pending or []):
