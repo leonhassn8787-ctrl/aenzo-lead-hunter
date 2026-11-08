@@ -638,6 +638,23 @@ class LeadSignalTests(unittest.TestCase):
             with self.subTest(message=message):
                 self.assertEqual(self.classify(message), [])
 
+    def test_vendor_database_and_ad_account_inventory_posts_are_rejected(self):
+        posts = [
+            "Fresh Crypto, investors,business, depositors, recovery, bank Leads etc..Just Landed. We give you access to our private database tool.",
+            "TABOOLA AD ACCOUNTS AVAILABLE! Regular Accounts, Agency Accounts, Network Accounts. DM for availability, pricing, and details.",
+            "Premium Advertising Accounts. Looking for stable accounts? We have rental and purchase options available.",
+            "Need a Team? We help set up multi-user call centre ops worldwide.",
+        ]
+        for post in posts:
+            with self.subTest(post=post):
+                self.assertEqual(self.classify(post), [])
+
+    def test_explicit_project_campaign_request_remains_qualified(self):
+        self.assertIn(
+            "KOL & Influencer Marketing",
+            self.classify("We are a Web3 project looking for KOLs for a paid token launch campaign. Please share your rates."),
+        )
+
     def test_realistic_service_seller_ads_are_rejected(self):
         seller_posts = [
             "Professional communication and telecom services. Looking for reliable solutions? Our services include Bulk SMS, VoIP and SIP trunking.",
