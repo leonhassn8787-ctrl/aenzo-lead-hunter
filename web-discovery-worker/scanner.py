@@ -393,40 +393,49 @@ def choose_official_site(source_url, source_page, title, source_name):
     return href
 
 def search_official_site(title):
-    """Fallback discovery when a publisher blocks article fetches."""
-    query = urllib.parse.urlencode({"q": (title + " official website").strip()})
-    search_url = "https://html.duckduckgo.com/html/?" + query
-    try:
-        final_url, content_type, body = safe_fetch(search_url, 700000)
-        page = parse_page(final_url, body)
-    except Exception:
-        return None
+    """Try public search result pages; candidate domains are verified again by site metadata."""
     terms = project_terms(title)
-    scored = {}
-    for item in page["anchors"]:
-        href = urljoin(final_url, item["href"])
-        parsed = urlsplit(href)
-        params = urllib.parse.parse_qs(parsed.query)
-        if "uddg" in params:
-            href = urllib.parse.unquote(params["uddg"][0])
+    queries = [
+        "https://html.duckduckgo.com/html/?" + urllib.parse.urlencode({"q": (title + " official website").strip()}),
+        "https://www.google.com/search?" + urllib.parse.urlencode({"q": (title + " official website").strip(), "num": "10"}),
+        "https://www.bing.com/search?" + urllib.parse.urlencode({"q": (title + " official website").strip()}),
+    ]
+    excluded = ("duckduckgo.com","google.com","bing.com","yahoo.com","coindesk.com","producthunt.com","crunchbase.com","rootdata.com","cryptorank.io","vcbacked.co","dappradar.com","tgeindex.com","projectstartups.com","meridial.io","grants.watch","hacklist.io","openvc.app")
+    for search_url in queries:
+        try:
+            final_url, content_type, body = safe_fetch(search_url, 900000)
+            page = parse_page(final_url, body)
+        except Exception:
+            continue
+        scored = {}
+        for item in page["anchors"]:
+            href = urljoin(final_url, item["href"])
             parsed = urlsplit(href)
-        host = (parsed.hostname or "").lower()
-        if parsed.scheme not in ("http","https") or not host or is_social_host(host):
-            continue
-        if any(x in host for x in ("duckduckgo.com","google.com","bing.com","coindesk.com","producthunt.com","crunchbase.com","rootdata.com","cryptorank.io","vcbacked.co","dappradar.com","tgeindex.com","projectstartups.com","meridial.io","grants.watch","hacklist.io","openvc.app")):
-            continue
-        label = clean_text(item["text"]).lower()
-        score = sum(2 for term in terms if term in label)
-        score += sum(2 for term in terms if term in host.split("."))
-        if score:
-            scored[host] = max(scored.get(host,(0,href)),(score,href))
-    if not scored:
-        return None
-    host, (score, href) = max(scored.items(),key=lambda item:item[1][0])
-    return href if score >= 2 else None
+            params = urllib.parse.parse_qs(parsed.query)
+            for key in ("uddg","q","url"):
+                if key in params and params[key][0].startswith(("http://","https://")):
+                    href = urllib.parse.unquote(params[key][0])
+                    parsed = urlsplit(href)
+                    break
+            host = (parsed.hostname or "").lower()
+            if parsed.scheme not in ("http","https") or not host or is_social_host(host):
+                continue
+            if any(x in host for x in excluded):
+                continue
+            label = clean_text(item["text"]).lower()
+            domain_parts = host.split(".")
+            score = sum(2 for term in terms if term in label)
+            score += sum(2 for term in terms if term in domain_parts)
+            if score:
+                scored[host] = max(scored.get(host,(0,href)),(score,href))
+        if scored:
+            host, (score, href) = max(scored.items(),key=lambda item:item[1][0])
+            if score >= 2:
+                return href
+    return None
 
 def enrich_candidate(candidate):
-    result = {"project_website":None,"project_name":None,"resolved_evidence_url":None,"public_contacts":[],"enrichment_status":"failed","buyer_intent_status":candidate.get("buyer_intent_status","unverified")}
+    result = {"project_website":None,"project_name":None,"resolved_evidence_url":None,"public_contacts":[],"enrichment_status":"failed","enrichment_error":None,"buyer_intent_status":candidate.get("buyer_intent_status","unverified")}
     try:
         resolved_url = candidate["evidence_url"]
         source_page = {"title":"","site_name":"","description":"","anchors":[],"jsonld":[],"text":""}
@@ -435,14 +444,18 @@ def enrich_candidate(candidate):
             if "html" in content_type or body.lstrip().lower().startswith((b"<!doctype html",b"<html")):
                 result["resolved_evidence_url"] = resolved_url
                 source_page = parse_page(resolved_url, body)
-        except Exception:
-            # Publisher anti-bot/rate limits must not stop project-site discovery.
-            pass
+        except urllib.error.HTTPError as exc:
+            # Preserve the final redirected publisher URL even when its page blocks automated access.
+            result["resolved_evidence_url"] = exc.geturl()
+            resolved_url = exc.geturl()
+        except Exception as exc:
+            result["enrichment_error"] = "Source page fetch failed: " + str(exc)[:150]
         official_url = choose_official_site(resolved_url, source_page, candidate.get("title",""), candidate.get("source_name",""))
         if not official_url:
             official_url = search_official_site(candidate.get("title",""))
         if not official_url:
             result["enrichment_status"] = "partial"
+            result["enrichment_error"] = result.get("enrichment_error") or "Could not verify an official project website from the source page or public search results."
             return result
         official_url, official_type, official_body = safe_fetch(official_url)
         if "html" not in official_type and not official_body.lstrip().lower().startswith((b"<!doctype html",b"<html")):
