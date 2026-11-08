@@ -1,0 +1,12 @@
+# AENZO Web Discovery Worker
+
+Scans public RSS and Google News RSS discovery indexes for Web3/crypto/AI project, funding, grant, token launch and product launch signals.
+
+Important:
+- Discovery records are stored in `public.discovery_candidates`, not promoted to confirmed leads.
+- A human review is required before a candidate becomes a lead.
+- CoinDesk and Product Hunt use public RSS feeds.
+- Other directory sources use Google News RSS site-restricted search because no verified public feed was configured for them.
+- RootData's free API requires an API key; CryptoRank funding endpoints require a paid tier. Neither paid API is called by this worker.
+- No paid service or API is enabled.
+- The scheduled workflow runs every two hours and records results in `public.scan_runs`.
