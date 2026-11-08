@@ -482,6 +482,16 @@ class LeadSignalTests(unittest.TestCase):
             self.classify("Our crypto wallet needs a marketing agency for its upcoming launch."),
         )
 
+    def test_genuine_buyer_budget_language_is_not_mistaken_for_a_vendor(self):
+        buyer_messages = [
+            "Our Web3 project is looking for KOLs for launch. We have an approved budget.",
+            "We need an influencer marketing agency for our wallet. We have budget for a paid campaign.",
+            "Looking for a PR partner for our token launch; we have funds approved and are ready to hire.",
+        ]
+        for message in buyer_messages:
+            with self.subTest(message=message):
+                self.assertTrue(self.classify(message))
+
     def test_kol_network_and_project_promotion_vendors_are_rejected(self):
         examples = [
             "Need KOLs? We have a large influencer network and can promote your token.",
