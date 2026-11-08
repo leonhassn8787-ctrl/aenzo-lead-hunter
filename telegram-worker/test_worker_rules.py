@@ -783,7 +783,7 @@ class JoinedGroupCheckpointTests(unittest.TestCase):
     def test_checkpoint_counts_all_messages_and_saves_before_current_message(self):
         source = WORKER.read_text(encoding="utf-8")
         start = source.index("async for msg in client.iter_messages(entity")
-        end = source.index("newest_seen = max(last_seen, newest_seen)", start)
+        end = source.index("if not group_write_failed:", start)
         loop_start = source[start:end]
         checkpoint = loop_start.index('if messages_since_checkpoint >= 25 and not group_write_failed:')
         save_cursor = loop_start.index('meta["last_seen_id"] = max(last_seen, newest_seen)')
