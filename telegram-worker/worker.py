@@ -230,7 +230,8 @@ SELLER_POST_CONTEXT = re.compile(
     r"get (targeted|campaign.ready|organized) (leads|business data|campaign data)|"
     r"lead generation (data|services|solutions) available|"
     r"our services|supported campaigns|"
-    r"looking for .{0,180} (i have|we have|we offer|we provide|let'?s get you set up)"
+    r"looking for .{0,180} (i have|we have) (a (large )?(kol|influencer|telegram|community) (network|team|group)|available (accounts|leads|services|solutions|packages)|the solution|the right solution)|"
+    r"looking for .{0,180} (we offer|we provide|let'?s get you set up)"
     r")\b",
     re.I,
 )
