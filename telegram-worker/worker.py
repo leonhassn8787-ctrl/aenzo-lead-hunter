@@ -89,7 +89,10 @@ SIGNALS = {
         r"ama collaboration", r"(host|hosting) an ama",
     ],
     "PR & Media Visibility": [
-        r"looking for pr", r"need pr (agency|service|support)",
+        r"looking for pr", r"looking for (a |an )?pr (agency|partner|service|firm|support)",
+        r"need (a |an )?pr (agency|partner|service|firm|support)",
+        r"seeking (a |an )?pr (agency|partner|service|firm|support)",
+        r"need pr (agency|service|support)",
         r"media coverage", r"press release", r"crypto pr (agency|services|campaign)",
         r"get (our )?(project|brand|token) featured", r"need more media exposure",
     ],
