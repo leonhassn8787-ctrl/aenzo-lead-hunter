@@ -69,7 +69,7 @@ BUYING = re.compile(
     r"want to hire (?:a |an )?(?:marketing|growth|community|pr|influencer)|"
     r"looking to hire (?:a |an )?(?:marketing|growth|community|pr|influencer))\b", re.I
 )
-INCIDENT = re.compile(r"\b(breach|hack|exploit|attack|scam|fraud|lawsuit|vulnerability|outage|liquidation|liquidated|price prediction|market update)\b", re.I)
+INCIDENT = re.compile(r"\b(breach|hack(?:ed|ing)?|exploit(?:ed)?|attack(?:ed)?|scam|fraud|lawsuit|vulnerability|outage|liquidation|liquidated|price prediction|market update|rug pull|phishing|stolen funds|drained|compromised|data leak|security incident|bankruptcy|insolvency|investigation)\b", re.I)
 GENERIC_DIRECTORY = re.compile(r"funding rounds, token sale review & tokenomics analysis", re.I)
 VENDOR = re.compile(
     r"\b(we offer|we provide|our services|marketing packages|"
