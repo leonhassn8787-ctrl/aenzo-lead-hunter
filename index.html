@@ -28,6 +28,11 @@
 <div class="stat"><b id="statLeads">—</b><small>Total leads</small></div><div class="stat"><b id="statNew">—</b><small>New leads</small></div><div class="stat"><b id="statPriority">—</b><small>Priority 70+</small></div><div class="stat"><b id="statContacts">—</b><small>Leads with public contacts</small></div>
 </div>
 <section style="margin-top:20px"><div class="row"><h2>Saved leads</h2><select id="statusFilter" class="status"><option value="all">All statuses</option><option value="new">New</option><option value="contacted">Contacted</option><option value="interested">Interested</option><option value="negotiation">Negotiation</option><option value="converted">Converted</option><option value="rejected">Rejected</option></select></div><div id="leadList"></div></section>
+<section style="margin-top:24px">
+<div class="row"><h2>Project discovery candidates</h2><button id="refreshCandidatesBtn">Refresh candidates</button></div>
+<div class="sub">Funding, launch, grant, and product signals from public sources. These are research candidates, not confirmed buyers.</div>
+<div id="candidateList"></div>
+</section>
 </main>
 <div class="footer">AENZO LABS · Private workspace · Automated matches are potential leads, not confirmed buyers</div>
 </div>
@@ -36,7 +41,7 @@ const SUPABASE_URL="https://royezoicromoebaxqzhx.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY="sb_publishable_ZKEVHzwVb364okXLhLZXBg_2IdGgg1N";
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 const $=id=>document.getElementById(id);
-let session=null,leads=[];
+let session=null,leads=[],candidates=[];
 const endpoint=name=>`${SUPABASE_URL}/functions/v1/${name}`;
 function esc(s=""){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function safeUrl(value){try{const u=new URL(String(value));return ["https:","http:"].includes(u.protocol)?u.href:"";}catch{return "";}}
@@ -46,12 +51,36 @@ function hideMsg(){$("message").classList.add("hidden");}
 async function callFn(name){const {data:{session:s}}=await sb.auth.getSession();if(!s)throw Error("Session expired. Please sign in again.");const r=await fetch(endpoint(name),{headers:{"apikey":SUPABASE_PUBLISHABLE_KEY,"Authorization":"Bearer "+s.access_token}});const j=await r.json().catch(()=>({error:"Invalid server response"}));if(!r.ok)throw Error(j.error||`Request failed (${r.status})`);return j;}
 function contactHtml(contacts){if(!Array.isArray(contacts)||!contacts.length)return '<span class="muted tiny">No public contact found in source</span>';return contacts.map(c=>{if(!c||typeof c!=="object")return "";const href=safeUrl(c.url);const label=c.value||(c.username?"@"+c.username:(c.type||"Contact"));const kind=c.type?c.type.toUpperCase()+": ":"";const display=kind+label;return href?`<a href="${esc(href)}" target="_blank" rel="noopener">${esc(display)}</a>`:esc(display);}).filter(Boolean).join(" · ");}
 function render(){const status=$("statusFilter").value;const visible=status==="all"?leads:leads.filter(l=>l.status===status);$("statLeads").textContent=leads.length;$("statNew").textContent=leads.filter(l=>l.status==="new").length;$("statPriority").textContent=leads.filter(l=>Number(l.priority_score)>=70).length;$("statContacts").textContent=leads.filter(l=>Array.isArray(l.contacts)&&l.contacts.length>0).length;const root=$("leadList");if(!visible.length){root.innerHTML='<div class="empty">No Telegram leads in this filter yet. The scanner will save matches after Telegram login is configured and a scan succeeds.</div>';return;}root.innerHTML=visible.map(l=>{const evidence=safeUrl(l.evidence_url),group=safeUrl(l.telegram_group_url);return `<article class="card"><div class="row"><div><h3>${esc(l.company_name||"Potential project — verify")}</h3><div class="muted tiny">${esc(l.industry||"Web3 / Crypto")} · ${esc(l.lead_type||"potential_buyer")} · ${date(l.evidence_date||l.created_at)}</div></div><div class="score">${Number(l.priority_score)||0}/100</div></div><p><b>Service need:</b> ${esc(l.service_need||"Needs manual verification")}</p><p><b>Public contacts:</b> ${contactHtml(l.contacts)}</p><div class="links">${evidence?`<a href="${esc(evidence)}" target="_blank" rel="noopener">Open message evidence ↗</a>`:""}${group?`<a href="${esc(group)}" target="_blank" rel="noopener">Open group ↗</a>`:""}</div><details><summary>Evidence, outreach and notes</summary><p><b>Original message</b></p><pre>${esc(l.evidence_summary||"No evidence text saved.")}</pre>${l.outreach_english?`<p><b>English outreach</b></p><pre>${esc(l.outreach_english)}</pre>`:""}${l.outreach_bengali?`<p><b>বাংলা অর্থ</b></p><pre>${esc(l.outreach_bengali)}</pre>`:""}${l.notes?`<p class="muted tiny">${esc(l.notes)}</p>`:""}</details><div class="row" style="margin-top:12px"><span class="muted tiny">Saved ${date(l.created_at)}</span><select class="status" aria-label="Lead status" onchange="updateLeadStatus('${esc(l.id)}',this.value)">${["new","contacted","interested","negotiation","converted","rejected"].map(v=>`<option value="${v}" ${l.status===v?"selected":""}>${v}</option>`).join("")}</select></div></article>`;}).join("");}
-async function loadAll(){hideMsg();try{const data=await callFn("lead-hunter-api");leads=data.leads||[];render();}catch(e){msg(e.message,"err");}}
+function renderCandidates(){
+ const root=$("candidateList");
+ if(!candidates.length){root.innerHTML='<div class="empty">No discovery candidates yet. The web-source scan runs every two hours.</div>';return;}
+ root.innerHTML=candidates.map(c=>{
+  const link=safeUrl(c.evidence_url);
+  return `<article class="card"><div class="row"><div><h3>${esc(c.title||"Untitled public signal")}</h3><div class="muted tiny">${esc(c.source_name)} · ${esc(c.signal_type||"discovery")} · ${date(c.published_at||c.created_at)}</div></div><div class="score">${Number(c.signal_score)||0}/100</div></div><p>${esc(c.summary||"No summary provided.")}</p><div class="links">${link?`<a href="${esc(link)}" target="_blank" rel="noopener">Open original evidence ↗</a>`:""}</div><div class="row"><span class="muted tiny">Candidate only — verify actual marketing need</span><select class="status" aria-label="Candidate review status" onchange="updateCandidateStatus('${esc(c.id)}',this.value)"><option value="new" ${c.review_status==="new"?"selected":""}>New</option><option value="reviewed" ${c.review_status==="reviewed"?"selected":""}>Reviewed</option><option value="converted" ${c.review_status==="converted"?"selected":""}>Converted to lead</option><option value="rejected" ${c.review_status==="rejected"?"selected":""}>Rejected</option></select></div></article>`;
+ }).join("");
+}
+async function loadCandidates(){
+ const {data,error}=await sb.from("discovery_candidates").select("id,source_name,title,summary,evidence_url,published_at,signal_type,signal_score,review_status,created_at").eq("owner_id",session.user.id).order("signal_score",{ascending:false}).order("created_at",{ascending:false}).limit(150);
+ if(error)throw error;
+ candidates=data||[];
+ renderCandidates();
+}
+window.updateCandidateStatus=async(id,status)=>{
+ try{
+  const {data,error}=await sb.from("discovery_candidates").update({review_status:status}).eq("id",id).eq("owner_id",session.user.id).select("id").maybeSingle();
+  if(error)throw error;
+  if(!data)throw Error("Candidate status was not changed.");
+  msg("Candidate review status updated.","ok");
+  await loadCandidates();
+ }catch(e){msg(e.message||"Could not update candidate status.","err");}
+};
+async function loadAll(){hideMsg();try{const data=await callFn("lead-hunter-api");leads=data.leads||[];render();await loadCandidates();}catch(e){msg(e.message,"err");}}
 window.updateLeadStatus=async(id,status)=>{try{const {data,error}=await sb.from("leads").update({status}).eq("id",id).eq("owner_id",session.user.id).select("id").maybeSingle();if(error)throw error;if(!data)throw Error("Status was not changed. Check your account access.");msg("Lead status updated.","ok");await loadAll();}catch(e){msg(e.message||"Could not update status.","err");}};
 $("loginBtn").onclick=async()=>{const b=$("loginBtn");b.disabled=true;$("loginMsg").classList.add("hidden");try{const {data,error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(error)throw error;session=data.session;showApp();}catch(e){$("loginMsg").textContent=e.message;$("loginMsg").className="notice err";}finally{b.disabled=false;}};
 function showApp(){$("loginBox").classList.add("hidden");$("app").classList.remove("hidden");$("logout").classList.remove("hidden");loadAll();}
 $("logout").onclick=async()=>{await sb.auth.signOut();location.reload();};
 $("refreshBtn").onclick=loadAll;
+$("refreshCandidatesBtn").onclick=loadCandidates;
 $("statusFilter").onchange=render;
 sb.auth.getSession().then(({data})=>{if(data.session){session=data.session;showApp();}});
 </script>
