@@ -61,15 +61,15 @@ RELEVANT = re.compile(
     r"metaverse|stablecoin|launchpad|onchain|bitcoin|ethereum|solana)\b", re.I
 )
 BUYING = re.compile(
-    r"\\b(looking for (?:a |an |the )?(?:kol|kols|marketing|growth|community|pr|influencer|agency|team|partner|promotion)|"
+    r"\b(looking for (?:a |an |the )?(?:kol|kols|marketing|growth|community|pr|influencer|agency|team|partner|promotion)|"
     r"need (?:a |an |the )?(?:kol|kols|marketing|growth|community|pr|influencer|agency|team|partner|promotion)|"
     r"need help with (?:our )?(?:marketing|growth|community|promotion)|"
     r"hiring (?:a |an )?(?:marketing|growth|community|pr|influencer)|"
     r"seeking (?:a |an )?(?:marketing|growth|community|pr|influencer|agency|partner)|"
     r"want to hire (?:a |an )?(?:marketing|growth|community|pr|influencer)|"
-    r"looking to hire (?:a |an )?(?:marketing|growth|community|pr|influencer))\\b", re.I
+    r"looking to hire (?:a |an )?(?:marketing|growth|community|pr|influencer))\b", re.I
 )
-INCIDENT = re.compile(r"\\b(breach|hack|exploit|attack|scam|fraud|lawsuit|vulnerability|outage|liquidation|liquidated|price prediction|market update)\\b", re.I)
+INCIDENT = re.compile(r"\b(breach|hack|exploit|attack|scam|fraud|lawsuit|vulnerability|outage|liquidation|liquidated|price prediction|market update)\b", re.I)
 GENERIC_DIRECTORY = re.compile(r"funding rounds, token sale review & tokenomics analysis", re.I)
 VENDOR = re.compile(
     r"\b(we offer|we provide|our services|marketing packages|"
