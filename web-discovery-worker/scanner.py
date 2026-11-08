@@ -399,29 +399,35 @@ def find_official_site_from_related_news(title, original_url, source_name):
     """Use another public publisher's copy when the primary article blocks crawlers."""
     terms = project_terms(title)
     focus = terms[-1] if terms else title.split()[0]
-    query = '"' + focus + '" (crypto OR blockchain OR digital asset) (funding OR announcement OR press release)'
-    rss_url = "https://news.google.com/rss/search?" + urllib.parse.urlencode({"q":query,"hl":"en-US","gl":"US","ceid":"US:en"})
-    try:
-        _, _, rss_body = safe_fetch(rss_url, 900000)
-        items = parse_feed(rss_body)
-    except Exception:
-        return None, None
+    queries = [
+        '"' + focus + ' Insure" website',
+        '"' + focus + ' Insure" funding',
+        '"' + focus + '" crypto insurer announcement',
+    ]
     original_host = (urlsplit(original_url).hostname or "").lower()
-    for item in items[:8]:
+    for query in queries:
+        rss_url = "https://news.google.com/rss/search?" + urllib.parse.urlencode({"q":query,"hl":"en-US","gl":"US","ceid":"US:en"})
         try:
-            article_url, content_type, body = safe_fetch(item["url"], 900000)
-            article_host = (urlsplit(article_url).hostname or "").lower()
-            if not article_host or article_host == original_host:
-                continue
-            if "html" not in content_type and not body.lstrip().lower().startswith((b"<!doctype html",b"<html")):
-                continue
-            page = parse_page(article_url, body)
-            official = choose_official_site(article_url, page, title, source_name)
-            if official:
-                return official, article_url
+            _, _, rss_body = safe_fetch(rss_url, 900000)
+            items = parse_feed(rss_body)
         except Exception:
             continue
+        for item in items[:10]:
+            try:
+                article_url, content_type, body = safe_fetch(item["url"], 900000)
+                article_host = (urlsplit(article_url).hostname or "").lower()
+                if not article_host or article_host == original_host:
+                    continue
+                if "html" not in content_type and not body.lstrip().lower().startswith((b"<!doctype html",b"<html")):
+                    continue
+                page = parse_page(article_url, body)
+                official = choose_official_site(article_url, page, title, source_name)
+                if official:
+                    return official, article_url
+            except Exception:
+                continue
     return None, None
+
 
 def search_official_site(title):
     """Try public search result pages; candidate domains are verified again by site metadata."""
