@@ -393,12 +393,13 @@ def choose_official_site(source_url, source_page, title, source_name):
     return href
 
 def enrich_candidate(candidate):
-    result = {"project_website":None,"public_contacts":[],"enrichment_status":"failed","buyer_intent_status":candidate.get("buyer_intent_status","unverified")}
+    result = {"project_website":None,"project_name":None,"resolved_evidence_url":None,"public_contacts":[],"enrichment_status":"failed","buyer_intent_status":candidate.get("buyer_intent_status","unverified")}
     try:
         resolved_url, content_type, body = safe_fetch(candidate["evidence_url"])
         if "html" not in content_type and not body.lstrip().lower().startswith((b"<!doctype html",b"<html")):
             result["enrichment_status"] = "partial"
             return result
+        result["resolved_evidence_url"] = resolved_url
         source_page = parse_page(resolved_url, body)
         official_url = choose_official_site(resolved_url, source_page, candidate.get("title",""), candidate.get("source_name",""))
         if not official_url:
@@ -418,6 +419,7 @@ def enrich_candidate(candidate):
             result["enrichment_status"] = "partial"
             return result
         result["project_website"] = official_url
+        result["project_name"] = official_page["site_name"] or official_page["title"] or None
         pages = [(official_url, official_page)]
         base = urlsplit(official_url)
         for path in ("/about","/team","/contact","/company"):
@@ -505,7 +507,7 @@ def main():
 
     # Enrich newly inserted and previously pending candidates with public official-site evidence.
     # Contact details are only kept when found on a site linked by the source page.
-    pending = api("GET", "discovery_candidates?select=id,title,summary,evidence_url,source_name,buyer_intent_status&owner_id=eq." + OWNER_ID + "&enrichment_status=eq.pending&order=created_at.desc&limit=" + str(MAX_ENRICH_PER_RUN))
+    pending = api("GET", "discovery_candidates?select=id,title,summary,evidence_url,source_name,buyer_intent_status&owner_id=eq." + OWNER_ID + "&enrichment_status=in.(pending,failed)&order=created_at.desc&limit=" + str(MAX_ENRICH_PER_RUN))
     enriched_count = 0
     for candidate in (pending or []):
         details = enrich_candidate(candidate)
