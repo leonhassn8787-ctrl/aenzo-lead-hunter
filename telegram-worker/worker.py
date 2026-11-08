@@ -49,7 +49,7 @@ POLL_SECONDS = bounded_int_env("POLL_SECONDS", 600, 60, 86400)
 LOOKBACK_DAYS = bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)
 GLOBAL_SEARCH_MAX_PAGES = bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)
 SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
-CLASSIFIER_RULES_VERSION = 4
+CLASSIFIER_RULES_VERSION = 5
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for KOL",
@@ -318,6 +318,14 @@ SELLER_POST_CONTEXT = re.compile(
     r"i (offer|provide|specialize in|help|support|work with|only deal with|deliver|supply) (advertisers|businesses|brands|clients|media buyers|agencies|accounts|leads)|"
     r"we give you access to .{0,100}(database|data|lead|tool)|"
     r"(our|my) (database|data|leads|accounts|services|solutions|packages) (include|are available|available)|"
+    r"fresh crypto,? investors?,? business,? depositors?.{0,100}(leads|data)|"
+    r"(taboola|meta|google|tiktok|facebook) (ad )?accounts? (available|for rent|for sale)|"
+    r"(premium|verified|agency|network) advertising accounts?|" 
+    r"ad accounts? (available|options|rental|purchase)|"
+    r"looking to buy (ad|advertising) accounts?|" 
+    r"(database tool|private database|premium lead samples|data drops)|"
+    r"we help set up multi.user call cent(re|er) ops|" 
+    r"(account options|campaign support|account setup|technical support).{0,150}(available|dm|contact|pricing)|"
     r"serious buyers only|dm to discuss availability|reliable supplier|"
     r"available lead categories|high.converting.{0,40}leads|niche.targeted leads|"
     r"fresh (crypto|investor|business|consumer|email|phone) leads|"
