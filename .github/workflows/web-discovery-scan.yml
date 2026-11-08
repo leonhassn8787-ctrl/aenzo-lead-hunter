@@ -1,6 +1,10 @@
 name: AENZO Web Discovery Scan
 
 on:
+  push:
+    paths:
+      - "web-discovery-worker/**"
+      - ".github/workflows/web-discovery-scan.yml"
   schedule:
     - cron: "37 */2 * * *"
   workflow_dispatch:
@@ -24,6 +28,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Validate scanner syntax
+        run: python -m py_compile web-discovery-worker/scanner.py
 
       - name: Scan public project and funding signals
         env:
