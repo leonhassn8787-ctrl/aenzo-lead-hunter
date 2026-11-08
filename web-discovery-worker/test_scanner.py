@@ -1,5 +1,6 @@
 import os
 import unittest
+from unittest.mock import patch
 from datetime import datetime, timezone
 
 os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
@@ -50,6 +51,31 @@ class ScannerTests(unittest.TestCase):
         kinds = {item["type"] for item in contacts}
         self.assertTrue({"person","email","telegram","x"}.issubset(kinds))
         self.assertTrue(all(item["verification"] == "found_on_official_site" for item in contacts))
+
+    def test_end_to_end_enrichment_links_official_site_and_public_contacts(self):
+        source_html = b'<html><body><a href="https://soter.example/">Soter</a></body></html>'
+        official_html = b'<html><head><meta property="og:title" content="Soter"><meta property="og:site_name" content="Soter"></head><body><p>Jane Doe, Founder</p><a href="mailto:bd@soter.example">BD email</a><a href="https://t.me/soter">Telegram</a><a href="https://x.com/soter">X</a></body></html>'
+        def fake_fetch(url, limit=scanner.MAX_PAGE_BYTES):
+            if url == "https://news.example/story":
+                return url, "text/html", source_html
+            if url == "https://soter.example/":
+                return url, "text/html", official_html
+            raise OSError("page not found")
+        candidate = {
+            "title":"Standard Chartered and SBI back crypto insurer Soter as funding reaches $23.5 million",
+            "summary":"A Web3 insurance company raised funding.",
+            "source_name":"CoinDesk",
+            "evidence_url":"https://news.example/story",
+            "buyer_intent_status":"unverified",
+        }
+        with patch.object(scanner, "safe_fetch", side_effect=fake_fetch):
+            result = scanner.enrich_candidate(candidate)
+        self.assertEqual(result["project_website"], "https://soter.example/")
+        self.assertEqual(result["resolved_evidence_url"], "https://news.example/story")
+        self.assertEqual(result["project_name"], "Soter")
+        self.assertEqual(result["enrichment_status"], "completed")
+        self.assertEqual({c["type"] for c in result["public_contacts"]}, {"person","email","telegram","x"})
+        self.assertEqual(result["buyer_intent_status"], "no_explicit_need")
 
     def test_private_and_local_urls_are_blocked(self):
         with self.assertRaises(ValueError):
