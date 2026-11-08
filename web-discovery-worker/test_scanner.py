@@ -28,9 +28,11 @@ class ScannerTests(unittest.TestCase):
         score = scanner.classify(item, "funding_signal")
         self.assertGreaterEqual(score, 50)
 
-    def test_irrelevant_or_vendor_posts_are_filtered(self):
+    def test_irrelevant_vendor_incident_and_generic_directory_posts_are_filtered(self):
         self.assertIsNone(scanner.classify({"title":"Bitcoin price today","summary":"Market is moving."}, "news_signal"))
         self.assertIsNone(scanner.classify({"title":"Web3 marketing packages available","summary":"We offer services for projects."}, "news_signal"))
+        self.assertIsNone(scanner.classify({"title":"Gnosis Pay breach exposes crypto wallets","summary":"A security incident."}, "news_signal"))
+        self.assertIsNone(scanner.classify({"title":"CRYMBO Funding Rounds, Token Sale Review & Tokenomics Analysis - CryptoRank","summary":"CryptoRank project profile."}, "funding_signal"))
 
 if __name__ == "__main__":
     unittest.main()
