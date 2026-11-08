@@ -1,6 +1,14 @@
 name: AENZO Telegram Group Lead Scan
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "telegram-worker/worker.py"
+      - "telegram-worker/test_worker_rules.py"
+      - "telegram-worker/requirements.txt"
+      - ".github/workflows/telegram-scan.yml"
   workflow_dispatch:
     inputs:
       test_bot:
