@@ -32,6 +32,9 @@ jobs:
       - name: Validate scanner syntax
         run: python -m py_compile web-discovery-worker/scanner.py
 
+      - name: Run scanner tests
+        run: python -m unittest discover -s web-discovery-worker -p "test_*.py" -v
+
       - name: Scan public project and funding signals
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
