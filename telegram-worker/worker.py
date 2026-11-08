@@ -59,7 +59,7 @@ GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for PR or AMA",
     "looking for project promotion",
     "need social media marketing",
-    "looking for beta testers",
+    "need beta testing team",
     "looking for influencer marketing",
     "need community manager",
     "looking for website developer",
@@ -144,9 +144,11 @@ SIGNALS = {
         r"looking for (motion graphics|video editing|graphic design)",
     ],
     "Project Review / VERDICT": [
-        r"looking for (project|product) review", r"need testers",
-        r"looking for beta testers", r"need (app|game|platform|website) testers",
-        r"looking for product feedback",
+        r"looking for (project|product) review",
+        r"(need|looking for|hiring) (a )?(beta testing|product testing|qa testing) (agency|team|partner|service)",
+        r"need (an? )?(external )?(team|agency|partner) to (test|review|evaluate) (our )?(app|game|platform|website|product)",
+        r"looking for (an? )?(external )?(team|agency|partner) to (test|review|evaluate) (our )?(app|game|platform|website|product)",
+        r"need professional (beta )?testing (services|support|team)",
     ],
     "Fundraising / Launch Promotion": [
         r"looking for (fundraising|launch) (marketing|promotion|partner)",
@@ -249,7 +251,10 @@ SELLER_POST_CONTEXT = re.compile(
 NON_BUYER_CONTEXT = re.compile(
     r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
     r"hire me|anyone hiring me|free airdrop|airdrop claim|claim (my )?airdrop|"
-    r"token price prediction|price prediction|trading signals|wallet (is )?(not working|stuck)|"
+    r"token price prediction|price prediction|trading signals|"
+    r"looking for beta testers|need beta testers|recruiting beta testers|"
+    r"looking for (app|game|platform|website) testers|looking for product feedback|"
+    r"wallet (is )?(not working|stuck)|"
     r"account (is )?(locked|suspended)|"
     r"we (offer|provide|specialize in|are offering|can provide|can help (with|you))|"
     r"we are (a|an) [a-z -]{1,50}(agency|service provider|marketing team|growth team|pr firm)|"
