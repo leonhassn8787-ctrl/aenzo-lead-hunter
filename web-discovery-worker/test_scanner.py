@@ -51,6 +51,7 @@ class ScannerTests(unittest.TestCase):
         kinds = {item["type"] for item in contacts}
         self.assertTrue({"person","email","telegram","x"}.issubset(kinds))
         self.assertIn(("John Doe", "Founder"), scanner.role_people(page["text"]))
+        self.assertIn(("Henson Orser", "Founder & CEO"), scanner.role_people("Henson Orser Founder & CEO"))
         self.assertTrue(all(item["verification"] == "found_on_official_site" for item in contacts))
 
     def test_end_to_end_enrichment_links_official_site_and_public_contacts(self):
