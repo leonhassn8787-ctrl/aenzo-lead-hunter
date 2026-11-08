@@ -49,7 +49,7 @@ POLL_SECONDS = bounded_int_env("POLL_SECONDS", 600, 60, 86400)
 LOOKBACK_DAYS = bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)
 GLOBAL_SEARCH_MAX_PAGES = bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)
 SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
-CLASSIFIER_RULES_VERSION = 3
+CLASSIFIER_RULES_VERSION = 4
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for KOL",
@@ -66,6 +66,16 @@ GLOBAL_GROUP_SEARCH_QUERIES = [
     "need AMA host",
     "looking for airdrop partner",
     "looking for launch promotion",
+    "need web3 marketing agency",
+    "looking for growth agency",
+    "need user acquisition",
+    "looking for paid promotion",
+    "need crypto marketing partner",
+    "looking for community management",
+    "need influencer campaign",
+    "looking for brand awareness",
+    "need project visibility",
+    "looking for marketing manager",
 ]
 
 # Signals that indicate a project may need one or more AENZO services.
@@ -79,6 +89,8 @@ SIGNALS = {
         r"need (kols|influencers)", r"kol campaign", r"influencer campaign",
         r"(crypto|web3) influencer (marketing|campaign|promotion)",
         r"anyone know (a |any )?(good )?(kol|influencer|influencers)",
+        r"(we are |we're )?(looking for|seeking) (a |an )?(kol|influencer) (agency|partner|team)",
+        r"need (a |an )?(kol|influencer) (agency|partner|team|campaign)",
         r"(need|looking for) someone to (run|manage) (our )?(kol|influencer) campaign",
     ],
     "Community Promotion": [
@@ -90,6 +102,8 @@ SIGNALS = {
         r"help us grow (our )?(telegram )?community",
         r"(telegram|community) (group )?(is )?(quiet|inactive|small).*(grow|users|members|engagement)",
         r"anyone know (a |any )?(community growth|telegram promotion) (agency|team|partner)",
+        r"(looking for|seeking) (a |an )?(community management|community growth) (agency|partner|team)",
+        r"need (a |an )?(community management|community growth) (agency|partner|team)",
     ],
     "AMA Hosting & Engagement": [
         r"looking for ama", r"need ama (host|hosting|partner)",
@@ -113,6 +127,9 @@ SIGNALS = {
         r"need (content distribution|content marketing)",
         r"content distribution (partner|service|agency)",
         r"looking for (marketing|content) agency",
+        r"(need|seeking) (a |an )?(web3 |crypto )?marketing (agency|partner|team)",
+        r"looking for (a |an )?(web3 |crypto )?growth (agency|partner|team)",
+        r"need (a |an )?growth (agency|partner|team)",
     ],
     "Social Media Marketing": [
         r"need social media (marketing|management|promotion)",
@@ -122,6 +139,10 @@ SIGNALS = {
     ],
     "Project Promotion": [
         r"looking for (promotion|marketing) (agency|partner|service)",
+        r"(need|seeking) (a |an )?(marketing|growth) partner",
+        r"looking for (paid promotion|project visibility|brand awareness)",
+        r"need (more )?(project visibility|brand awareness|user acquisition)",
+        r"(looking for|need) (a |an )?user acquisition (agency|partner|team|service)",
         r"need project promotion", r"promote our project",
         r"looking for a marketing partner", r"project marketing campaign",
         r"upcoming launch (promotion|marketing)",
@@ -377,7 +398,9 @@ def classify(text):
         r"can anyone recommend|does anyone know|anyone know|who can help|"
         r"can someone help|anyone able to|partner with|could use|"
         r"struggling to|not getting enough|trying to increase|"
-        r"trying to grow|want to grow|want to increase|want to attract)\b",
+        r"trying to grow|want to grow|want to increase|want to attract|"
+        r"we are looking for|we're looking for|we need|we are seeking|"
+        r"looking to onboard|who handles|recommend a (marketing|growth|pr) agency)\b",
         re.I,
     )
 
