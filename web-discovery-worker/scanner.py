@@ -507,12 +507,14 @@ def main():
 
     # Enrich newly inserted and previously pending candidates with public official-site evidence.
     # Contact details are only kept when found on a site linked by the source page.
-    pending = api("GET", "discovery_candidates?select=id,title,summary,evidence_url,source_name,buyer_intent_status&owner_id=eq." + OWNER_ID + "&enrichment_status=in.(pending,failed)&order=created_at.desc&limit=" + str(MAX_ENRICH_PER_RUN))
+    pending = api("GET", "discovery_candidates?select=id,title,summary,evidence_url,source_name,buyer_intent_status&owner_id=eq." + OWNER_ID + "&enrichment_status=eq.pending&order=created_at.desc&limit=" + str(MAX_ENRICH_PER_RUN))
     enriched_count = 0
+    enriched_rows = []
     for candidate in (pending or []):
         details = enrich_candidate(candidate)
         details["enriched_at"] = datetime.now(timezone.utc).isoformat()
         api("PATCH", "discovery_candidates?id=eq." + candidate["id"] + "&owner_id=eq." + OWNER_ID, details)
+        enriched_rows.append({"title":candidate.get("title","Project candidate"), **details})
         enriched_count += 1
 
     finished = datetime.now(timezone.utc)
@@ -533,12 +535,16 @@ def main():
         "Only explicit marketing requests are buyer-intent signals; funding/launch news remains unverified.",
     ]
     for row in inserted[:8]:
-        lines.append("• " + row["source_name"] + ": " + row["title"][:100] + "\n" + row["evidence_url"])
+        lines.append("• New candidate — " + row["source_name"] + ": " + row["title"][:100] + "\n" + row["evidence_url"])
+    for row in enriched_rows[:8]:
+        site = row.get("project_website") or "Official website not verified"
+        contacts = ", ".join((item.get("type","contact") + ": " + item.get("value","")) for item in row.get("public_contacts",[])[:4]) or "No public contacts verified"
+        lines.append("• Enriched — " + row.get("title","Project")[:90] + "\n" + site + "\n" + contacts)
     if errors:
         lines.append("Feed errors: " + "; ".join(errors[:5]))
     report = "\n".join(lines)
     print(report)
-    if inserted or errors:
+    if inserted or enriched_rows or errors:
         telegram_send(report)
     if checked == 0:
         raise SystemExit("No web sources could be checked; inspect feed/network errors.")
