@@ -135,6 +135,36 @@ class LeadSignalTests(unittest.TestCase):
             with self.subTest(query=query):
                 self.assertIn(query, source)
 
+    def test_new_web3_marketing_partner_request_is_detected(self):
+        self.assertIn(
+            "Project Promotion",
+            self.classify("We are seeking a Web3 marketing partner for our blockchain launch"),
+        )
+
+    def test_user_acquisition_agency_request_is_detected(self):
+        self.assertIn(
+            "Project Promotion",
+            self.classify("Need a user acquisition agency for our crypto wallet launch"),
+        )
+
+    def test_new_public_search_queries_cover_growth_and_visibility(self):
+        source = WORKER.read_text(encoding="utf-8")
+        for query in (
+            "need web3 marketing agency",
+            "looking for growth agency",
+            "need user acquisition",
+            "looking for paid promotion",
+            "need project visibility",
+        ):
+            with self.subTest(query=query):
+                self.assertIn(query, source)
+
+    def test_expanded_buyer_detection_does_not_admit_vendor_promotion_ads(self):
+        self.assertEqual(
+            self.classify("We provide KOL marketing and paid promotion for crypto projects. DM us for rates."),
+            [],
+        )
+
     def test_same_author_cross_post_is_deduplicated(self):
         first = self.dedupe("group-a", 100, 42, "Need KOLs for our crypto launch!")
         second = self.dedupe("group-b", 900, 42, "NEED KOLS FOR OUR CRYPTO LAUNCH")
