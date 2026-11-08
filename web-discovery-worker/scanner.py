@@ -65,6 +65,8 @@ BUYING = re.compile(
     r"need (kol|marketing|growth|community|pr|influencer)|"
     r"hiring (marketing|growth|community)|seeking (marketing|growth|community))\b", re.I
 )
+INCIDENT = re.compile(r"\\b(breach|hack|exploit|attack|scam|fraud|lawsuit|vulnerability|outage|liquidation|liquidated|price prediction|market update)\\b", re.I)
+GENERIC_DIRECTORY = re.compile(r"funding rounds, token sale review & tokenomics analysis", re.I)
 VENDOR = re.compile(
     r"\b(we offer|we provide|our services|marketing packages|"
     r"available for promotion|dm for rates|buy our|sell our)\b", re.I
@@ -126,10 +128,11 @@ def parse_feed(xml_bytes):
     return output
 
 def classify(item, kind):
-    text = item["title"] + " " + item["summary"]
+    title = item["title"]
+    text = title + " " + item["summary"]
     if not RELEVANT.search(text) or not POSITIVE.search(text):
         return None
-    if VENDOR.search(text):
+    if VENDOR.search(text) or INCIDENT.search(title) or GENERIC_DIRECTORY.search(title):
         return None
     score = 38
     if re.search(r"\b(raised|raises|funding|seed round|series [a-d]|grant|accelerator)\b", text, re.I):
