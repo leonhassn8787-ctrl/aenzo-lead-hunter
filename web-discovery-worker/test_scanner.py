@@ -28,6 +28,11 @@ class ScannerTests(unittest.TestCase):
         score = scanner.classify(item, "funding_signal")
         self.assertGreaterEqual(score, 50)
 
+    def test_explicit_marketing_need_is_detected_separately(self):
+        self.assertIsNotNone(scanner.extract_marketing_need("We are looking for a marketing agency for our Web3 wallet."))
+        self.assertIsNotNone(scanner.extract_marketing_need("Need help with our community growth."))
+        self.assertIsNone(scanner.extract_marketing_need("Our Web3 startup raised $8 million."))
+    
     def test_irrelevant_vendor_incident_and_generic_directory_posts_are_filtered(self):
         self.assertIsNone(scanner.classify({"title":"Bitcoin price today","summary":"Market is moving."}, "news_signal"))
         self.assertIsNone(scanner.classify({"title":"Web3 marketing packages available","summary":"We offer services for projects."}, "news_signal"))
