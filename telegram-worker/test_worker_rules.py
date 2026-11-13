@@ -207,6 +207,15 @@ class LeadSignalTests(unittest.TestCase):
         self.assertEqual(headers["apikey"], "sb_secret_test")
         self.assertNotIn("Authorization", headers)
 
+    def test_notification_alerts_fetch_all_pages_before_sending(self):
+        source = WORKER.read_text(encoding="utf-8")
+        start = source.index("async def notify_pending_leads(http):")
+        end = source.index("\\n\\nasync def send_scan_report", start)
+        notify = source[start:end]
+        self.assertIn("'offset': str(offset)", notify)
+        self.assertIn("pending.extend(page)", notify)
+        self.assertLess(notify.index("pending.extend(page)"), notify.index("for lead in pending"))
+
     def assert_signal(self, category, message):
         self.assertTrue(
             any(pattern.search(message) for pattern in self.patterns[category]),
