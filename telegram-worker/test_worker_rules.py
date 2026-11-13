@@ -584,6 +584,8 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("messages_processed >= MAX_MESSAGES_PER_RUN", source)
         self.assertIn('query_meta["cursor"]', source)
         self.assertIn("public_cursor_is_after(msg, cursor)", source)
+        self.assertIn("global_search_query_index", source)
+        self.assertIn("rotate_global_search_queries(GLOBAL_GROUP_SEARCH_QUERIES", source)
         self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 50, 1, 100)', source)
         self.assertIn('CLASSIFIER_RULES_VERSION = 9', source)
         for phrase in (
@@ -1087,11 +1089,13 @@ class PublicSearchCursorTests(unittest.TestCase):
             nodes["public_message_cursor_key"],
             nodes["public_cursor_is_after"],
             nodes["store_public_cursor"],
+            nodes["rotate_global_search_queries"],
         ]
         exec(compile(ast.Module(body=selected, type_ignores=[]), str(WORKER), "exec"), namespace)
         cls.cursor_key = staticmethod(namespace["public_message_cursor_key"])
         cls.is_after = staticmethod(namespace["public_cursor_is_after"])
         cls.store = staticmethod(namespace["store_public_cursor"])
+        cls.rotate_queries = staticmethod(namespace["rotate_global_search_queries"])
 
     def test_public_cursor_resumes_by_timestamp_peer_and_message_id(self):
         from datetime import datetime, timezone
@@ -1108,6 +1112,13 @@ class PublicSearchCursorTests(unittest.TestCase):
         self.assertFalse(self.is_after(same, cursor))
         self.assertTrue(self.is_after(next_id, cursor))
         self.assertTrue(self.is_after(next_peer, cursor))
+
+    def test_public_search_query_order_rotates_without_starving_later_phrases(self):
+        self.assertEqual(
+            self.rotate_queries(["first", "second", "third"], 1),
+            [(1, "second"), (2, "third"), (0, "first")],
+        )
+        self.assertEqual(self.rotate_queries([], 0), [])
 
     def test_public_cursor_is_persisted_in_query_state(self):
         from datetime import datetime, timezone
