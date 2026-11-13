@@ -52,6 +52,7 @@ SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
 CLASSIFIER_RULES_VERSION = 8
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
+    "looking for beta testers",
     "looking for KOL",
     "need marketing agency",
     "looking for community growth",
@@ -159,6 +160,7 @@ SIGNALS = {
         r"looking for (kol|kols|influencer|influencers)",
         r"searching for (kol|kols|influencer|influencers)",
         r"want to hire (kol|kols|influencer|influencers)",
+        r"looking to hire (kol|kols|influencer|influencers)",
         r"looking to hire (an? )?(external )?(kol|influencer|marketing|growth) (agency|team)",
         r"need help with (our )?(kol|influencer) campaign",
         r"need (kols|influencers)", r"kol campaign", r"influencer campaign",
