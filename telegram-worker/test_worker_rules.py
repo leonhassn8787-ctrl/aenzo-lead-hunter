@@ -1162,7 +1162,7 @@ class GroupScanningOptimizationTests(unittest.TestCase):
 
     def test_worker_numeric_environment_settings_are_bounded(self):
         source = WORKER.read_text(encoding="utf-8")
-        self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
+        self.assertIn('bounded_int_env("POLL_SECONDS", 14400, 60, 86400)', source)
         self.assertIn('bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)', source)
         self.assertIn('bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)', source)
         self.assertIn('bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)', source)
