@@ -1238,7 +1238,7 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         self.assertIn('bounded_int_env("POLL_SECONDS", 14400, 60, 86400)', source)
         self.assertIn('bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)', source)
         self.assertIn('bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)', source)
-        self.assertIn('bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)', source)
+        self.assertIn('bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1920)', source)
         self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 1300, 1, 2000)', source)
 
     def test_scan_report_separates_joined_groups_from_public_search_signals(self):
