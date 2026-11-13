@@ -1216,7 +1216,9 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         self.assertIn("'status': 'eq.new'", notification_code)
         self.assertIn("'telegram_notified_at': 'is.null'", notification_code)
         self.assertIn("'owner_id': 'eq.' + SUPABASE_OWNER_ID", notification_code)
-        self.assertIn("'limit': '25'", notification_code)
+        self.assertIn("'limit': '100'", notification_code)
+        self.assertIn("'offset': str(offset)", notification_code)
+        self.assertIn('pending.extend(page)', notification_code)
 
     def test_worker_numeric_environment_settings_are_bounded(self):
         source = WORKER.read_text(encoding="utf-8")
