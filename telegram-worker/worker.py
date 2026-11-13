@@ -53,7 +53,7 @@ MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 1300, 1, 2000)
 MAX_PUBLIC_MESSAGES_PER_RUN = min(bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500), MAX_MESSAGES_PER_RUN)
 MAX_JOINED_MESSAGES_PER_RUN = bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 1000, 1, 1500)
 MAX_MESSAGES_PER_GROUP_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_GROUP_PER_RUN", 10, 1, 50)
-CLASSIFIER_RULES_VERSION = 17
+CLASSIFIER_RULES_VERSION = 18
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for beta testers",
@@ -418,6 +418,11 @@ NON_BUYER_CONTEXT = re.compile(
     r"looking for (a )?(new )?(role|position|opportunity)|available for (a )?(new )?(role|position|opportunity)|"
     r"anyone hiring|is anyone hiring|who is hiring|job opportunities|employment opportunities|"
     r"looking to join (a |your |any )?team|"
+    r"looking for bd partners|bd partners to onboard|partner recruitment|"
+    r"looking for (affiliate|affiliates|ambassadors?|referral partners?|regional representatives)|"
+    r"join our (affiliate|ambassador|referral|partner) program|"
+    r"open to mutually beneficial collaborations|open for (pr )?collaborations|"
+    r"seeking collaborations with (web3 |crypto )?(projects|communities|media partners)|"
     r"hire me|anyone hiring me|free airdrop|airdrop claim|claim (my )?airdrop|"
     r"token price prediction|price prediction|trading signals|"
     r"wallet (is )?(not working|stuck)|"
@@ -535,8 +540,6 @@ def classify(text):
                 CRYPTO_CONTEXT.search(text)
                 and re.search(
                     r"\b(early users?|early adopters?|beta testers?|product feedback|mvp testing|"
-                    r"pr collaborations?|x partnerships?|twitter partnerships?|cross[- ]marketing|"
-                    r"co[- ]marketing|joint campaigns?|ama partnerships?|"
                     r"looking to hire .{0,60}(kol|kols|influencer|marketing|growth)|"
                     r"hiring .{0,60}(kol|kols|influencer|marketing|growth))\b",
                     text,
@@ -572,12 +575,14 @@ def classify(text):
         r"\b(looking for|looking to hire|searching for|seeking|need|needs|want to hire|"
         r"hiring|want to work with|looking to work with|need help with|"
         r"can anyone recommend|does anyone know|anyone know|who can help|"
-        r"can someone help|anyone able to|partner with|could use|"
+        r"can someone help|anyone able to|could use|"
         r"struggling to|not getting enough|trying to increase|"
         r"trying to grow|want to grow|want to increase|want to attract|"
         r"we are looking for|we're looking for|we need|we are seeking|"
         r"looking to onboard|who handles|recommend a (marketing|growth|pr) agency|"
-        r"open to|open for|interested in (a |an )?(partnership|collaboration|cross[- ]marketing))\b",
+        r"partner with (a |an )?(web3 |crypto )?marketing agency|"
+        r"looking for a (web3 |crypto )?marketing partner|"
+        r"interested in hiring a (web3 |crypto )?marketing team)\b",
         re.I,
     )
 
@@ -627,10 +632,6 @@ def classify(text):
             r"user acquisition|launch promotion|project promotion|paid campaign)\b",
             re.I,
         )
-        partnership_opportunity = (
-            re.search(r"\b(collaboration|collaborations|partnership|partnerships|cross[- ]marketing|co[- ]marketing|joint campaign)\b", text, re.I)
-            and CRYPTO_CONTEXT.search(text)
-        )
         growth_demand = re.compile(
             r"\b(users?|user base|audience|traction|signups|registrations|"
             r"engagement|members|visibility|early users?|early adopters?|beta testers?|product feedback)\b",
@@ -643,7 +644,7 @@ def classify(text):
         )
         # Generic "looking for users" posts are not enough. Accept indirect
         # growth requests only when the post identifies a digital/Web3 project.
-        if strong_marketing_intent.search(text) or partnership_opportunity or (
+        if strong_marketing_intent.search(text) or (
             growth_demand.search(text)
             and (CRYPTO_CONTEXT.search(text) or digital_project_context.search(text))
         ):
