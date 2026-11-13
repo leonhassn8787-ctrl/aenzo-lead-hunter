@@ -208,7 +208,7 @@ jobs:
           GLOBAL_SEARCH_MAX_PAGES: "3"
           SCAN_BUDGET_SECONDS: "1320"
           MAX_MESSAGES_PER_RUN: "500"
-          MAX_PUBLIC_MESSAGES_PER_RUN: "50"
+          MAX_PUBLIC_MESSAGES_PER_RUN: "300"
           MAX_MESSAGES_PER_GROUP_PER_RUN: "10"
         run: python worker.py --once
 
