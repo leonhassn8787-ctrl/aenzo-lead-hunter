@@ -632,7 +632,7 @@ class LeadSignalTests(unittest.TestCase):
     def test_scan_is_capped_at_500_messages_and_runs_every_two_hours(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 500, 1, 1000)', source)
-        self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 50, 1, 100)', source)
+        self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500)', source)
         self.assertIn("public_messages_processed >= MAX_PUBLIC_MESSAGES_PER_RUN", source)
         self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
         self.assertIn("messages_processed >= MAX_MESSAGES_PER_RUN", source)
@@ -640,7 +640,7 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("public_cursor_is_after(msg, cursor)", source)
         self.assertIn("global_search_query_index", source)
         self.assertIn("rotate_global_search_queries(GLOBAL_GROUP_SEARCH_QUERIES", source)
-        self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 50, 1, 100)', source)
+        self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500)', source)
         self.assertIn('CLASSIFIER_RULES_VERSION = 17', source)
         for phrase in (
             '"hiring Telegram promoters"',
