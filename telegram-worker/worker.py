@@ -535,9 +535,10 @@ def classify(text):
         if any(pattern.search(text) for pattern in patterns)
     ]
 
-    # A named AENZO service plus explicit buyer language is required.
-    # Indirect growth-pain messages are accepted only when the text clearly
-    # mentions marketing, visibility, audience, acquisition, or promotion.
+    # Require a request/buying cue: direct AENZO service requests and relevant
+    # Web3 growth/partnership opportunities qualify without a stated budget.
+    # Indirect growth-pain messages still need marketing, visibility, audience,
+    # acquisition, or promotion context.
     indirect_growth = (
         re.search(
             r"\b(struggling to|having trouble|not getting (enough|many)|"
