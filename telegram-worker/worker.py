@@ -167,6 +167,7 @@ SIGNALS = {
         r"(crypto|web3) influencer (marketing|campaign|promotion)",
         r"anyone know (a |any )?(good )?(kol|influencer|influencers)",
         r"looking for (a |an )?(cex |crypto )?(kol|kols|influencer|influencers)",
+        r"hiring (growth )?(marketers?|kols?|influencers?)",
         r"looking for .{0,100}(kol|kols|influencer|influencers)",
         r"onboard .{0,60}(kol|kols|influencer|influencers)",
         r"(we are |we're )?(looking for|seeking) (a |an )?(kol|influencer) (agency|partner|team)",
