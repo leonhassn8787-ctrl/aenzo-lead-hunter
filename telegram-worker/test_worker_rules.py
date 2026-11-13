@@ -356,7 +356,7 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("KOL & Influencer Marketing", self.classify("We want to hire KOLs for our crypto launch"))
         self.assertIn("KOL & Influencer Marketing", self.classify("Need help with our KOL campaign for the token launch"))
 
-    def test_classifier_accepts_partner_with_intent(self):
+    def test_classifier_accepts_explicit_marketing_agency_partner_request(self):
         self.assertIn("Project Promotion", self.classify("We want to partner with a Web3 marketing agency"))
 
     def test_classifier_understands_natural_group_writing(self):
@@ -451,13 +451,13 @@ class LeadSignalTests(unittest.TestCase):
             ),
         )
 
-    def test_web3_cross_marketing_and_ama_partnership_posts_are_potential_leads(self):
-        self.assertIn(
-            "Project Promotion",
+    def test_generic_cross_marketing_and_ama_partnership_invitation_is_rejected(self):
+        self.assertEqual(
             self.classify(
                 "We have two Web3 projects open for PR collaborations, X partnerships, "
                 "joint campaigns, AMAs, and cross-marketing opportunities."
             ),
+            [],
         )
 
     def test_telegram_promoter_offer_is_not_a_client_lead(self):
@@ -517,12 +517,12 @@ class LeadSignalTests(unittest.TestCase):
             ),
         )
 
-    def test_bd_partner_request_to_onboard_kols_is_a_potential_lead(self):
-        self.assertIn(
-            "KOL & Influencer Marketing",
+    def test_bd_partner_recruitment_to_onboard_kols_is_not_a_client_lead(self):
+        self.assertEqual(
             self.classify(
                 "Looking for BD partners who can onboard high-volume KOLs to a new exchange."
             ),
+            [],
         )
 
     def test_project_hiring_growth_marketers_and_kols_is_a_potential_lead(self):
@@ -534,13 +534,13 @@ class LeadSignalTests(unittest.TestCase):
             ),
         )
 
-    def test_general_web3_partnership_invitation_is_a_warm_prospect(self):
-        self.assertIn(
-            "Project Promotion",
+    def test_general_web3_partnership_invitation_is_rejected(self):
+        self.assertEqual(
             self.classify(
                 "We are open to mutually beneficial collaborations with Web3 projects, "
                 "communities, and media partners."
             ),
+            [],
         )
 
     def test_generic_promoter_request_for_ai_launchpad_users_is_a_prospect(self):
