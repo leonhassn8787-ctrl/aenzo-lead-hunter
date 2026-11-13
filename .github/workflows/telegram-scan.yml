@@ -208,6 +208,7 @@ jobs:
           GLOBAL_SEARCH_MAX_PAGES: "3"
           SCAN_BUDGET_SECONDS: "1320"
           MAX_MESSAGES_PER_RUN: "100"
+          MAX_PUBLIC_MESSAGES_PER_RUN: "50"
         run: python worker.py --once
 
       - name: Save scan progress
