@@ -460,7 +460,7 @@ class LeadSignalTests(unittest.TestCase):
             ),
         )
 
-    def test_paid_promotion_reseller_recruitment_is_not_a_client_lead(self):
+    def test_telegram_promoter_offer_is_not_a_client_lead(self):
         self.assertEqual(
             self.classify(
                 "Hiring Telegram promoters for daily paid promotions. "
@@ -641,7 +641,7 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("global_search_query_index", source)
         self.assertIn("rotate_global_search_queries(GLOBAL_GROUP_SEARCH_QUERIES", source)
         self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 50, 1, 100)', source)
-        self.assertIn('CLASSIFIER_RULES_VERSION = 14', source)
+        self.assertIn('CLASSIFIER_RULES_VERSION = 16', source)
         for phrase in (
             '"hiring Telegram promoters"',
             '"looking for Telegram promoters"',
