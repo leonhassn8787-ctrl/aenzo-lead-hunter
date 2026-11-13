@@ -38,7 +38,6 @@ SOURCES = [
     {"name": "VCBacked", "url": "https://www.vcbacked.co/directory/industries/web3", "feed": google_news("vcbacked.co", "web3 startup OR funding OR portfolio"), "kind": "funding_signal"},
     {"name": "Product Hunt", "url": "https://www.producthunt.com/", "feed": "https://www.producthunt.com/feed", "kind": "product_launch"},
     {"name": "DappRadar", "url": "https://dappradar.com/narratives/icos", "feed": google_news("dappradar.com", "new dapp OR launch OR blockchain game OR token"), "kind": "launch_signal"},
-    {"name": "TGE Index", "url": "https://tgeindex.com/tge/", "feed": google_news("tgeindex.com", "upcoming TGE OR token generation event OR launch"), "kind": "token_launch"},
     {"name": "CoinDesk", "url": "https://www.coindesk.com/", "feed": "https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml", "kind": "news_signal"},
     {"name": "Crunchbase", "url": "https://www.crunchbase.com/", "feed": google_news("crunchbase.com", "web3 OR crypto OR AI startup funding raised"), "kind": "funding_signal"},
     {"name": "ProjectStartups", "url": "https://projectstartups.com/pages/crypto-web3/", "feed": google_news("projectstartups.com", "crypto OR web3 startup funding launch"), "kind": "funding_signal"},
@@ -617,7 +616,7 @@ def main():
     finished = datetime.now(timezone.utc)
     api("PATCH", "scan_runs?id=eq." + run_id, {
         "finished_at": finished.isoformat(),
-        "status": "completed" if not errors else "completed",
+        "status": "failed" if checked == 0 else "completed",
         "sources_checked": checked,
         "leads_found": len(candidates),
         "leads_saved": len(inserted),
