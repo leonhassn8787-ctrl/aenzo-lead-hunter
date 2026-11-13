@@ -104,6 +104,16 @@ def parse_date(value):
         except Exception:
             return None
 
+def filter_enabled_sources(source_configs, source_rows):
+    """Only scan configured sources explicitly enabled in the owner's source table."""
+    active_names = {
+        row.get("source_name")
+        for row in (source_rows or [])
+        if row.get("is_active") is True and row.get("source_name")
+    }
+    return [source for source in source_configs if source["name"] in active_names]
+
+
 def parse_feed(xml_bytes):
     root = ET.fromstring(xml_bytes)
     items = root.findall(".//item")
@@ -546,14 +556,18 @@ def main():
     started = datetime.now(timezone.utc)
     run = api("POST", "scan_runs", {"owner_id": OWNER_ID, "status": "running"}, "return=representation")
     run_id = run[0]["id"]
-    existing = api("GET", "lead_sources?select=id,source_name&owner_id=eq." + OWNER_ID)
+    existing = api("GET", "lead_sources?select=id,source_name,is_active&owner_id=eq." + OWNER_ID)
     source_ids = {row["source_name"]: row["id"] for row in (existing or [])}
+    active_sources = filter_enabled_sources(SOURCES, existing or [])
     checked = 0
     candidates = []
     errors = []
     cutoff = started - timedelta(days=LOOKBACK_DAYS)
 
-    for source in SOURCES:
+    if not active_sources:
+        errors.append("No active configured discovery sources are enabled.")
+
+    for source in active_sources:
         try:
             request = urllib.request.Request(source["feed"], headers={"User-Agent": "AENZO-LeadHunter/1.0 (+public RSS discovery)"})
             with urllib.request.urlopen(request, timeout=30) as response:
@@ -624,7 +638,7 @@ def main():
     })
     lines = [
         "AENZO LABS — Web Discovery Scan",
-        f"Sources checked: {checked}/{len(SOURCES)}",
+        f"Sources checked: {checked}/{len(active_sources)}",
         f"Potential signals found: {len(candidates)}",
         f"New candidates saved: {len(inserted)}",
         f"Candidates enriched: {enriched_count}",
