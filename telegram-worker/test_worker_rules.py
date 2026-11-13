@@ -483,6 +483,15 @@ class LeadSignalTests(unittest.TestCase):
             ),
         )
 
+    def test_project_hiring_growth_marketers_and_kols_is_a_potential_lead(self):
+        self.assertIn(
+            "KOL & Influencer Marketing",
+            self.classify(
+                "Qurve is hiring growth marketers and KOLs to bring AI agent creators "
+                "and active builders to its ecosystem."
+            ),
+        )
+
     def test_verdict_testing_service_buyer_request(self):
         self.assert_signal(
             "Project Review / VERDICT",
