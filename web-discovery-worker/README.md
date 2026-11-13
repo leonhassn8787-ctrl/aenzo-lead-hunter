@@ -1,6 +1,6 @@
 # AENZO Web Discovery Worker
 
-Scans public RSS and Google News RSS discovery indexes for Web3/crypto/AI project, funding, grant, token launch and product launch signals.
+Scans public RSS and Google News RSS discovery indexes for Web3/crypto/AI project, funding, grant and product launch signals.
 
 Important:
 - Discovery records are stored in `public.discovery_candidates`, not promoted to confirmed leads.
