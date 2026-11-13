@@ -540,7 +540,7 @@ class LeadSignalTests(unittest.TestCase):
     def test_no_upfront_fee_launchpad_offer_is_rejected_as_a_vendor(self):
         self.assertEqual(
             self.classify(
-                "DM me, we have a good launchpad that does not take upfront fees."
+                "DM me, we have a good launchpad who not tack upfront fee."
             ),
             [],
         )
