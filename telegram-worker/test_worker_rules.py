@@ -578,6 +578,8 @@ class LeadSignalTests(unittest.TestCase):
     def test_scan_is_capped_at_100_messages_and_runs_every_two_hours(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)', source)
+        self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 50, 1, 100)', source)
+        self.assertIn("public_messages_processed >= MAX_PUBLIC_MESSAGES_PER_RUN", source)
         self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
         self.assertIn("messages_processed >= MAX_MESSAGES_PER_RUN", source)
         self.assertIn('query_meta["cursor"]', source)
