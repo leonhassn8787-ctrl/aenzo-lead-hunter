@@ -25,6 +25,12 @@ jobs:
       - name: Test AENZO lead detection patterns
         working-directory: telegram-worker
         run: python -m unittest -v test_worker_rules.py
+
+      - name: Compile web discovery scanner
+        run: python -m py_compile web-discovery-worker/scanner.py
+
+      - name: Test web discovery rules and integrations
+        run: python -m unittest discover -s web-discovery-worker -p "test_*.py" -v
       - name: Validate Telegram dashboard JavaScript
         run: |
           python - <<'PY'
