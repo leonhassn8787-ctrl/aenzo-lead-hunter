@@ -829,6 +829,17 @@ def message_scan_kwargs(last_seen, cutoff):
         kwargs["offset_date"] = cutoff
     return kwargs
 
+def rotate_global_search_queries(queries, start_index=0):
+    """Rotate query order so a busy early phrase cannot starve later search phrases."""
+    if not queries:
+        return []
+    start = int(start_index or 0) % len(queries)
+    return [
+        ((start + offset) % len(queries), queries[(start + offset) % len(queries)])
+        for offset in range(len(queries))
+    ]
+
+
 async def fetch_global_group_messages(client, query, min_date, max_date):
     """Search public groups with recursive date windows so busy queries do not starve."""
     async def fetch_window(window_min, window_max, depth=0):
@@ -1142,11 +1153,16 @@ async def run(once=False):
             global_search_complete = 0
             global_search_incomplete = 0
 
-            for query in GLOBAL_GROUP_SEARCH_QUERIES:
+            query_start_index = int(state.get("global_search_query_index", 0) or 0)
+            for query_index, query in rotate_global_search_queries(GLOBAL_GROUP_SEARCH_QUERIES, query_start_index):
                 if public_messages_processed >= MAX_PUBLIC_MESSAGES_PER_RUN or messages_processed >= MAX_MESSAGES_PER_RUN:
+                    state["global_search_query_index"] = query_index
+                    write_state(state)
                     log.info("Public-search message budget reached; remaining public queries resume next run.")
                     break
                 if asyncio.get_running_loop().time() - scan_started >= SCAN_BUDGET_SECONDS:
+                    state["global_search_query_index"] = query_index
+                    write_state(state)
                     log.info("Public search time budget reached; remaining queries resume next run.")
                     break
                 query_meta = global_search_state.setdefault(query, {})
@@ -1159,6 +1175,8 @@ async def run(once=False):
                 )
                 query_max_date = int(now.timestamp())
                 if query_min_date >= query_max_date:
+                    state["global_search_query_index"] = (query_index + 1) % len(GLOBAL_GROUP_SEARCH_QUERIES)
+                    write_state(state)
                     continue
 
                 try:
@@ -1173,10 +1191,14 @@ async def run(once=False):
                     if exc.seconds <= 60:
                         await asyncio.sleep(exc.seconds)
                     global_search_incomplete += 1
+                    state["global_search_query_index"] = (query_index + 1) % len(GLOBAL_GROUP_SEARCH_QUERIES)
+                    write_state(state)
                     continue
                 except Exception:
                     log.exception("Global public-group search failed for query %r; cursor retained.", query)
                     global_search_incomplete += 1
+                    state["global_search_query_index"] = (query_index + 1) % len(GLOBAL_GROUP_SEARCH_QUERIES)
+                    write_state(state)
                     continue
 
                 if not complete:
@@ -1307,11 +1329,16 @@ async def run(once=False):
                     write_state(state)
                     global_search_incomplete += 1
                     if public_messages_processed >= MAX_PUBLIC_MESSAGES_PER_RUN or messages_processed >= MAX_MESSAGES_PER_RUN:
+                        state["global_search_query_index"] = query_index
+                        write_state(state)
                         log.info("Public-search budget reached; cursor saved and joined-group scan will use the remaining message budget.")
                         break
+                    state["global_search_query_index"] = (query_index + 1) % len(GLOBAL_GROUP_SEARCH_QUERIES)
+                    write_state(state)
                     continue
 
                 global_search_state[query] = {"last_scanned_at": query_max_date}
+                state["global_search_query_index"] = (query_index + 1) % len(GLOBAL_GROUP_SEARCH_QUERIES)
                 write_state(state)
                 global_search_complete += 1
 
