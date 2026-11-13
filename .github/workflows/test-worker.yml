@@ -1,7 +1,7 @@
 name: AENZO Telegram Worker Tests
 
 on:
-  push:
+  # Pull requests and intentional manual runs only; main-branch pushes are covered by python-check.yml.
   pull_request:
   workflow_dispatch:
 
