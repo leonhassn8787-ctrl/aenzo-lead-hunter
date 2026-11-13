@@ -10,4 +10,5 @@ Important:
 - The worker respects each source row’s `is_active` setting in `public.lead_sources`; inactive sources are skipped.
 - RootData's free API requires an API key; CryptoRank funding endpoints require a paid tier. Neither paid API is called by this worker.
 - No paid service or API is enabled.
+- Modern Supabase `sb_secret_...` keys are sent only in the `apikey` header, not as a Bearer JWT.
 - The scheduled workflow runs every two hours and records results in `public.scan_runs`.
