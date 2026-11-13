@@ -585,6 +585,30 @@ class LeadSignalTests(unittest.TestCase):
             [],
         )
 
+    def test_beggar_agency_sales_pitch_is_rejected_as_a_vendor(self):
+        self.assertEqual(
+            self.classify(
+                "Gonçalo here, Head of sales at Beggar Agency. "
+                "We work with the best streamers & influencers mainly from Portugal. "
+                "If you are looking for consistent FTDs and high-quality traffic from the best, let’s connect."
+            ),
+            [],
+        )
+
+    def test_influencer_network_traffic_offer_is_rejected_as_a_vendor(self):
+        self.assertEqual(
+            self.classify(
+                "We work with top streamers and influencers and can deliver qualified leads and FTDs. DM us."
+            ),
+            [],
+        )
+
+    def test_real_project_request_for_influencers_is_still_accepted(self):
+        self.assertIn(
+            "KOL & Influencer Marketing",
+            self.classify("Our Web3 project is looking for influencers for our paid launch campaign.")
+        )
+
     def test_scan_is_capped_at_100_messages_and_runs_every_two_hours(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)', source)
