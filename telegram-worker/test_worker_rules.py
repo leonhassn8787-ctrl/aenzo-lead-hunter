@@ -1109,9 +1109,22 @@ class TelegramNotificationGateTests(unittest.TestCase):
 
     def test_low_priority_is_blocked(self):
         self.assertEqual(
-            self.check({"evidence_summary": "Our crypto project needs a paid marketing campaign before launch.", "service_need": "Project Promotion", "priority_score": 64}),
+            self.check({"evidence_summary": "Our crypto project needs a paid marketing campaign before launch.", "service_need": "Project Promotion", "priority_score": 54}),
             "priority_below_notification_threshold",
         )
+
+    def test_direct_buyer_at_minimum_qualified_score_can_be_notified(self):
+        lead = {
+            "evidence_summary": "Our crypto project needs a paid marketing campaign before launch. We need an agency.",
+            "service_need": "Project Promotion",
+            "priority_score": 55,
+        }
+        self.assertIsNone(self.check(lead))
+
+    def test_new_leads_trigger_immediate_notification_from_both_sources(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn("async def notify_saved_lead(http, dedupe_key):", source)
+        self.assertEqual(source.count('await notify_saved_lead(http, payload["dedupe_key"])'), 2)
 
     def test_non_buyer_evidence_is_blocked(self):
         self.assertEqual(
