@@ -1030,7 +1030,7 @@ async def send_scan_report(http, stats):
         f"Joined-group duplicate leads: {stats.get('joined_duplicates', 0)}\n"
         f"Global search queries completed: {stats.get('global_queries_completed', 0)}\n"
         f"Global search queries incomplete: {stats.get('global_queries_incomplete', 0)}\n"
-        f"Messages checked: {stats.get('messages_checked', 0):,}\n"
+        f"Messages processed this run: {stats.get('messages_processed', 0):,} / {MAX_MESSAGES_PER_RUN:,}\\n"
         f"Seller/vendor posts: {stats.get('seller_posts', 0):,}\n"
         f"Buyer signals: {stats.get('buyer_signals', 0):,}\n"
         f"New leads saved: {stats.get('leads_saved', 0)}\n"
@@ -1309,6 +1309,9 @@ async def run(once=False):
             )
 
             for dialog in dialogs:
+                if messages_processed >= MAX_MESSAGES_PER_RUN:
+                    log.info("Per-run message limit reached; remaining joined groups resume next run.")
+                    break
                 if asyncio.get_running_loop().time() - scan_started >= SCAN_BUDGET_SECONDS:
                     log.info("Scan time budget reached; remaining joined groups resume next run.")
                     break
@@ -1347,6 +1350,8 @@ async def run(once=False):
                 group_write_failed = False
                 messages_since_checkpoint = 0
                 async for msg in client.iter_messages(entity, **message_scan_kwargs(last_seen, cutoff)):
+                    if messages_processed >= MAX_MESSAGES_PER_RUN:
+                        break
                     if asyncio.get_running_loop().time() - scan_started >= SCAN_BUDGET_SECONDS:
                         break
                     if not msg:
@@ -1361,6 +1366,11 @@ async def run(once=False):
 
                     newest_seen = max(newest_seen, int(msg.id))
                     messages_since_checkpoint += 1
+                    public_message_key = (repr(getattr(msg, "peer_id", None)), int(getattr(msg, "id", 0) or 0))
+                    if public_message_key in run_seen_public_messages:
+                        continue
+                    run_seen_public_messages.add(public_message_key)
+                    messages_processed += 1
                     if getattr(msg, "out", False):
                         continue
                     if not msg.message or not msg.date:
@@ -1475,6 +1485,7 @@ async def run(once=False):
                 "public_duplicates": public_duplicates,
                 "joined_duplicates": duplicates - public_duplicates,
                 "messages_checked": messages_checked,
+                "messages_processed": messages_processed,
                 "seller_posts": seller_posts,
                 "buyer_signals": buyer_signals,
                 "leads_saved": saved,
@@ -1482,8 +1493,8 @@ async def run(once=False):
                 "duration_seconds": duration_seconds,
             })
             log.info(
-                "Scan complete: %s/%s joined groups checked; %s messages checked; %s new leads saved; %.1fs.",
-                checked, len(dialogs), messages_checked, saved, duration_seconds
+                "Scan complete: %s/%s joined groups checked; %s messages processed (%s cap); %s text messages checked; %s new leads saved; %.1fs.",
+                checked, len(dialogs), messages_processed, MAX_MESSAGES_PER_RUN, messages_checked, saved, duration_seconds
             )
             if once:
                 break
