@@ -52,7 +52,7 @@ SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
 MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)
 MAX_PUBLIC_MESSAGES_PER_RUN = min(bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 50, 1, 100), MAX_MESSAGES_PER_RUN)
 MAX_MESSAGES_PER_GROUP_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_GROUP_PER_RUN", 10, 1, 50)
-CLASSIFIER_RULES_VERSION = 15
+CLASSIFIER_RULES_VERSION = 16
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for beta testers",
@@ -396,6 +396,10 @@ SELLER_POST_CONTEXT = re.compile(
     r"(our|my) telegram channel provides access to .{0,100}(contact|investor|email|phone|lead) (collections|datasets|data)|"
     r"premium global contact data services|"
     r"growth network is open for new projects|"
+    r"(global partners|partner recruitment).{0,300}(referral rewards|team commissions|first deposit|minimum first deposit)|"
+    r"(regional|country) representatives.{0,250}(referral rewards|team commissions|first deposit)|"
+    r"daily paid promotions? available|"
+    r"we are looking for promoters for paid promotions|"
     r"(head|director|manager) of sales at .{0,80}\b(agency|media|marketing|traffic|influencer)\b|"
     r"we work with (the )?(best|top|leading) .{0,100}\b(streamers?|influencers?|kols?|publishers?|affiliates?)\b|"
     r"we work with .{0,120}\b(streamers?|influencers?|kols?)\b.{0,180}\b(ftds?|high[- ]quality traffic|targeted traffic|qualified leads|paid campaigns?)\b|"
