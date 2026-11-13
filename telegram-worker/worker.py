@@ -52,7 +52,7 @@ SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
 MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)
 MAX_PUBLIC_MESSAGES_PER_RUN = min(bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 50, 1, 100), MAX_MESSAGES_PER_RUN)
 MAX_MESSAGES_PER_GROUP_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_GROUP_PER_RUN", 10, 1, 50)
-CLASSIFIER_RULES_VERSION = 11
+CLASSIFIER_RULES_VERSION = 12
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for beta testers",
@@ -521,7 +521,9 @@ def classify(text):
                 and re.search(
                     r"\b(early users?|early adopters?|beta testers?|product feedback|mvp testing|"
                     r"pr collaborations?|x partnerships?|twitter partnerships?|cross[- ]marketing|"
-                    r"co[- ]marketing|joint campaigns?|ama partnerships?)\b",
+                    r"co[- ]marketing|joint campaigns?|ama partnerships?|"
+                    r"looking to hire .{0,60}(kol|kols|influencer|marketing|growth)|"
+                    r"hiring .{0,60}(kol|kols|influencer|marketing|growth))\b",
                     text,
                     re.I,
                 )
