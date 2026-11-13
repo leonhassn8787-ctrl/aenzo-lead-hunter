@@ -460,23 +460,23 @@ class LeadSignalTests(unittest.TestCase):
             ),
         )
 
-    def test_telegram_promoter_request_is_a_potential_lead(self):
-        self.assertIn(
-            "Community Promotion",
+    def test_paid_promotion_reseller_recruitment_is_not_a_client_lead(self):
+        self.assertEqual(
             self.classify(
                 "Hiring Telegram promoters for daily paid promotions. "
                 "Do you own a group with active members?"
             ),
+            [],
         )
 
-    def test_daily_paid_promotions_available_hiring_post_is_a_prospect(self):
-        self.assertIn(
-            "Community Promotion",
+    def test_daily_paid_promotions_available_hiring_post_is_not_a_client_lead(self):
+        self.assertEqual(
             self.classify(
                 "HIRING TELEGRAM PROMOTERS! Daily Paid Promotions Available! "
                 "Do you own a Telegram group or channel with active members? "
                 "We are looking for promoters for paid promotions."
             ),
+            [],
         )
 
     def test_kryptokite_free_article_and_cross_promotion_offer_is_rejected(self):
