@@ -1,10 +1,6 @@
 name: AENZO Web Discovery Scan
 
 on:
-  push:
-    paths:
-      - "web-discovery-worker/**"
-      - ".github/workflows/web-discovery-scan.yml"
   schedule:
     - cron: "37 */2 * * *"
   workflow_dispatch:
