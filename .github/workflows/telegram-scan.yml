@@ -9,7 +9,8 @@ on:
         type: boolean
         default: false
   schedule:
-    - cron: "17 */4 * * *"
+    # Bangladesh time (UTC+6): 09:00 and 17:00 = 03:00 and 11:00 UTC.
+    - cron: "0 3,11 * * *"
 
 permissions:
   contents: read
