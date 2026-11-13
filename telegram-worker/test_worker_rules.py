@@ -1031,6 +1031,56 @@ class JoinedGroupCheckpointTests(unittest.TestCase):
         self.assertIn("if getattr(msg, \"out\", False):", loop_start)
 
 
+class PublicSearchCursorTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        tree = ast.parse(WORKER.read_text(encoding="utf-8"))
+        nodes = {
+            node.name: node for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+        }
+        namespace = {"getattr": getattr}
+        selected = [
+            nodes["public_message_cursor_key"],
+            nodes["public_cursor_is_after"],
+            nodes["store_public_cursor"],
+        ]
+        exec(compile(ast.Module(body=selected, type_ignores=[]), str(WORKER), "exec"), namespace)
+        cls.cursor_key = staticmethod(namespace["public_message_cursor_key"])
+        cls.is_after = staticmethod(namespace["public_cursor_is_after"])
+        cls.store = staticmethod(namespace["store_public_cursor"])
+
+    def test_public_cursor_resumes_by_timestamp_peer_and_message_id(self):
+        from datetime import datetime, timezone
+        from types import SimpleNamespace
+
+        moment = datetime(2026, 11, 13, 10, 0, tzinfo=timezone.utc)
+        first = SimpleNamespace(date=moment, peer_id="peer-a", id=10)
+        same = SimpleNamespace(date=moment, peer_id="peer-a", id=10)
+        next_id = SimpleNamespace(date=moment, peer_id="peer-a", id=11)
+        next_peer = SimpleNamespace(date=moment, peer_id="peer-b", id=1)
+        key = self.cursor_key(first)
+        cursor = {"date": key[0], "peer": key[1], "message_id": key[2]}
+
+        self.assertFalse(self.is_after(same, cursor))
+        self.assertTrue(self.is_after(next_id, cursor))
+        self.assertTrue(self.is_after(next_peer, cursor))
+
+    def test_public_cursor_is_persisted_in_query_state(self):
+        from datetime import datetime, timezone
+        from types import SimpleNamespace
+
+        message = SimpleNamespace(
+            date=datetime(2026, 11, 13, 10, 0, tzinfo=timezone.utc),
+            peer_id="peer-a",
+            id=42,
+        )
+        state = {}
+        self.store(state, message)
+        self.assertEqual(state["cursor"]["message_id"], 42)
+        self.assertEqual(state["cursor"]["date"], int(message.date.timestamp()))
+
+
 class GlobalSearchPaginationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
