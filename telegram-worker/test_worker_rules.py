@@ -1000,10 +1000,11 @@ class GroupScanningOptimizationTests(unittest.TestCase):
 
     def test_worker_numeric_environment_settings_are_bounded(self):
         source = WORKER.read_text(encoding="utf-8")
-        self.assertIn('bounded_int_env("POLL_SECONDS", 600, 60, 86400)', source)
+        self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
         self.assertIn('bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)', source)
         self.assertIn('bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)', source)
         self.assertIn('bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)', source)
+        self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)', source)
 
     def test_scan_report_separates_joined_groups_from_public_search_signals(self):
         source = WORKER.read_text(encoding="utf-8")
