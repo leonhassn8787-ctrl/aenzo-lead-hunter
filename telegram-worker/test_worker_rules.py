@@ -435,10 +435,53 @@ class LeadSignalTests(unittest.TestCase):
     def test_recruitment_request(self):
         self.assert_signal("Recruitment", "Hiring community manager for our crypto project")
 
-    def test_beta_tester_recruitment_is_not_a_paid_client_lead(self):
+    def test_generic_beta_tester_posts_without_crypto_project_context_are_not_leads(self):
         self.assertEqual(self.classify("Looking for beta testers for our app"), [])
         self.assertEqual(self.classify("We are opening early access and need app testers"), [])
         self.assertEqual(self.classify("Looking for product feedback from early users"), [])
+
+    def test_web3_project_looking_for_early_users_is_a_potential_lead(self):
+        self.assertIn(
+            "Project Review / VERDICT",
+            self.classify(
+                "We are building a Solana AI trading agent and looking for early users "
+                "to try our MVP and share honest feedback."
+            ),
+        )
+
+    def test_web3_cross_marketing_and_ama_partnership_posts_are_potential_leads(self):
+        self.assertIn(
+            "Project Promotion",
+            self.classify(
+                "We have two Web3 projects open for PR collaborations, X partnerships, "
+                "joint campaigns, AMAs, and cross-marketing opportunities."
+            ),
+        )
+
+    def test_telegram_promoter_request_is_a_potential_lead(self):
+        self.assertIn(
+            "Community Promotion",
+            self.classify(
+                "Hiring Telegram promoters for daily paid promotions. "
+                "Do you own a group with active members?"
+            ),
+        )
+
+    def test_cex_kol_and_trader_acquisition_request_is_a_potential_lead(self):
+        self.assertIn(
+            "KOL & Influencer Marketing",
+            self.classify(
+                "Looking for CEX KOLs, if you can bring traders DM me."
+            ),
+        )
+
+    def test_bd_partner_request_to_onboard_kols_is_a_potential_lead(self):
+        self.assertIn(
+            "KOL & Influencer Marketing",
+            self.classify(
+                "Looking for BD partners who can onboard high-volume KOLs to a new exchange."
+            ),
+        )
 
     def test_verdict_testing_service_buyer_request(self):
         self.assert_signal(
