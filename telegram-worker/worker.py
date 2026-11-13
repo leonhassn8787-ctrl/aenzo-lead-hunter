@@ -1041,16 +1041,27 @@ async def notify_pending_leads(http):
         return
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
     url = SUPABASE_URL + '/rest/v1/leads'
-    params = {'select': 'id,company_name,service_need,priority_score,evidence_date,evidence_summary,evidence_url,telegram_group_url,contacts,outreach_english,outreach_bengali', 'owner_id': 'eq.' + SUPABASE_OWNER_ID, 'status': 'eq.new', 'telegram_notified_at': 'is.null', 'order': 'created_at.asc', 'limit': '25'}
+    base_params = {'select': 'id,company_name,service_need,priority_score,evidence_date,evidence_summary,evidence_url,telegram_group_url,contacts,outreach_english,outreach_bengali', 'owner_id': 'eq.' + SUPABASE_OWNER_ID, 'status': 'eq.new', 'telegram_notified_at': 'is.null', 'order': 'created_at.asc', 'limit': '100'}
+    # Load every pending row before sending or updating any row. This keeps
+    # offset pagination stable while successful notifications leave the query.
+    pending = []
+    offset = 0
     try:
-        response = await http.get(url, headers=headers, params=params, timeout=30)
-        if response.status_code != 200:
-            log.error('Could not load pending Telegram alerts: %s', response.text[:300])
-            return
-        pending = response.json()
+        while True:
+            params = {**base_params, 'offset': str(offset)}
+            response = await http.get(url, headers=headers, params=params, timeout=30)
+            if response.status_code != 200:
+                log.error('Could not load pending Telegram alerts: %s', response.text[:300])
+                return
+            page = response.json()
+            pending.extend(page)
+            if len(page) < 100:
+                break
+            offset += len(page)
     except Exception:
         log.exception('Could not load pending Telegram alerts.')
         return
+    log.info('Loaded %s pending Telegram alerts for strict review.', len(pending))
     for lead in pending:
         lead_id = lead.get('id')
         block_reason = telegram_notification_block_reason(lead)
