@@ -7,6 +7,7 @@ Important:
 - A human review is required before a candidate becomes a lead.
 - CoinDesk and Product Hunt use public RSS feeds.
 - Other directory sources use Google News RSS site-restricted search because no verified public feed was configured for them.
+- The worker respects each source row’s `is_active` setting in `public.lead_sources`; inactive sources are skipped.
 - RootData's free API requires an API key; CryptoRank funding endpoints require a paid tier. Neither paid API is called by this worker.
 - No paid service or API is enabled.
 - The scheduled workflow runs every two hours and records results in `public.scan_runs`.
