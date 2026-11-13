@@ -51,7 +51,8 @@ GLOBAL_SEARCH_MAX_PAGES = bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)
 SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
 MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)
 MAX_PUBLIC_MESSAGES_PER_RUN = min(bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 50, 1, 100), MAX_MESSAGES_PER_RUN)
-CLASSIFIER_RULES_VERSION = 9
+MAX_MESSAGES_PER_GROUP_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_GROUP_PER_RUN", 10, 1, 50)
+CLASSIFIER_RULES_VERSION = 10
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for beta testers",
@@ -420,6 +421,8 @@ NON_BUYER_CONTEXT = re.compile(
     r"exchange rate premium|daily demand for usdt|daily earnings|"
     r"large number of (indian )?customers|"
     r"welcome to .{0,80}partner.{0,40}pinksale|"
+    r"guest signup open|guest speakers?|join us as guest speakers|"
+    r"looking for founders,? kols?,? and project representatives to join us|"
     r"recognized with kyc,? audit and doxx badge)\b",
     re.I,
 )
@@ -479,6 +482,18 @@ def group_priority(meta):
         + min(int(meta.get("buyer_signals", 0)), 200) * 10
         - min(int(meta.get("seller_ads", 0)), 200)
     )
+
+def rotate_group_ids(group_ids, last_group_id=None):
+    """Rotate joined-group order so message-heavy groups cannot starve the rest."""
+    ids = [str(group_id) for group_id in group_ids]
+    if not ids:
+        return []
+    try:
+        start = (ids.index(str(last_group_id)) + 1) % len(ids)
+    except (ValueError, TypeError):
+        start = 0
+    return ids[start:] + ids[:start]
+
 
 def should_pause_group(meta):
     """Only snooze a group after a meaningful sample dominated by seller ads."""
@@ -1343,13 +1358,20 @@ async def run(once=False):
                 global_search_complete += 1
 
 
-            # Groups with a history of genuine buyer signals are checked first.
+            # Prioritize proven groups, then rotate after the last visited group.
+            # A busy group is capped per run so it cannot monopolize the budget.
             dialogs.sort(
                 key=lambda dialog: group_priority(
                     groups_state.get(str(dialog.entity.id), {})
                 ),
                 reverse=True,
             )
+            dialog_by_id = {str(dialog.entity.id): dialog for dialog in dialogs}
+            ordered_group_ids = rotate_group_ids(
+                dialog_by_id.keys(), state.get("joined_group_cursor")
+            )
+            dialogs = [dialog_by_id[group_id] for group_id in ordered_group_ids]
+            last_group_visited = None
 
             for dialog in dialogs:
                 if messages_processed >= MAX_MESSAGES_PER_RUN:
@@ -1360,6 +1382,7 @@ async def run(once=False):
                     break
                 entity = dialog.entity
                 group_id = str(entity.id)
+                last_group_visited = group_id
                 meta = groups_state.setdefault(group_id, {
                     "last_seen_id": 0,
                     "messages_seen": 0,
@@ -1392,7 +1415,10 @@ async def run(once=False):
                 newest_seen = last_seen
                 group_write_failed = False
                 messages_since_checkpoint = 0
+                group_messages_processed = 0
                 async for msg in client.iter_messages(entity, **message_scan_kwargs(last_seen, cutoff)):
+                    if group_messages_processed >= MAX_MESSAGES_PER_GROUP_PER_RUN:
+                        break
                     if messages_processed >= MAX_MESSAGES_PER_RUN:
                         break
                     if asyncio.get_running_loop().time() - scan_started >= SCAN_BUDGET_SECONDS:
@@ -1414,6 +1440,7 @@ async def run(once=False):
                         continue
                     run_seen_public_messages.add(public_message_key)
                     messages_processed += 1
+                    group_messages_processed += 1
                     if getattr(msg, "out", False):
                         continue
                     if not msg.message or not msg.date:
@@ -1501,6 +1528,9 @@ async def run(once=False):
                 if checked % 10 == 0:
                     write_state(state)
 
+
+            if last_group_visited is not None:
+                state["joined_group_cursor"] = last_group_visited
 
             newly_discovered_groups = global_group_ids - joined_group_ids
             log.info(
