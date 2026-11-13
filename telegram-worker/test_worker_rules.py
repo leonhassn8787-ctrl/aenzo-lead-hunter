@@ -256,6 +256,9 @@ class LeadSignalTests(unittest.TestCase):
     def test_unknown_sender_is_excluded(self):
         self.assertFalse(self.is_human_sender(None))
 
+    def test_advice_to_another_member_is_not_a_client_lead(self):
+        self.assertEqual(self.classify("You need marketing in spanish"), [])
+
     def test_job_seeker_is_not_a_client_lead(self):
         self.assertEqual(self.classify("Looking for a job in a Web3 project"), [])
 
@@ -642,7 +645,7 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("global_search_query_index", source)
         self.assertIn("rotate_global_search_queries(GLOBAL_GROUP_SEARCH_QUERIES", source)
         self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500)', source)
-        self.assertIn('CLASSIFIER_RULES_VERSION = 18', source)
+        self.assertIn('CLASSIFIER_RULES_VERSION = 19', source)
         for phrase in (
             '"hiring Telegram promoters"',
             '"looking for Telegram promoters"',
