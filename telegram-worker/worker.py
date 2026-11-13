@@ -49,8 +49,9 @@ POLL_SECONDS = bounded_int_env("POLL_SECONDS", 7200, 60, 86400)
 LOOKBACK_DAYS = bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)
 GLOBAL_SEARCH_MAX_PAGES = bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)
 SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
-MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 500, 1, 1000)
+MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 1300, 1, 2000)
 MAX_PUBLIC_MESSAGES_PER_RUN = min(bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500), MAX_MESSAGES_PER_RUN)
+MAX_JOINED_MESSAGES_PER_RUN = bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 1000, 1, 1500)
 MAX_MESSAGES_PER_GROUP_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_GROUP_PER_RUN", 10, 1, 50)
 CLASSIFIER_RULES_VERSION = 17
 GLOBAL_GROUP_SEARCH_QUERIES = [
@@ -1180,6 +1181,7 @@ async def run(once=False):
                 dialogs.append(dialog)
 
             public_messages_processed = 0
+            joined_messages_processed = 0
             public_messages_checked = 0
             public_buyer_signals = 0
             public_leads_saved = 0
@@ -1398,7 +1400,7 @@ async def run(once=False):
             last_group_visited = None
 
             for dialog in dialogs:
-                if messages_processed >= MAX_MESSAGES_PER_RUN:
+                if messages_processed >= MAX_MESSAGES_PER_RUN or joined_messages_processed >= MAX_JOINED_MESSAGES_PER_RUN:
                     log.info("Per-run message limit reached; remaining joined groups resume next run.")
                     break
                 if asyncio.get_running_loop().time() - scan_started >= SCAN_BUDGET_SECONDS:
@@ -1443,7 +1445,7 @@ async def run(once=False):
                 async for msg in client.iter_messages(entity, **message_scan_kwargs(last_seen, cutoff)):
                     if group_messages_processed >= MAX_MESSAGES_PER_GROUP_PER_RUN:
                         break
-                    if messages_processed >= MAX_MESSAGES_PER_RUN:
+                    if messages_processed >= MAX_MESSAGES_PER_RUN or joined_messages_processed >= MAX_JOINED_MESSAGES_PER_RUN:
                         break
                     if asyncio.get_running_loop().time() - scan_started >= SCAN_BUDGET_SECONDS:
                         break
@@ -1464,6 +1466,7 @@ async def run(once=False):
                         continue
                     run_seen_public_messages.add(public_message_key)
                     messages_processed += 1
+                    joined_messages_processed += 1
                     group_messages_processed += 1
                     if getattr(msg, "out", False):
                         continue
@@ -1574,6 +1577,7 @@ async def run(once=False):
                 "global_queries_incomplete": global_search_incomplete,
                 "public_groups_with_buyer_signals": len(global_group_ids),
                 "public_messages_processed": public_messages_processed,
+                "joined_messages_processed": joined_messages_processed,
                 "public_messages_checked": public_messages_checked,
                 "public_buyer_signals": public_buyer_signals,
                 "public_leads_saved": public_leads_saved,
