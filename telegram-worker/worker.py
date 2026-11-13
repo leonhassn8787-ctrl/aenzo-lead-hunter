@@ -52,7 +52,7 @@ SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
 MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)
 MAX_PUBLIC_MESSAGES_PER_RUN = min(bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 50, 1, 100), MAX_MESSAGES_PER_RUN)
 MAX_MESSAGES_PER_GROUP_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_GROUP_PER_RUN", 10, 1, 50)
-CLASSIFIER_RULES_VERSION = 13
+CLASSIFIER_RULES_VERSION = 14
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for beta testers",
@@ -345,6 +345,8 @@ SELLER_AD_CONTEXT = re.compile(
 
 SELLER_POST_CONTEXT = re.compile(
     r"\b("
+    r"performance[- ]based collaboration.{0,180}no upfront payments?|"
+    r"no upfront payments?.{0,180}(milestone|performance[- ]based|kpi)|"
     r"we (offer|provide|specialize in|are offering|can provide) (web3 |crypto )?(marketing|promotion|kol|influencer|pr|ama|community management|social media|advertising|lead generation|ad account|campaign management|growth) (services|packages|solutions|support|campaigns)|"
     r"we (help|support|work with|only deal with|deliver|supply|give you access to) (advertisers|businesses|brands|clients|media buyers|agencies|accounts|leads)|"
     r"i (offer|provide|specialize in|help|support|work with|only deal with|deliver|supply) (advertisers|businesses|brands|clients|media buyers|agencies|accounts|leads)|"
