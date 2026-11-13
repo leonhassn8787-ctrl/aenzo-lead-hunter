@@ -631,8 +631,9 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_scan_is_capped_at_500_messages_and_runs_every_two_hours(self):
         source = WORKER.read_text(encoding="utf-8")
-        self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 500, 1, 1000)', source)
+        self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 1300, 1, 2000)', source)
         self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500)', source)
+        self.assertIn('bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 1000, 1, 1500)', source)
         self.assertIn("public_messages_processed >= MAX_PUBLIC_MESSAGES_PER_RUN", source)
         self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
         self.assertIn("messages_processed >= MAX_MESSAGES_PER_RUN", source)
@@ -1167,7 +1168,7 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         self.assertIn('bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)', source)
         self.assertIn('bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)', source)
         self.assertIn('bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)', source)
-        self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 500, 1, 1000)', source)
+        self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 1300, 1, 2000)', source)
 
     def test_scan_report_separates_joined_groups_from_public_search_signals(self):
         source = WORKER.read_text(encoding="utf-8")
