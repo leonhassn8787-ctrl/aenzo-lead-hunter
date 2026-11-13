@@ -53,7 +53,7 @@ MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 1300, 1, 2000)
 MAX_PUBLIC_MESSAGES_PER_RUN = min(bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500), MAX_MESSAGES_PER_RUN)
 MAX_JOINED_MESSAGES_PER_RUN = bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 1000, 1, 1500)
 MAX_MESSAGES_PER_GROUP_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_GROUP_PER_RUN", 10, 1, 50)
-CLASSIFIER_RULES_VERSION = 18
+CLASSIFIER_RULES_VERSION = 19
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for beta testers",
@@ -414,6 +414,7 @@ NON_BUYER_CONTEXT = re.compile(
     r"looking for (a )?(new )?(role|position|opportunity)|available for (a )?(new )?(role|position|opportunity)|"
     r"anyone hiring|is anyone hiring|who is hiring|job opportunities|employment opportunities|"
     r"looking to join (a |your |any )?team|"
+    r"you need (marketing|promotion|kols?|influencers?) (in|for)|you should (hire|look for|find) a? ?(marketing|growth) (agency|team)|"
     r"looking for bd partners|bd partners to onboard|partner recruitment|"
     r"looking for (affiliate|affiliates|ambassadors?|referral partners?|regional representatives)|"
     r"join our (affiliate|ambassador|referral|partner) program|"
