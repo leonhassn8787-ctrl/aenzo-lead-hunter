@@ -290,7 +290,7 @@ SIGNALS = {
 }
 COMPILED = {name: [re.compile(p, re.I) for p in patterns] for name, patterns in SIGNALS.items()}
 BUYING_CONTEXT = re.compile(r"\b(struggling to (get|attract|reach|grow|increase)|having trouble (getting|attracting|reaching|growing)|not getting (enough|many) (users|registrations|signups|members|engagement|traction)|could use more|how can we (get|attract|reach|grow|increase)|what.s the best way to (get|attract|reach|grow|increase)|looking for|looking to work with|looking to grow|looking to increase|looking to boost|looking to attract|looking to reach|looking to get|in search of|trying to find|trying to grow|trying to increase|trying to reach|want to grow|want to increase|want to boost|want to attract|want to reach|need|needs|need more|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|need a hand|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|can anyone help|anyone able to|someone who can|anyone experienced in|could use|need help with|help us|partner with|any agency|suggest a)\b", re.I)
-CRYPTO_CONTEXT = re.compile(r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet)\b", re.I)
+CRYPTO_CONTEXT = re.compile(r"\b(web3|crypto|blockchain|solana|memecoins?|defi|cefi|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet|layer[- ]?[12])\b", re.I)
 # Posts selling tools, accounts, traffic, or services are vendors—not buyers.
 # This catches ads that contain phrases such as "looking for an account" while
 # the author is actually offering rentals or inventory.
@@ -543,6 +543,16 @@ def classify(text):
 
     # Do not turn technical token-launch requests into marketing prospects.
     if technical_only.search(text) and not marketing_intent.search(text):
+        return []
+
+    # Generic app beta-testing requests are not AENZO prospects. Keep early-user,
+    # beta-tester, and feedback requests only when a crypto/Web3 project is named.
+    beta_feedback_request = re.search(
+        r"\b(early users?|early adopters?|beta testers?|product feedback|mvp testing)\b",
+        text,
+        re.I,
+    )
+    if beta_feedback_request and not CRYPTO_CONTEXT.search(text):
         return []
 
     if not hits and marketing_intent.search(text):
