@@ -52,7 +52,7 @@ SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
 MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)
 MAX_PUBLIC_MESSAGES_PER_RUN = min(bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 50, 1, 100), MAX_MESSAGES_PER_RUN)
 MAX_MESSAGES_PER_GROUP_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_GROUP_PER_RUN", 10, 1, 50)
-CLASSIFIER_RULES_VERSION = 12
+CLASSIFIER_RULES_VERSION = 13
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for beta testers",
@@ -352,6 +352,9 @@ SELLER_POST_CONTEXT = re.compile(
     r"(our|my) (database|data|leads|accounts|services|solutions|packages) (include|are available|available)|"
     r"fresh crypto,? investors?,? business,? depositors?.{0,100}(leads|data)|"
     r"(taboola|meta|google|tiktok|facebook) (ad )?accounts? (available|for rent|for sale)|"
+    r"premium advertising network solutions|advertising network solutions|"
+    r"business owners, media buyers and agencies are welcome|"
+    r"(mediago|quantcast|moloco).{0,120}(programmatic advertising|traffic|lead generation)|"
     r"(premium|verified|agency|network) advertising accounts?|" 
     r"ad accounts? (available|options|rental|purchase)|"
     r"looking to buy (ad|advertising) accounts?|" 
