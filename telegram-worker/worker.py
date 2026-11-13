@@ -1028,11 +1028,64 @@ def telegram_notification_block_reason(lead):
         return "missing_or_too_short_evidence"
     if not service_need or service_need.lower() in {"unknown", "needs review", "n/a", "none"}:
         return "missing_service_need"
-    if priority < 65:
+    # A direct, classified buyer-intent message normally starts at 55.
+    # Requiring 65 suppresses genuine requests without budget or urgency wording.
+    if priority < 55:
         return "priority_below_notification_threshold"
     if not classify(evidence):
         return "evidence_does_not_pass_buyer_intent_rules"
     return None
+
+
+async def notify_saved_lead(http, dedupe_key):
+    """Send a newly inserted qualified lead immediately, without waiting for scan completion."""
+    if not BOT_TOKEN or not BOT_CHAT_ID:
+        return
+    headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
+    url = SUPABASE_URL + "/rest/v1/leads"
+    params = {
+        "select": "id,company_name,service_need,priority_score,evidence_date,evidence_summary,evidence_url,telegram_group_url,contacts,outreach_english,outreach_bengali",
+        "owner_id": "eq." + SUPABASE_OWNER_ID,
+        "dedupe_key": "eq." + str(dedupe_key),
+        "telegram_notified_at": "is.null",
+        "limit": "1",
+    }
+    try:
+        response = await http.get(url, headers=headers, params=params, timeout=15)
+        if response.status_code != 200:
+            log.warning("Could not load newly saved lead for immediate alert: %s", response.text[:300])
+            return
+        rows = response.json()
+        if not rows:
+            log.warning("Newly saved lead was not returned for immediate notification.")
+            return
+        lead = rows[0]
+        reason = telegram_notification_block_reason(lead)
+        if reason:
+            log.info("Immediate Telegram alert held for lead %s: %s", lead.get("id"), reason)
+            return
+        sent = await http.post(
+            "https://api.telegram.org/bot" + BOT_TOKEN + "/sendMessage",
+            json={"chat_id": BOT_CHAT_ID, "text": format_telegram_lead(lead), "disable_web_page_preview": True},
+            timeout=20,
+        )
+        if sent.status_code != 200 or not sent.json().get("ok"):
+            log.warning("Immediate Telegram alert failed for lead %s: %s", lead.get("id"), sent.text[:300])
+            return
+        marked = await http.patch(
+            url,
+            headers=headers,
+            params={"id": "eq." + str(lead.get("id")), "owner_id": "eq." + SUPABASE_OWNER_ID},
+            json={"telegram_notified_at": datetime.now(timezone.utc).isoformat(), "telegram_notification_error": None},
+            timeout=15,
+        )
+        if marked.status_code not in (200, 204):
+            log.error("Immediate alert sent for lead %s but delivery timestamp was not saved (%s).", lead.get("id"), marked.status_code)
+        else:
+            log.info("Immediate Telegram alert delivered for new lead %s.", lead.get("id"))
+    except Exception:
+        # Do not interrupt scanning; the end-of-run pending queue retries it.
+        log.exception("Immediate notification failed for newly saved lead; it remains pending for retry.")
 
 
 async def notify_pending_leads(http):
@@ -1391,6 +1444,7 @@ async def run(once=False):
                     if save_status == "saved":
                         saved += 1
                         public_leads_saved += 1
+                        await notify_saved_lead(http, payload["dedupe_key"])
                     elif save_status == "duplicate":
                         duplicates += 1
                         public_duplicates += 1
@@ -1571,6 +1625,7 @@ async def run(once=False):
                     if save_status == "saved":
                         saved += 1
                         meta["qualified_leads"] = int(meta.get("qualified_leads", 0)) + 1
+                        await notify_saved_lead(http, payload["dedupe_key"])
                     elif save_status == "duplicate":
                         duplicates += 1
                         meta["qualified_leads"] = int(meta.get("qualified_leads", 0)) + 1
