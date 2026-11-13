@@ -584,6 +584,17 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("messages_processed >= MAX_MESSAGES_PER_RUN", source)
         self.assertIn('query_meta["cursor"]', source)
         self.assertIn("public_cursor_is_after(msg, cursor)", source)
+        self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 50, 1, 100)', source)
+        self.assertIn('CLASSIFIER_RULES_VERSION = 9', source)
+        for phrase in (
+            '"hiring Telegram promoters"',
+            '"looking for Telegram promoters"',
+            '"looking for CEX KOLs"',
+            '"looking for BD partners"',
+            '"looking for AMA partnerships"',
+            '"looking for early users"',
+        ):
+            self.assertIn(phrase, source)
 
     def test_verdict_testing_service_buyer_request(self):
         self.assert_signal(
