@@ -50,7 +50,7 @@ SOURCES = [
 POSITIVE = re.compile(
     r"\b(raised|raises|raising|funding|fundraise|seed round|series [a-d]|"
     r"grant|grants|accelerator|incubator|launches|launched|launching|"
-    r"mainnet|testnet|token generation|tge|token sale|ido|ico|ieo|"
+    r"mainnet|testnet|"
     r"product launch|new product|beta launch|public launch|"
     r"partnership|expansion|ecosystem fund|builder program|hackathon)\b", re.I
 )
