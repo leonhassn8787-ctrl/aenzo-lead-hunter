@@ -1,8 +1,8 @@
 name: AENZO Web Discovery Scan
 
 on:
-  schedule:
-    - cron: "37 */2 * * *"
+  # Automatic web-discovery schedule disabled to prevent extra recurring runs.
+  # Keep manual dispatch available for intentional testing.
   workflow_dispatch:
 
 permissions:
