@@ -8,7 +8,7 @@ This worker has two Telegram group discovery paths:
 
 It does not bypass membership, privacy, or access controls. Private groups remain inaccessible unless the account is a member. Telegram may rate-limit global searches, and some public groups/messages may not appear in search.
 
-It looks for messages that appear to request AENZO LABS services, then stores:
+It looks for messages that request AENZO LABS services or show a relevant Web3 growth/partnership need, then stores:
 - the original message text as evidence and its UTC date;
 - a Telegram message link when that group type supports one;
 - the sender's public Telegram username and any explicitly posted X, WhatsApp, email, Telegram, or website contact details; each is labelled as sourced from the message or author and is not independently verified;
@@ -18,7 +18,7 @@ It looks for messages that appear to request AENZO LABS services, then stores:
 A group title is not treated as a verified company name. Unverified identities are labelled **Potential project (verify)**. Every candidate needs human review before outreach.
 
 ## Accuracy and scan limits
-- Detection requires an AENZO-relevant service signal plus buyer intent. Generic crypto discussion, technical token-launch help, USDT/arbitrage/payment promotions, job-seeking, bot posts, and agency self-advertising are excluded. Indirect growth problems are accepted only when marketing/audience/visibility context is present. This is rule-based, not a full language model: slang-heavy, multilingual, or context-dependent requests can still be missed or misclassified. Review every candidate before outreach.
+- Detection accepts direct AENZO service requests and relevant Web3 project growth/partnership opportunities; an explicit budget or payment promise is not required. Generic crypto discussion, generic upcoming-token-launch signals, USDT/arbitrage/payment promotions, job-seeking, bot posts, free media/vendor offers, and agency self-advertising are excluded. Indirect growth problems are accepted only when marketing/audience/visibility context is present. This is rule-based, not a full language model: slang-heavy, multilingual, or context-dependent requests can still be missed or misclassified. Review every candidate before outreach.
 - Each scan run processes at most `MAX_MESSAGES_PER_RUN` unique incoming messages across public search and joined groups (default 100). Public search runs first; both public-search cursors and joined-group message cursors are saved so the next two-hour run resumes where it stopped. The first joined-group scan checks accessible history from the last `LOOKBACK_DAYS` days. Each GitHub Actions run still has a 30-minute job timeout.
 - Joined-group messages are processed oldest-first. The saved per-group message cursor resumes any remaining backlog on the next run.
 - Global public-group searches run against a list of buyer-intent phrases. A per-query timestamp is saved only after all result pages complete, so an interrupted or rate-limited query is retried rather than silently skipped.
