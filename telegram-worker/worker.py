@@ -1175,12 +1175,18 @@ async def run(once=False):
                 # the partial page set, but never advance its cursor until complete.
                 query_failed = not complete
                 for msg in global_messages:
+                    if messages_processed >= MAX_MESSAGES_PER_RUN:
+                        query_failed = True
+                        break
                     if asyncio.get_running_loop().time() - scan_started >= SCAN_BUDGET_SECONDS:
                         query_failed = True
                         break
-                    if not msg or not getattr(msg, "message", None) or not getattr(msg, "date", None):
+                    if not msg or not getattr(msg, "date", None):
+                        continue
+                    if not public_cursor_is_after(msg, cursor):
                         continue
                     if getattr(msg, "out", False):
+                        store_public_cursor(query_meta, msg)
                         continue
                     if int(msg.date.timestamp()) < query_min_date:
                         continue
@@ -1190,16 +1196,24 @@ async def run(once=False):
                         int(getattr(msg, "id", 0) or 0),
                     )
                     if public_message_key in run_seen_public_messages:
+                        store_public_cursor(query_meta, msg)
                         continue
                     run_seen_public_messages.add(public_message_key)
+                    messages_processed += 1
 
-                    text_body = msg.message.strip()
+                    text_body = (getattr(msg, "message", None) or "").strip()
+                    if not text_body:
+                        store_public_cursor(query_meta, msg)
+                        continue
                     messages_checked += 1
                     public_messages_checked += 1
                     if SELLER_AD_CONTEXT.search(text_body) or SELLER_POST_CONTEXT.search(text_body):
                         seller_posts += 1
                     services = classify(text_body)
                     if not services:
+                        store_public_cursor(query_meta, msg)
+                        if messages_processed % 25 == 0:
+                            write_state(state)
                         continue
                     buyer_signals += 1
                     public_buyer_signals += 1
@@ -1210,11 +1224,13 @@ async def run(once=False):
                     except Exception:
                         log.exception("Could not resolve public-group message or author %s.", getattr(msg, "id", "?"))
                         query_failed = True
-                        continue
+                        break
 
                     if entity is None or bool(getattr(entity, "broadcast", False)):
+                        store_public_cursor(query_meta, msg)
                         continue
                     if not is_human_sender(sender):
+                        store_public_cursor(query_meta, msg)
                         continue
 
                     group_id = str(entity.id)
@@ -1265,9 +1281,18 @@ async def run(once=False):
                         public_duplicates += 1
                     else:
                         query_failed = True
+                        break
+                    store_public_cursor(query_meta, msg)
+                    if messages_processed % 25 == 0:
+                        write_state(state)
 
                 if query_failed:
+                    global_search_state[query] = query_meta
+                    write_state(state)
                     global_search_incomplete += 1
+                    if messages_processed >= MAX_MESSAGES_PER_RUN:
+                        log.info("Per-run message limit reached; public search cursor saved for the next run.")
+                        break
                     continue
 
                 global_search_state[query] = {"last_scanned_at": query_max_date}
