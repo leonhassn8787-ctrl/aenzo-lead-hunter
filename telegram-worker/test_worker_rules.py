@@ -489,6 +489,16 @@ class LeadSignalTests(unittest.TestCase):
             [],
         )
 
+    def test_event_guest_speaker_signup_is_not_a_client_lead(self):
+        self.assertEqual(
+            self.classify(
+                "Friday Spaces AMA - Guest Signup Open. "
+                "We are looking for founders, KOLs, and project representatives "
+                "to join us as guest speakers. DM me if interested."
+            ),
+            [],
+        )
+
     def test_nikola_naro_style_web3_collaboration_post_is_a_prospect(self):
         self.assertIn(
             "Project Promotion",
@@ -963,7 +973,7 @@ class GroupScanningOptimizationTests(unittest.TestCase):
     def setUpClass(cls):
         tree = ast.parse(WORKER.read_text(encoding="utf-8"))
         wanted = {
-            "group_priority", "should_pause_group", "message_scan_kwargs",
+            "group_priority", "rotate_group_ids", "should_pause_group", "message_scan_kwargs",
             "reset_group_quality_metrics",
         }
         nodes = [
@@ -973,6 +983,7 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         namespace = {"CLASSIFIER_RULES_VERSION": 3}
         exec(compile(ast.Module(body=nodes, type_ignores=[]), str(WORKER), "exec"), namespace)
         cls.group_priority = staticmethod(namespace["group_priority"])
+        cls.rotate_group_ids = staticmethod(namespace["rotate_group_ids"])
         cls.should_pause_group = staticmethod(namespace["should_pause_group"])
         cls.message_scan_kwargs = staticmethod(namespace["message_scan_kwargs"])
         cls.reset_group_quality_metrics = staticmethod(namespace["reset_group_quality_metrics"])
@@ -996,6 +1007,12 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         good = {"qualified_leads": 2, "buyer_signals": 5, "seller_ads": 0}
         noisy = {"qualified_leads": 0, "buyer_signals": 0, "seller_ads": 20}
         self.assertGreater(self.group_priority(good), self.group_priority(noisy))
+
+    def test_joined_group_scan_rotates_after_last_group(self):
+        ids = ["a", "b", "c", "d"]
+        self.assertEqual(self.rotate_group_ids(ids, "b"), ["c", "d", "a", "b"])
+        self.assertEqual(self.rotate_group_ids(ids, "missing"), ids)
+        self.assertEqual(self.rotate_group_ids([], "a"), [])
 
     def test_only_vendor_heavy_groups_without_leads_are_snoozed(self):
         self.assertTrue(self.should_pause_group({
