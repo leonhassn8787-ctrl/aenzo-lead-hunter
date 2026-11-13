@@ -936,6 +936,26 @@ class LeadSignalTests(unittest.TestCase):
         )
         self.assertEqual(self.classify(post), [])
 
+    def test_premium_advertising_network_vendor_post_is_rejected(self):
+        post = (
+            "PREMIUM ADVERTISING NETWORK SOLUTIONS "
+            "Looking for traffic and advertising opportunities? "
+            "MediaGo Quantcast Moloco Programmatic Advertising "
+            "Traffic & Lead Generation. "
+            "Business owners, media buyers and agencies are welcome! "
+            "Send me a private message for details."
+        )
+        self.assertEqual(self.classify(post), [])
+
+    def test_real_crypto_project_request_for_paid_marketing_still_passes(self):
+        self.assertIn(
+            "Project Promotion",
+            self.classify(
+                "Our crypto project is looking for a paid advertising campaign "
+                "and a marketing agency to bring targeted traffic."
+            ),
+        )
+
     def test_real_crypto_project_request_for_targeted_traffic_still_passes(self):
         self.assertIn(
             "Project Promotion",
