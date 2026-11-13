@@ -1329,9 +1329,9 @@ async def run(once=False):
                     write_state(state)
                     global_search_incomplete += 1
                     if public_messages_processed >= MAX_PUBLIC_MESSAGES_PER_RUN or messages_processed >= MAX_MESSAGES_PER_RUN:
-                        state["global_search_query_index"] = query_index
+                        state["global_search_query_index"] = (query_index + 1) % len(GLOBAL_GROUP_SEARCH_QUERIES)
                         write_state(state)
-                        log.info("Public-search budget reached; cursor saved and joined-group scan will use the remaining message budget.")
+                        log.info("Public-search budget reached; cursor saved, later queries get priority next run, and joined groups use the remaining message budget.")
                         break
                     state["global_search_query_index"] = (query_index + 1) % len(GLOBAL_GROUP_SEARCH_QUERIES)
                     write_state(state)
