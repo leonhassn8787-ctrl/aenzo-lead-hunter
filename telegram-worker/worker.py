@@ -356,7 +356,12 @@ SELLER_POST_CONTEXT = re.compile(
 
 NON_BUYER_CONTEXT = re.compile(
     r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
-    r"open to (the )?(next|new) (opportunity|role|position)|open to opportunities|"\n    r"looking for (my )?(next|new) (opportunity|role|position)|seeking (a )?(new )?(role|position|opportunity)|"\n    r"looking for (a )?(new )?(role|position|opportunity)|available for (a )?(new )?(role|position|opportunity)|"\n    r"anyone hiring|is anyone hiring|who is hiring|job opportunities|employment opportunities|"\n    r"looking to join (a |your |any )?team|"\n    r"hire me|anyone hiring me|free airdrop|airdrop claim|claim (my )?airdrop|"
+    r"open to (the )?(next|new) (opportunity|role|position)|open to opportunities|"
+    r"looking for (my )?(next|new) (opportunity|role|position)|seeking (a )?(new )?(role|position|opportunity)|"
+    r"looking for (a )?(new )?(role|position|opportunity)|available for (a )?(new )?(role|position|opportunity)|"
+    r"anyone hiring|is anyone hiring|who is hiring|job opportunities|employment opportunities|"
+    r"looking to join (a |your |any )?team|"
+    r"hire me|anyone hiring me|free airdrop|airdrop claim|claim (my )?airdrop|"
     r"token price prediction|price prediction|trading signals|"
     r"looking for beta testers|need beta testers|recruiting beta testers|"
     r"looking for (app|game|platform|website) testers|looking for product feedback|"
