@@ -50,6 +50,7 @@ LOOKBACK_DAYS = bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)
 GLOBAL_SEARCH_MAX_PAGES = bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)
 SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
 MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)
+MAX_PUBLIC_MESSAGES_PER_RUN = min(bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 50, 1, 100), MAX_MESSAGES_PER_RUN)
 CLASSIFIER_RULES_VERSION = 9
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
@@ -1021,7 +1022,8 @@ async def send_scan_report(http, stats):
         f"Joined groups paused: {stats.get('groups_paused', 0)}\n"
         f"Non-joined public groups with qualified signals: {stats.get('public_groups_found', 0)}\n"
         f"Public groups with qualified buyer signals: {stats.get('public_groups_with_buyer_signals', 0)}\n"
-        f"Public messages checked: {stats.get('public_messages_checked', 0):,}\n"
+        f"Public messages processed: {stats.get('public_messages_processed', 0):,} / {MAX_PUBLIC_MESSAGES_PER_RUN:,}\\n"
+        f"Public text messages checked: {stats.get('public_messages_checked', 0):,}\\n"
         f"Public buyer signals: {stats.get('public_buyer_signals', 0):,}\n"
         f"Public leads saved: {stats.get('public_leads_saved', 0)}\n"
         f"Public duplicate leads: {stats.get('public_duplicates', 0)}\n"
@@ -1117,6 +1119,7 @@ async def run(once=False):
                     continue
                 dialogs.append(dialog)
 
+            public_messages_processed = 0
             public_messages_checked = 0
             public_buyer_signals = 0
             public_leads_saved = 0
@@ -1130,8 +1133,8 @@ async def run(once=False):
             global_search_incomplete = 0
 
             for query in GLOBAL_GROUP_SEARCH_QUERIES:
-                if messages_processed >= MAX_MESSAGES_PER_RUN:
-                    log.info("Per-run message limit reached during public search; remaining work resumes next run.")
+                if public_messages_processed >= MAX_PUBLIC_MESSAGES_PER_RUN or messages_processed >= MAX_MESSAGES_PER_RUN:
+                    log.info("Public-search message budget reached; remaining public queries resume next run.")
                     break
                 if asyncio.get_running_loop().time() - scan_started >= SCAN_BUDGET_SECONDS:
                     log.info("Public search time budget reached; remaining queries resume next run.")
@@ -1177,7 +1180,7 @@ async def run(once=False):
                 # the partial page set, but never advance its cursor until complete.
                 query_failed = not complete
                 for msg in global_messages:
-                    if messages_processed >= MAX_MESSAGES_PER_RUN:
+                    if public_messages_processed >= MAX_PUBLIC_MESSAGES_PER_RUN or messages_processed >= MAX_MESSAGES_PER_RUN:
                         query_failed = True
                         break
                     if asyncio.get_running_loop().time() - scan_started >= SCAN_BUDGET_SECONDS:
@@ -1202,6 +1205,7 @@ async def run(once=False):
                         continue
                     run_seen_public_messages.add(public_message_key)
                     messages_processed += 1
+                    public_messages_processed += 1
 
                     text_body = (getattr(msg, "message", None) or "").strip()
                     if not text_body:
@@ -1292,8 +1296,8 @@ async def run(once=False):
                     global_search_state[query] = query_meta
                     write_state(state)
                     global_search_incomplete += 1
-                    if messages_processed >= MAX_MESSAGES_PER_RUN:
-                        log.info("Per-run message limit reached; public search cursor saved for the next run.")
+                    if public_messages_processed >= MAX_PUBLIC_MESSAGES_PER_RUN or messages_processed >= MAX_MESSAGES_PER_RUN:
+                        log.info("Public-search budget reached; cursor saved and joined-group scan will use the remaining message budget.")
                         break
                     continue
 
@@ -1478,6 +1482,7 @@ async def run(once=False):
                 "global_queries_completed": global_search_complete,
                 "global_queries_incomplete": global_search_incomplete,
                 "public_groups_with_buyer_signals": len(global_group_ids),
+                "public_messages_processed": public_messages_processed,
                 "public_messages_checked": public_messages_checked,
                 "public_buyer_signals": public_buyer_signals,
                 "public_leads_saved": public_leads_saved,
@@ -1495,8 +1500,8 @@ async def run(once=False):
                 "duration_seconds": duration_seconds,
             })
             log.info(
-                "Scan complete: %s/%s joined groups checked; %s messages processed (%s cap); %s text messages checked; %s new leads saved; %.1fs.",
-                checked, len(dialogs), messages_processed, MAX_MESSAGES_PER_RUN, messages_checked, saved, duration_seconds
+                "Scan complete: %s/%s joined groups checked; %s total messages processed (%s cap, %s public budget); %s public messages; %s text messages checked; %s new leads saved; %.1fs.",
+                checked, len(dialogs), messages_processed, MAX_MESSAGES_PER_RUN, MAX_PUBLIC_MESSAGES_PER_RUN, public_messages_processed, messages_checked, saved, duration_seconds
             )
             if once:
                 break
