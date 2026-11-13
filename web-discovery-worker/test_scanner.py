@@ -10,7 +10,7 @@ os.environ.setdefault("SUPABASE_OWNER_ID", "00000000-0000-0000-0000-000000000000
 import scanner
 
 class ScannerTests(unittest.TestCase):
-    def test_source_catalog_contains_thirteen_requested_sources(self):
+    def test_source_catalog_contains_twelve_requested_sources_without_tge_index(self):
         names = {source["name"] for source in scanner.SOURCES}
         self.assertEqual(len(names), 12)
         self.assertIn("Product Hunt", names)
@@ -24,6 +24,10 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["url"], "https://example.com/story")
         self.assertIsNotNone(rows[0]["published"])
+
+    def test_upcoming_token_launch_only_signal_is_not_discovered(self):
+        item = {"title": "Upcoming TGE token launch date announced", "summary": "A crypto token generation event is scheduled."}
+        self.assertIsNone(scanner.classify(item, "token_launch"))
 
     def test_funding_signal_is_candidate_not_lead(self):
         item = {"title": "Web3 startup raised $8 million funding", "summary": "A blockchain company raised a seed round."}
