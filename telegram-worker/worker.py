@@ -374,7 +374,7 @@ SELLER_POST_CONTEXT = re.compile(
     r"offering (free )?(project features?|social media cross.promotion|cross.promotion|pr collaborations?)|"
     r"i create .{0,140}(promotional content|ugc content|product promotion content|ai influencer models)|"
     r"i\'?m open to:?.{0,180}(ugc content creation|product promotions|paid partnerships|ai influencer marketing)|"
-    r"launchpad.{0,100}(no upfront|without upfront|no (upfront )?fee|does not take upfront|do not take upfront)"
+    r"launchpad.{0,100}(no upfront|without upfront|no (upfront )?fees?|does not take upfront|do not take upfront|who (does not|doesn\'t|do not|don\'t|not) take (or tack )?(any )?upfront fees?)"
     r")\b",
     re.I,
 )
@@ -1031,6 +1031,7 @@ async def send_scan_report(http, stats):
         f"Global search queries completed: {stats.get('global_queries_completed', 0)}\n"
         f"Global search queries incomplete: {stats.get('global_queries_incomplete', 0)}\n"
         f"Messages processed this run: {stats.get('messages_processed', 0):,} / {MAX_MESSAGES_PER_RUN:,}\\n"
+        f"Text messages checked: {stats.get('messages_checked', 0):,}\\n"
         f"Seller/vendor posts: {stats.get('seller_posts', 0):,}\n"
         f"Buyer signals: {stats.get('buyer_signals', 0):,}\n"
         f"New leads saved: {stats.get('leads_saved', 0)}\n"
