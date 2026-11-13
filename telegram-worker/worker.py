@@ -1016,6 +1016,25 @@ def format_telegram_lead(lead):
         'বাংলা অর্থ:\n' + str(lead.get('outreach_bengali') or 'পর্যালোচনা করুন') + '\n\n' +
         'Potential lead only. Verify the project and buyer intent before outreach.')[:3900]
 
+def telegram_notification_block_reason(lead):
+    """Fail closed: only notify when stored evidence independently passes buyer rules."""
+    evidence = str(lead.get("evidence_summary") or "").strip()
+    service_need = str(lead.get("service_need") or "").strip()
+    try:
+        priority = int(lead.get("priority_score") or 0)
+    except (TypeError, ValueError):
+        priority = 0
+    if len(evidence) < 25:
+        return "missing_or_too_short_evidence"
+    if not service_need or service_need.lower() in {"unknown", "needs review", "n/a", "none"}:
+        return "missing_service_need"
+    if priority < 65:
+        return "priority_below_notification_threshold"
+    if not classify(evidence):
+        return "evidence_does_not_pass_buyer_intent_rules"
+    return None
+
+
 async def notify_pending_leads(http):
     if not BOT_TOKEN or not BOT_CHAT_ID:
         log.info('Telegram bot alerts not configured; scanning continues.')
@@ -1034,6 +1053,14 @@ async def notify_pending_leads(http):
         return
     for lead in pending:
         lead_id = lead.get('id')
+        block_reason = telegram_notification_block_reason(lead)
+        if block_reason:
+            log.warning(
+                "Telegram alert blocked for lead %s by strict buyer-evidence gate: %s",
+                lead_id, block_reason,
+            )
+            # Keep the record for manual review; do not send a bot notification.
+            continue
         try:
             sent = await http.post('https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage', json={'chat_id': BOT_CHAT_ID, 'text': format_telegram_lead(lead), 'disable_web_page_preview': True}, timeout=30)
             if sent.status_code != 200 or not sent.json().get('ok'):
