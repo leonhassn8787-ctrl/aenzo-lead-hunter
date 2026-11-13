@@ -45,10 +45,11 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 SUPABASE_OWNER_ID = os.environ["SUPABASE_OWNER_ID"]
 BOT_TOKEN = os.getenv("AENZO_BOT_TOKEN", "").strip()
 BOT_CHAT_ID = os.getenv("AENZO_BOT_CHAT_ID", "").strip()
-POLL_SECONDS = bounded_int_env("POLL_SECONDS", 600, 60, 86400)
+POLL_SECONDS = bounded_int_env("POLL_SECONDS", 7200, 60, 86400)
 LOOKBACK_DAYS = bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)
 GLOBAL_SEARCH_MAX_PAGES = bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)
 SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
+MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)
 CLASSIFIER_RULES_VERSION = 8
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
@@ -181,6 +182,7 @@ SIGNALS = {
         r"grow our (telegram )?community", r"community growth (agency|partner|service)",
         r"telegram group promotion",
         r"looking for (telegram )?(promoter|promoters)",
+        r"looking for (a )?(promoter|promoters)",
         r"hiring (telegram )?(promoter|promoters)",
         r"need (telegram )?(promoter|promoters)",
         r"paid promotions? (for|on) (our )?telegram",
@@ -231,6 +233,7 @@ SIGNALS = {
         r"need project promotion", r"promote our project",
         r"cross[- ]marketing", r"co[- ]marketing", r"joint campaign",
         r"pr collaboration", r"x partnership", r"twitter partnership",
+        r"(open to|looking for|seeking|interested in) .{0,80}(collaboration|collaborations|partnership|partnerships)",
         r"looking for a marketing partner", r"project marketing campaign",
         r"upcoming launch (promotion|marketing)",
     ],
@@ -330,7 +333,8 @@ SELLER_AD_CONTEXT = re.compile(
 
 SELLER_POST_CONTEXT = re.compile(
     r"\b("
-    r"we (offer|provide|specialize in|are offering|can provide|help|support|work with|only deal with|deliver|supply|give you access to)|"
+    r"we (offer|provide|specialize in|are offering|can provide) (web3 |crypto )?(marketing|promotion|kol|influencer|pr|ama|community management|social media|advertising|lead generation|ad account|campaign management|growth) (services|packages|solutions|support|campaigns)|"
+    r"we (help|support|work with|only deal with|deliver|supply|give you access to) (advertisers|businesses|brands|clients|media buyers|agencies|accounts|leads)|"
     r"i (offer|provide|specialize in|help|support|work with|only deal with|deliver|supply) (advertisers|businesses|brands|clients|media buyers|agencies|accounts|leads)|"
     r"we give you access to .{0,100}(database|data|lead|tool)|"
     r"(our|my) (database|data|leads|accounts|services|solutions|packages) (include|are available|available)|"
@@ -365,7 +369,12 @@ SELLER_POST_CONTEXT = re.compile(
     r"looking for .{0,180} (i have|we have) (a (large )?(kol|influencer|telegram|community) (network|team|group)|available (accounts|leads|services|solutions|packages)|the solution|the right solution)|"
     r"looking for .{0,180} (we offer|we provide|let'?s get you set up)|"
     r"looking for targeted traffic and potential customers for your platform|"
-    r"digital marketing solutions tailored to your campaign goals"
+    r"digital marketing solutions tailored to your campaign goals|"
+    r"we\'?re offering (this )?(collaboration|project features?|social media cross.promotion|cross.promotion|pr collaboration) (free|for free|at no cost)|"
+    r"offering (free )?(project features?|social media cross.promotion|cross.promotion|pr collaborations?)|"
+    r"i create .{0,140}(promotional content|ugc content|product promotion content|ai influencer models)|"
+    r"i\'?m open to:?.{0,180}(ugc content creation|product promotions|paid partnerships|ai influencer marketing)|"
+    r"launchpad.{0,100}(no upfront|without upfront|no (upfront )?fee|does not take upfront|do not take upfront)"
     r")\b",
     re.I,
 )
@@ -381,7 +390,6 @@ NON_BUYER_CONTEXT = re.compile(
     r"token price prediction|price prediction|trading signals|"
     r"wallet (is )?(not working|stuck)|"
     r"account (is )?(locked|suspended)|"
-    r"we (offer|provide|specialize in|are offering|can provide|can help (with|you))|"
     r"we are (a|an) [a-z -]{1,50}(agency|service provider|marketing team|growth team|pr firm)|"
     r"our (agency|company|team) (offers|provides|specializes in|is offering|can provide)|"
     r"(dm|message|contact) (me|us) (for|to get) (rates|pricing|packages|details|collaboration)|"
@@ -567,6 +575,10 @@ def classify(text):
             r"user acquisition|launch promotion|project promotion|paid campaign)\b",
             re.I,
         )
+        partnership_opportunity = (
+            re.search(r"\b(collaboration|collaborations|partnership|partnerships|cross[- ]marketing|co[- ]marketing|joint campaign)\b", text, re.I)
+            and CRYPTO_CONTEXT.search(text)
+        )
         growth_demand = re.compile(
             r"\b(users?|user base|audience|traction|signups|registrations|"
             r"engagement|members|visibility|early users?|early adopters?|beta testers?|product feedback)\b",
@@ -579,7 +591,7 @@ def classify(text):
         )
         # Generic "looking for users" posts are not enough. Accept indirect
         # growth requests only when the post identifies a digital/Web3 project.
-        if strong_marketing_intent.search(text) or (
+        if strong_marketing_intent.search(text) or partnership_opportunity or (
             growth_demand.search(text)
             and (CRYPTO_CONTEXT.search(text) or digital_project_context.search(text))
         ):
@@ -588,6 +600,30 @@ def classify(text):
             return []
 
     return hits
+
+def public_message_cursor_key(message):
+    """Stable cursor ordering for public search results spanning multiple Telegram groups."""
+    return (
+        int(message.date.timestamp()),
+        repr(getattr(message, "peer_id", None)),
+        int(getattr(message, "id", 0) or 0),
+    )
+
+
+def public_cursor_is_after(message, cursor):
+    if not isinstance(cursor, dict):
+        return True
+    try:
+        previous = (int(cursor["date"]), str(cursor["peer"]), int(cursor["message_id"]))
+    except (KeyError, TypeError, ValueError):
+        return True
+    return public_message_cursor_key(message) > previous
+
+
+def store_public_cursor(query_meta, message):
+    stamp, peer, message_id = public_message_cursor_key(message)
+    query_meta["cursor"] = {"date": stamp, "peer": peer, "message_id": message_id}
+
 
 def make_message_url(entity, message_id):
     """Build only Telegram permalink formats supported by the group type."""
@@ -850,6 +886,7 @@ async def fetch_global_group_messages(client, query, min_date, max_date):
                 unique.values(),
                 key=lambda message: (
                     int(message.date.timestamp()) if getattr(message, "date", None) else 0,
+                    repr(getattr(message, "peer_id", None)),
                     int(getattr(message, "id", 0) or 0),
                 ),
             )
@@ -1061,6 +1098,7 @@ async def run(once=False):
             saved = 0
             paused = 0
             messages_checked = 0
+            messages_processed = 0
             seller_posts = 0
             buyer_signals = 0
             duplicates = 0
@@ -1090,14 +1128,19 @@ async def run(once=False):
             global_search_incomplete = 0
 
             for query in GLOBAL_GROUP_SEARCH_QUERIES:
+                if messages_processed >= MAX_MESSAGES_PER_RUN:
+                    log.info("Per-run message limit reached during public search; remaining work resumes next run.")
+                    break
                 if asyncio.get_running_loop().time() - scan_started >= SCAN_BUDGET_SECONDS:
                     log.info("Public search time budget reached; remaining queries resume next run.")
                     break
-                query_meta = global_search_state.get(query, {})
+                query_meta = global_search_state.setdefault(query, {})
                 previous_scan = int(query_meta.get("last_scanned_at", 0) or 0)
+                cursor = query_meta.get("cursor")
+                cursor_date = int(cursor.get("date", 0) or 0) if isinstance(cursor, dict) else 0
                 query_min_date = max(
                     int(cutoff.timestamp()),
-                    previous_scan - 2 if previous_scan else int(cutoff.timestamp()),
+                    cursor_date - 2 if cursor_date else (previous_scan - 2 if previous_scan else int(cutoff.timestamp())),
                 )
                 query_max_date = int(now.timestamp())
                 if query_min_date >= query_max_date:
