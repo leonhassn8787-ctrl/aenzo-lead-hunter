@@ -635,7 +635,7 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500)', source)
         self.assertIn('bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 1000, 1, 1500)', source)
         self.assertIn("public_messages_processed >= MAX_PUBLIC_MESSAGES_PER_RUN", source)
-        self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
+        self.assertIn('bounded_int_env("POLL_SECONDS", 14400, 60, 86400)', source)
         self.assertIn("messages_processed >= MAX_MESSAGES_PER_RUN", source)
         self.assertIn('query_meta["cursor"]', source)
         self.assertIn("public_cursor_is_after(msg, cursor)", source)
