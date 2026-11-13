@@ -49,7 +49,7 @@ POLL_SECONDS = bounded_int_env("POLL_SECONDS", 600, 60, 86400)
 LOOKBACK_DAYS = bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)
 GLOBAL_SEARCH_MAX_PAGES = bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)
 SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
-CLASSIFIER_RULES_VERSION = 5
+CLASSIFIER_RULES_VERSION = 6
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for KOL",
@@ -347,7 +347,9 @@ SELLER_POST_CONTEXT = re.compile(
     r"lead generation (data|services|solutions) available|"
     r"our services|supported campaigns|"
     r"looking for .{0,180} (i have|we have) (a (large )?(kol|influencer|telegram|community) (network|team|group)|available (accounts|leads|services|solutions|packages)|the solution|the right solution)|"
-    r"looking for .{0,180} (we offer|we provide|let'?s get you set up)"
+    r"looking for .{0,180} (we offer|we provide|let'?s get you set up)|"
+    r"looking for targeted traffic and potential customers for your platform|"
+    r"digital marketing solutions tailored to your campaign goals"
     r")\b",
     re.I,
 )
