@@ -1071,6 +1071,52 @@ class LeadSignalTests(unittest.TestCase):
             ),
         )
 
+class TelegramNotificationGateTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        tree = ast.parse(WORKER.read_text(encoding="utf-8"))
+        node = next(
+            item for item in tree.body
+            if isinstance(item, ast.FunctionDef)
+            and item.name == "telegram_notification_block_reason"
+        )
+        namespace = {"classify": lambda evidence: ["Project Promotion"] if "our crypto project needs a paid marketing campaign" in evidence.lower() else []}
+        exec(compile(ast.Module(body=[node], type_ignores=[]), str(WORKER), "exec"), namespace)
+        cls.check = staticmethod(namespace["telegram_notification_block_reason"])
+
+    def test_strong_evidenced_buyer_can_be_notified(self):
+        lead = {
+            "evidence_summary": "Our crypto project needs a paid marketing campaign before launch. We need an agency.",
+            "service_need": "Project Promotion",
+            "priority_score": 75,
+        }
+        self.assertIsNone(self.check(lead))
+
+    def test_missing_evidence_is_blocked(self):
+        self.assertEqual(
+            self.check({"evidence_summary": "", "service_need": "Project Promotion", "priority_score": 90}),
+            "missing_or_too_short_evidence",
+        )
+
+    def test_low_priority_is_blocked(self):
+        self.assertEqual(
+            self.check({"evidence_summary": "Our crypto project needs a paid marketing campaign before launch.", "service_need": "Project Promotion", "priority_score": 64}),
+            "priority_below_notification_threshold",
+        )
+
+    def test_non_buyer_evidence_is_blocked(self):
+        self.assertEqual(
+            self.check({"evidence_summary": "We offer marketing services to crypto projects and need clients.", "service_need": "Project Promotion", "priority_score": 90}),
+            "evidence_does_not_pass_buyer_intent_rules",
+        )
+
+    def test_missing_service_category_is_blocked(self):
+        self.assertEqual(
+            self.check({"evidence_summary": "Our crypto project needs a paid marketing campaign before launch.", "service_need": "", "priority_score": 90}),
+            "missing_service_need",
+        )
+
+
 class GroupScanningOptimizationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
