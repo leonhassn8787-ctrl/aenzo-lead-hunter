@@ -52,7 +52,7 @@ SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
 MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)
 MAX_PUBLIC_MESSAGES_PER_RUN = min(bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 50, 1, 100), MAX_MESSAGES_PER_RUN)
 MAX_MESSAGES_PER_GROUP_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_GROUP_PER_RUN", 10, 1, 50)
-CLASSIFIER_RULES_VERSION = 10
+CLASSIFIER_RULES_VERSION = 11
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for beta testers",
@@ -387,6 +387,11 @@ SELLER_POST_CONTEXT = re.compile(
     r"i create .{0,140}(promotional content|ugc content|product promotion content|ai influencer models)|"
     r"i\'?m open to:?.{0,180}(ugc content creation|product promotions|paid partnerships|ai influencer marketing)|"
     r"launchpad.{0,100}(no upfront|without upfront|no (upfront )?fees?|does not take upfront|do not take upfront|who (does not|doesn\'t|do not|don\'t|not) take (or tack )?(any )?upfront fees?)"
+    r"anyone looking for (a )?free (marketing|lead generation|automation) (and|\+|or).{0,80}tool|"
+    r"(our|my) telegram channel provides access to .{0,100}(contact|investor|email|phone|lead) (collections|datasets|data)|"
+    r"premium global contact data services|"
+    r"growth network is open for new projects|"
+    r"we'?re currently taking on new .{0,80}projects looking to grow through|"
     r")\b",
     re.I,
 )
@@ -423,6 +428,9 @@ NON_BUYER_CONTEXT = re.compile(
     r"welcome to .{0,80}partner.{0,40}pinksale|"
     r"guest signup open|guest speakers?|join us as guest speakers|"
     r"looking for founders,? kols?,? and project representatives to join us|"
+    r"looking for projects for sale|"
+    r"private investors.{0,100}looking for (projects|investment opportunities)|"
+    r"looking for projects to fund|"
     r"recognized with kyc,? audit and doxx badge)\b",
     re.I,
 )
