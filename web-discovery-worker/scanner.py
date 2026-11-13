@@ -18,12 +18,19 @@ BOT_TOKEN = os.getenv("AENZO_BOT_TOKEN", "").strip()
 BOT_CHAT_ID = os.getenv("AENZO_BOT_CHAT_ID", "").strip()
 LOOKBACK_DAYS = int(os.getenv("WEB_LOOKBACK_DAYS", "10"))
 MAX_ITEMS_PER_SOURCE = int(os.getenv("WEB_MAX_ITEMS_PER_SOURCE", "35"))
-HEADERS = {
-    "apikey": SERVICE_KEY,
-    "Authorization": "Bearer " + SERVICE_KEY,
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-}
+def supabase_headers(secret_key):
+    """Modern sb_secret keys are API keys, not JWT bearer tokens."""
+    headers = {
+        "apikey": secret_key,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    if not secret_key.startswith("sb_secret_"):
+        headers["Authorization"] = "Bearer " + secret_key
+    return headers
+
+
+HEADERS = supabase_headers(SERVICE_KEY)
 
 def google_news(domain, terms):
     query = f"site:{domain} ({terms})"
