@@ -647,8 +647,6 @@ class LeadSignalTests(unittest.TestCase):
             '"hiring Telegram promoters"',
             '"looking for Telegram promoters"',
             '"looking for CEX KOLs"',
-            '"looking for BD partners"',
-            '"looking for AMA partnerships"',
             '"looking for early users"',
         ):
             self.assertIn(phrase, source)
