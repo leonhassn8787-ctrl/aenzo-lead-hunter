@@ -499,14 +499,14 @@ class LeadSignalTests(unittest.TestCase):
             [],
         )
 
-    def test_nikola_naro_style_web3_collaboration_post_is_a_prospect(self):
-        self.assertIn(
-            "Project Promotion",
+    def test_nikola_naro_style_web3_collaboration_post_is_rejected(self):
+        self.assertEqual(
             self.classify(
                 "We have two Web3 projects open to PR collaborations, X partnerships, "
                 "joint campaigns, AMAs, and cross-marketing opportunities. "
                 "We are open to mutually beneficial partnerships with crypto communities."
             ),
+            [],
         )
 
     def test_cex_kol_and_trader_acquisition_request_is_a_potential_lead(self):
@@ -629,7 +629,7 @@ class LeadSignalTests(unittest.TestCase):
             [],
         )
 
-    def test_scan_is_capped_at_500_messages_and_runs_every_two_hours(self):
+    def test_scan_budgets_and_four_hour_schedule_settings(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 1300, 1, 2000)', source)
         self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500)', source)
@@ -642,7 +642,7 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("global_search_query_index", source)
         self.assertIn("rotate_global_search_queries(GLOBAL_GROUP_SEARCH_QUERIES", source)
         self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500)', source)
-        self.assertIn('CLASSIFIER_RULES_VERSION = 17', source)
+        self.assertIn('CLASSIFIER_RULES_VERSION = 18', source)
         for phrase in (
             '"hiring Telegram promoters"',
             '"looking for Telegram promoters"',
