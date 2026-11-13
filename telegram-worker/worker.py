@@ -1035,7 +1035,6 @@ async def send_scan_report(http, stats):
         f"Global search queries incomplete: {stats.get('global_queries_incomplete', 0)}\n"
         f"Messages processed this run: {stats.get('messages_processed', 0):,} / {MAX_MESSAGES_PER_RUN:,}\n"
         f"Text messages checked: {stats.get('messages_checked', 0):,}\n"
-        f"Text messages checked: {stats.get('messages_checked', 0):,}\\n"
         f"Seller/vendor posts: {stats.get('seller_posts', 0):,}\n"
         f"Buyer signals: {stats.get('buyer_signals', 0):,}\n"
         f"New leads saved: {stats.get('leads_saved', 0)}\n"
