@@ -18,6 +18,16 @@ class ScannerTests(unittest.TestCase):
         self.assertNotIn("ChainJobs", names)
         self.assertNotIn("TGE Index", names)
 
+    def test_source_active_flags_are_respected(self):
+        rows = [
+            {"source_name": "CoinDesk", "is_active": True},
+            {"source_name": "TGE Index", "is_active": False},
+            {"source_name": "Product Hunt", "is_active": True},
+        ]
+        enabled = scanner.filter_enabled_sources(scanner.SOURCES, rows)
+        names = {source["name"] for source in enabled}
+        self.assertEqual(names, {"CoinDesk", "Product Hunt"})
+
     def test_parse_rss_item(self):
         xml = b"""<?xml version='1.0'?><rss><channel><item><title>Web3 startup raised $8 million funding</title><link>https://example.com/story</link><description>A blockchain project raised seed funding.</description><pubDate>Sun, 08 Nov 2026 10:00:00 GMT</pubDate></item></channel></rss>"""
         rows = scanner.parse_feed(xml)
