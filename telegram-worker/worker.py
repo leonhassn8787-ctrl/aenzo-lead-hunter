@@ -386,12 +386,12 @@ SELLER_POST_CONTEXT = re.compile(
     r"offering (free )?(project features?|social media cross.promotion|cross.promotion|pr collaborations?)|"
     r"i create .{0,140}(promotional content|ugc content|product promotion content|ai influencer models)|"
     r"i\'?m open to:?.{0,180}(ugc content creation|product promotions|paid partnerships|ai influencer marketing)|"
-    r"launchpad.{0,100}(no upfront|without upfront|no (upfront )?fees?|does not take upfront|do not take upfront|who (does not|doesn\'t|do not|don\'t|not) take (or tack )?(any )?upfront fees?)"
+    r"launchpad.{0,100}(no upfront|without upfront|no (upfront )?fees?|does not take upfront|do not take upfront|who (does not|doesn\'t|do not|don\'t|not) take (or tack )?(any )?upfront fees?)|"
     r"anyone looking for (a )?free (marketing|lead generation|automation) (and|\+|or).{0,80}tool|"
     r"(our|my) telegram channel provides access to .{0,100}(contact|investor|email|phone|lead) (collections|datasets|data)|"
     r"premium global contact data services|"
     r"growth network is open for new projects|"
-    r"we'?re currently taking on new .{0,80}projects looking to grow through|"
+    r"we'?re currently taking on new .{0,80}projects looking to grow through"
     r")\b",
     re.I,
 )
