@@ -469,6 +469,36 @@ class LeadSignalTests(unittest.TestCase):
             ),
         )
 
+    def test_daily_paid_promotions_available_hiring_post_is_a_prospect(self):
+        self.assertIn(
+            "Community Promotion",
+            self.classify(
+                "HIRING TELEGRAM PROMOTERS! Daily Paid Promotions Available! "
+                "Do you own a Telegram group or channel with active members? "
+                "We are looking for promoters for paid promotions."
+            ),
+        )
+
+    def test_kryptokite_free_article_and_cross_promotion_offer_is_rejected(self):
+        self.assertEqual(
+            self.classify(
+                "We're building KryptoKite and looking to connect with promising crypto projects. "
+                "We'll publish a dedicated project article and do social media cross-promotion. "
+                "We're offering this collaboration free of charge."
+            ),
+            [],
+        )
+
+    def test_nikola_naro_style_web3_collaboration_post_is_a_prospect(self):
+        self.assertIn(
+            "Project Promotion",
+            self.classify(
+                "We have two Web3 projects open to PR collaborations, X partnerships, "
+                "joint campaigns, AMAs, and cross-marketing opportunities. "
+                "We are open to mutually beneficial partnerships with crypto communities."
+            ),
+        )
+
     def test_cex_kol_and_trader_acquisition_request_is_a_potential_lead(self):
         self.assertIn(
             "KOL & Influencer Marketing",
