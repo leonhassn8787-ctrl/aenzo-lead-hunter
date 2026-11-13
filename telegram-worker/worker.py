@@ -1304,7 +1304,7 @@ async def run(once=False):
                     sender_id = getattr(sender, "id", None)
                     payload = {
                         "owner_id": SUPABASE_OWNER_ID,
-                        "company_name": f"Potential project (verify) — {group_name}"[:250],
+                        "company_name": "Potential project (verify)",
                         "website": None,
                         "industry": "Web3 / Crypto",
                         "service_need": "; ".join(services),
@@ -1483,7 +1483,7 @@ async def run(once=False):
                     en, bn = make_outreach(services)
                     payload = {
                         "owner_id": SUPABASE_OWNER_ID,
-                        "company_name": f"Potential project (verify) — {group_name}"[:250],
+                        "company_name": "Potential project (verify)",
                         "website": None,
                         "industry": "Web3 / Crypto",
                         "service_need": "; ".join(services),
