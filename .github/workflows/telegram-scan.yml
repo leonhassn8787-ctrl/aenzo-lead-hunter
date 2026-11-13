@@ -22,7 +22,7 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
@@ -207,7 +207,7 @@ jobs:
           STATE_FILE: scan_state.json
           LOOKBACK_DAYS: "30"
           GLOBAL_SEARCH_MAX_PAGES: "3"
-          SCAN_BUDGET_SECONDS: "1320"
+          SCAN_BUDGET_SECONDS: "1920"
           MAX_MESSAGES_PER_RUN: "1300"
           MAX_JOINED_MESSAGES_PER_RUN: "1000"
           MAX_PUBLIC_MESSAGES_PER_RUN: "300"
