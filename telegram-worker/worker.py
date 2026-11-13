@@ -49,7 +49,7 @@ POLL_SECONDS = bounded_int_env("POLL_SECONDS", 600, 60, 86400)
 LOOKBACK_DAYS = bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)
 GLOBAL_SEARCH_MAX_PAGES = bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)
 SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
-CLASSIFIER_RULES_VERSION = 7
+CLASSIFIER_RULES_VERSION = 8
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for KOL",
@@ -164,6 +164,9 @@ SIGNALS = {
         r"need (kols|influencers)", r"kol campaign", r"influencer campaign",
         r"(crypto|web3) influencer (marketing|campaign|promotion)",
         r"anyone know (a |any )?(good )?(kol|influencer|influencers)",
+        r"looking for (a |an )?(cex |crypto )?(kol|kols|influencer|influencers)",
+        r"looking for .{0,100}(kol|kols|influencer|influencers)",
+        r"onboard .{0,60}(kol|kols|influencer|influencers)",
         r"(we are |we're )?(looking for|seeking) (a |an )?(kol|influencer) (agency|partner|team)",
         r"need (a |an )?(kol|influencer) (agency|partner|team|campaign)",
         r"(need|looking for) someone to (run|manage) (our )?(kol|influencer) campaign",
@@ -174,6 +177,10 @@ SIGNALS = {
         r"need telegram community (growth|promotion|marketing)",
         r"grow our (telegram )?community", r"community growth (agency|partner|service)",
         r"telegram group promotion",
+        r"looking for (telegram )?(promoter|promoters)",
+        r"hiring (telegram )?(promoter|promoters)",
+        r"need (telegram )?(promoter|promoters)",
+        r"paid promotions? (for|on) (our )?telegram",
         r"help us grow (our )?(telegram )?community",
         r"(telegram|community) (group )?(is )?(quiet|inactive|small).*(grow|users|members|engagement)",
         r"anyone know (a |any )?(community growth|telegram promotion) (agency|team|partner)",
@@ -182,7 +189,7 @@ SIGNALS = {
     ],
     "AMA Hosting & Engagement": [
         r"looking for ama", r"need ama (host|hosting|partner)",
-        r"ama collaboration", r"(host|hosting) an ama",
+        r"ama collaboration", r"ama partnership", r"(host|hosting) an ama",
     ],
     "PR & Media Visibility": [
         r"looking for pr", r"looking for (a |an )?pr (agency|partner|service|firm|support)",
@@ -219,6 +226,8 @@ SIGNALS = {
         r"need (more )?(project visibility|brand awareness|user acquisition)",
         r"(looking for|need) (a |an )?user acquisition (agency|partner|team|service)",
         r"need project promotion", r"promote our project",
+        r"cross[- ]marketing", r"co[- ]marketing", r"joint campaign",
+        r"pr collaboration", r"x partnership", r"twitter partnership",
         r"looking for a marketing partner", r"project marketing campaign",
         r"upcoming launch (promotion|marketing)",
     ],
@@ -245,6 +254,10 @@ SIGNALS = {
         r"need (an? )?(external )?(team|agency|partner) to (test|review|evaluate) (our )?(app|game|platform|website|product)",
         r"looking for (an? )?(external )?(team|agency|partner) to (test|review|evaluate) (our )?(app|game|platform|website|product)",
         r"need professional (beta )?testing (services|support|team)",
+        r"looking for (early )?(users|adopters) to (try|test|use) (our )?(mvp|app|platform|product)",
+        r"looking for (beta )?testers? for (our )?(web3|crypto|blockchain|ai|defi|cefi|trading|wallet|launchpad)",
+        r"need (early )?(users|adopters) for (our )?(web3|crypto|blockchain|ai|defi|cefi|trading|wallet|launchpad)",
+        r"looking for product feedback from (early )?users",
     ],
     "Fundraising / Launch Promotion": [
         r"looking for (fundraising|launch) (marketing|promotion|partner)",
@@ -363,8 +376,6 @@ NON_BUYER_CONTEXT = re.compile(
     r"looking to join (a |your |any )?team|"
     r"hire me|anyone hiring me|free airdrop|airdrop claim|claim (my )?airdrop|"
     r"token price prediction|price prediction|trading signals|"
-    r"looking for beta testers|need beta testers|recruiting beta testers|"
-    r"looking for (app|game|platform|website) testers|looking for product feedback|"
     r"wallet (is )?(not working|stuck)|"
     r"account (is )?(locked|suspended)|"
     r"we (offer|provide|specialize in|are offering|can provide|can help (with|you))|"
@@ -372,7 +383,6 @@ NON_BUYER_CONTEXT = re.compile(
     r"our (agency|company|team) (offers|provides|specializes in|is offering|can provide)|"
     r"(dm|message|contact) (me|us) (for|to get) (rates|pricing|packages|details|collaboration)|"
     r"(our|my) (services|packages|plans|rates|pricing) (include|start|are|for)|"
-    r"(available|open) for (collaborations|partnerships|paid promotions|promo| ama|marketing campaigns)|"
     r"(kol|influencer|shilling|marketing|promotion|pr|ama|community management|social media) (services|packages|agency|team|campaigns) (available|offered|provided)|"
     r"(we have|we run|we manage) (a )?(large )?(telegram )?(community|network|influencer network|kol network) (for|to promote|promotion)|"
     r"(promote|promotion|shill|advertise) your (project|token|coin|brand|website|app) (with|through|via) (us|our)|"
@@ -456,10 +466,22 @@ def should_pause_group(meta):
     return qualified == 0 and messages >= 200 and sellers / max(messages, 1) >= 0.35
 
 def classify(text):
-    """Return only messages with a clear request for an AENZO-relevant service."""
+    """Return direct and plausible AENZO prospects; seller and job-seeker posts remain excluded."""
     if (
         not text
-        or NON_BUYER_CONTEXT.search(text)
+        or (
+            NON_BUYER_CONTEXT.search(text)
+            and not (
+                CRYPTO_CONTEXT.search(text)
+                and re.search(
+                    r"\b(early users?|early adopters?|beta testers?|product feedback|mvp testing|"
+                    r"pr collaborations?|x partnerships?|twitter partnerships?|cross[- ]marketing|"
+                    r"co[- ]marketing|joint campaigns?|ama partnerships?)\b",
+                    text,
+                    re.I,
+                )
+            )
+        )
         or SELLER_AD_CONTEXT.search(text)
         or SELLER_POST_CONTEXT.search(text)
     ):
@@ -479,7 +501,9 @@ def classify(text):
         r"press release|ama hosting|giveaway campaign|airdrop campaign|"
         r"social media management|content marketing|content distribution|"
         r"brand awareness|user acquisition|grow our audience|increase visibility|audience|user base|users|traction|attract users|more users|signups|registrations|"
-        r"launch promotion|project promotion|advertising|paid campaign)\b",
+        r"launch promotion|project promotion|advertising|paid campaign|promoter|promoters|"
+        r"cross[- ]marketing|co[- ]marketing|collaboration|partnership|joint campaign|"
+        r"early users?|early adopters?|beta testers?|product feedback|mvp testing)\b",
         re.I,
     )
     buyer_intent = re.compile(
@@ -490,7 +514,8 @@ def classify(text):
         r"struggling to|not getting enough|trying to increase|"
         r"trying to grow|want to grow|want to increase|want to attract|"
         r"we are looking for|we're looking for|we need|we are seeking|"
-        r"looking to onboard|who handles|recommend a (marketing|growth|pr) agency)\b",
+        r"looking to onboard|who handles|recommend a (marketing|growth|pr) agency|"
+        r"open to|open for|interested in (a |an )?(partnership|collaboration|cross[- ]marketing))\b",
         re.I,
     )
 
@@ -531,7 +556,7 @@ def classify(text):
         )
         growth_demand = re.compile(
             r"\b(users?|user base|audience|traction|signups|registrations|"
-            r"engagement|members|visibility)\b",
+            r"engagement|members|visibility|early users?|early adopters?|beta testers?|product feedback)\b",
             re.I,
         )
         digital_project_context = re.compile(
