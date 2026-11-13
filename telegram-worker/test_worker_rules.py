@@ -609,6 +609,26 @@ class LeadSignalTests(unittest.TestCase):
             self.classify("Our Web3 project is looking for influencers for our paid launch campaign.")
         )
 
+    def test_affiliate_partner_recruitment_pitch_is_not_a_client_lead(self):
+        self.assertEqual(
+            self.classify(
+                "SEEFX GLOBAL PARTNER RECRUITMENT. We are now welcoming global partners. "
+                "Regional & Country Representatives, Marketing Professionals, Community Builders. "
+                "Referral rewards and team commissions. Minimum first deposit: $500."
+            ),
+            [],
+        )
+
+    def test_paid_promotion_reseller_recruitment_is_not_a_client_lead(self):
+        self.assertEqual(
+            self.classify(
+                "HIRING TELEGRAM PROMOTERS! Daily Paid Promotions Available! "
+                "Do you own a Telegram group or channel with active members? "
+                "We are looking for promoters for paid promotions."
+            ),
+            [],
+        )
+
     def test_scan_is_capped_at_100_messages_and_runs_every_two_hours(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)', source)
