@@ -759,6 +759,24 @@ class LeadSignalTests(unittest.TestCase):
                            "We are looking for an agency to manage it."),
         )
 
+    def test_marketing_agency_self_promotion_ad_is_rejected(self):
+        post = (
+            "CRYPTO & FOREX BUSINESSES — LET'S SCALE! "
+            "Looking for targeted traffic and potential customers for your platform? "
+            "Digital marketing solutions tailored to your campaign goals. "
+            "Reach the right audience with a smarter marketing strategy. MESSAGE ME TODAY!"
+        )
+        self.assertEqual(self.classify(post), [])
+
+    def test_real_crypto_project_request_for_targeted_traffic_still_passes(self):
+        self.assertIn(
+            "Project Promotion",
+            self.classify(
+                "Our crypto platform is looking for an agency to bring targeted traffic "
+                "and potential customers through a paid marketing campaign."
+            ),
+        )
+
 class GroupScanningOptimizationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
