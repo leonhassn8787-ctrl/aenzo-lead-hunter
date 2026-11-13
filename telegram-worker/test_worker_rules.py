@@ -35,9 +35,11 @@ class LeadSignalTests(unittest.TestCase):
                 r"\b(struggling to (get|attract|reach|grow|increase)|having trouble (getting|attracting|reaching|growing)|not getting (enough|many) (users|registrations|signups|members|engagement|traction)|could use more|how can we (get|attract|reach|grow|increase)|what.s the best way to (get|attract|reach|grow|increase)|looking for|looking to work with|looking to grow|looking to increase|looking to boost|in search of|trying to find|trying to grow|trying to increase|want to grow|want to increase|want to boost|need|needs|need more|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|need a hand|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|can anyone help|anyone able to|someone who can|anyone experienced in|could use|need help with|help us|partner with|any agency|suggest a)\b",
                 re.I,
             ),
-            "CRYPTO_CONTEXT": re.compile(
-                r"\b(web3|crypto|blockchain|defi|cefi|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet)\b",
-                re.I,
+            "CRYPTO_CONTEXT": next(
+                eval(compile(ast.Expression(body=node.value), str(WORKER), "eval"), {"re": re})
+                for node in tree.body
+                if isinstance(node, ast.Assign)
+                and any(isinstance(target, ast.Name) and target.id == "CRYPTO_CONTEXT" for target in node.targets)
             ),
             "NON_BUYER_CONTEXT": next(
                 eval(compile(ast.Expression(body=node.value), str(WORKER), "eval"), {"re": re})
@@ -491,6 +493,65 @@ class LeadSignalTests(unittest.TestCase):
                 "and active builders to its ecosystem."
             ),
         )
+
+    def test_general_web3_partnership_invitation_is_a_warm_prospect(self):
+        self.assertIn(
+            "Project Promotion",
+            self.classify(
+                "We are open to mutually beneficial collaborations with Web3 projects, "
+                "communities, and media partners."
+            ),
+        )
+
+    def test_generic_promoter_request_for_ai_launchpad_users_is_a_prospect(self):
+        self.assertIn(
+            "Community Promotion",
+            self.classify(
+                "Looking for a promoter who can help get users for our AI agent launchpad platform."
+            ),
+        )
+
+    def test_project_owner_can_say_we_offer_a_product_and_still_be_a_buyer(self):
+        self.assertIn(
+            "Community Promotion",
+            self.classify(
+                "We offer an AI agent launchpad platform and are looking for promoters to bring users."
+            ),
+        )
+
+    def test_ai_influencer_content_creator_is_rejected_as_a_service_seller(self):
+        self.assertEqual(
+            self.classify(
+                "I create aesthetic beauty, skincare and product promotional content using AI influencer models. "
+                "I'm open to brand collaborations, UGC content creation, product promotions, paid partnerships, "
+                "and AI influencer marketing."
+            ),
+            [],
+        )
+
+    def test_free_pr_and_cross_promotion_offer_is_rejected_as_a_vendor(self):
+        self.assertEqual(
+            self.classify(
+                "We're offering this collaboration free of charge: project features and social media cross-promotion."
+            ),
+            [],
+        )
+
+    def test_no_upfront_fee_launchpad_offer_is_rejected_as_a_vendor(self):
+        self.assertEqual(
+            self.classify(
+                "DM me, we have a good launchpad that does not take upfront fees."
+            ),
+            [],
+        )
+
+    def test_scan_is_capped_at_100_messages_and_runs_every_two_hours(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)', source)
+        self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
+        self.assertIn("messages_processed >= MAX_MESSAGES_PER_RUN", source)
+        self.assertIn('query_meta["cursor"]', source)
+        self.assertIn("public_cursor_is_after(msg, cursor)", source)
 
     def test_verdict_testing_service_buyer_request(self):
         self.assert_signal(
