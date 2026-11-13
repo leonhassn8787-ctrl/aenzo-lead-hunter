@@ -777,6 +777,29 @@ class LeadSignalTests(unittest.TestCase):
             ),
         )
 
+
+    def test_job_seekers_and_people_asking_for_nontechnical_roles_are_rejected(self):
+        posts = [
+            "Hey y'all! Official off my last role. I'm open to the next opportunity now. "
+            "I was lead product manager for a 300m+ users gaming platform. Preferably remote.",
+            "Is there anyone hiring team member for Marketing, Partnership, BD Manager, "
+            "Operations, or any other non-technical position?",
+            "I'm looking for a new role as a Marketing Manager in Web3.",
+            "Available for new opportunities in business development or operations.",
+        ]
+        for post in posts:
+            with self.subTest(post=post):
+                self.assertEqual(self.classify(post), [])
+
+    def test_actual_project_marketing_buyer_is_not_blocked_by_job_filter(self):
+        self.assertIn(
+            "KOL & Influencer Marketing",
+            self.classify(
+                "Our Web3 project is looking to hire KOLs for a paid marketing campaign. "
+                "Please share your rates."
+            ),
+        )
+
 class GroupScanningOptimizationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
