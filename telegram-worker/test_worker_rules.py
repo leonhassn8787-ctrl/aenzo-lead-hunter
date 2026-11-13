@@ -597,7 +597,7 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("global_search_query_index", source)
         self.assertIn("rotate_global_search_queries(GLOBAL_GROUP_SEARCH_QUERIES", source)
         self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 50, 1, 100)', source)
-        self.assertIn('CLASSIFIER_RULES_VERSION = 10', source)
+        self.assertIn('CLASSIFIER_RULES_VERSION = 11', source)
         for phrase in (
             '"hiring Telegram promoters"',
             '"looking for Telegram promoters"',
@@ -958,6 +958,43 @@ class LeadSignalTests(unittest.TestCase):
         for post in posts:
             with self.subTest(post=post):
                 self.assertEqual(self.classify(post), [])
+
+    def test_free_marketing_tool_offer_is_rejected(self):
+        self.assertEqual(
+            self.classify(
+                "Anyone looking for a free Marketing + Automation + Lead Generation tool "
+                "for their business? If yes, DM me and I'll share the details."
+            ),
+            [],
+        )
+
+    def test_contact_data_service_vendor_is_rejected(self):
+        self.assertEqual(
+            self.classify(
+                "Premium Global Contact Data Services. Our Telegram channel provides "
+                "access to international contact datasets."
+            ),
+            [],
+        )
+
+    def test_growth_network_soliciting_projects_is_rejected(self):
+        self.assertEqual(
+            self.classify(
+                "TrafficPlaza Growth Network is open for new projects. "
+                "We're currently taking on new Web3 projects looking to grow through "
+                "user acquisition, targeted traffic and CPA campaigns."
+            ),
+            [],
+        )
+
+    def test_investor_project_funding_request_is_not_a_marketing_lead(self):
+        self.assertEqual(
+            self.classify(
+                "Private investors looking for projects to fund. "
+                "DM if you have investment opportunities."
+            ),
+            [],
+        )
 
     def test_actual_project_marketing_buyer_is_not_blocked_by_job_filter(self):
         self.assertIn(
