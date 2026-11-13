@@ -49,7 +49,7 @@ POLL_SECONDS = bounded_int_env("POLL_SECONDS", 600, 60, 86400)
 LOOKBACK_DAYS = bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)
 GLOBAL_SEARCH_MAX_PAGES = bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)
 SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1500)
-CLASSIFIER_RULES_VERSION = 6
+CLASSIFIER_RULES_VERSION = 7
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for KOL",
@@ -356,7 +356,7 @@ SELLER_POST_CONTEXT = re.compile(
 
 NON_BUYER_CONTEXT = re.compile(
     r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
-    r"hire me|anyone hiring me|free airdrop|airdrop claim|claim (my )?airdrop|"
+    r"open to (the )?(next|new) (opportunity|role|position)|open to opportunities|"\n    r"looking for (my )?(next|new) (opportunity|role|position)|seeking (a )?(new )?(role|position|opportunity)|"\n    r"looking for (a )?(new )?(role|position|opportunity)|available for (a )?(new )?(role|position|opportunity)|"\n    r"anyone hiring|is anyone hiring|who is hiring|job opportunities|employment opportunities|"\n    r"looking to join (a |your |any )?team|"\n    r"hire me|anyone hiring me|free airdrop|airdrop claim|claim (my )?airdrop|"
     r"token price prediction|price prediction|trading signals|"
     r"looking for beta testers|need beta testers|recruiting beta testers|"
     r"looking for (app|game|platform|website) testers|looking for product feedback|"
