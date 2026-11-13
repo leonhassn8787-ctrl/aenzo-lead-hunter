@@ -209,6 +209,7 @@ jobs:
           SCAN_BUDGET_SECONDS: "1320"
           MAX_MESSAGES_PER_RUN: "100"
           MAX_PUBLIC_MESSAGES_PER_RUN: "50"
+          MAX_MESSAGES_PER_GROUP_PER_RUN: "10"
         run: python worker.py --once
 
       - name: Save scan progress
