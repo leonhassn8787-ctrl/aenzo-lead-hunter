@@ -210,7 +210,7 @@ class LeadSignalTests(unittest.TestCase):
     def test_notification_alerts_fetch_all_pages_before_sending(self):
         source = WORKER.read_text(encoding="utf-8")
         start = source.index("async def notify_pending_leads(http):")
-        end = source.index("\\n\\nasync def send_scan_report", start)
+        end = source.index("async def send_scan_report", start)
         notify = source[start:end]
         self.assertIn("'offset': str(offset)", notify)
         self.assertIn("pending.extend(page)", notify)
