@@ -10,6 +10,15 @@ os.environ.setdefault("SUPABASE_OWNER_ID", "00000000-0000-0000-0000-000000000000
 import scanner
 
 class ScannerTests(unittest.TestCase):
+    def test_modern_supabase_secret_is_not_sent_as_bearer_jwt(self):
+        headers = scanner.supabase_headers("sb_secret_test")
+        self.assertEqual(headers["apikey"], "sb_secret_test")
+        self.assertNotIn("Authorization", headers)
+
+    def test_legacy_supabase_service_role_jwt_keeps_bearer_header(self):
+        headers = scanner.supabase_headers("legacy-service-role-jwt")
+        self.assertEqual(headers["Authorization"], "Bearer legacy-service-role-jwt")
+
     def test_source_catalog_contains_twelve_requested_sources_without_tge_index(self):
         names = {source["name"] for source in scanner.SOURCES}
         self.assertEqual(len(names), 12)
