@@ -58,6 +58,24 @@ class ScannerTests(unittest.TestCase):
         self.assertIsNotNone(scanner.extract_marketing_need("Need help with our community growth."))
         self.assertIsNone(scanner.extract_marketing_need("Our Web3 startup raised $8 million."))
     
+    def test_completed_candidate_without_explicit_buyer_need_is_rejected(self):
+        self.assertEqual(scanner.candidate_review_status({
+            "enrichment_status": "completed",
+            "buyer_intent_status": "no_explicit_need",
+        }), "rejected")
+
+    def test_candidate_with_explicit_need_remains_reviewable(self):
+        self.assertEqual(scanner.candidate_review_status({
+            "enrichment_status": "completed",
+            "buyer_intent_status": "explicit_need",
+        }), "new")
+
+    def test_failed_enrichment_is_not_auto_rejected(self):
+        self.assertEqual(scanner.candidate_review_status({
+            "enrichment_status": "failed",
+            "buyer_intent_status": "unverified",
+        }), "new")
+
     def test_official_site_requires_named_source_link(self):
         source_html = b'<html><body><a href="https://soter.example/">Soter</a><a href="https://random.example/">Click</a></body></html>'
         page = scanner.parse_page("https://news.example/story", source_html)
