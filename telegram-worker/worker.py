@@ -341,7 +341,13 @@ SELLER_AD_CONTEXT = re.compile(
 )
 
 SELLER_POST_CONTEXT = re.compile(
-    r"\b("
+    r"\\b("
+    // Explicit vendor pitch: provider language must override a "looking for..." sales CTA.
+    r"(we|i) (specialize|specialise) in (providing|proving|supplying|selling|offering) .{0,140}\\b(advertising|ad|meta|tiktok|google|facebook) .{0,60}\\b(accounts?|credit lines?|services?|solutions?)\\b|"
+    r"(we|i) (provide|offer|supply|sell) .{0,120}\\b(advertising|ad|meta|tiktok|google|facebook) .{0,60}\\b(accounts?|credit lines?|services?|solutions?)\\b|"
+    r"\\b(reliable|trusted|verified) (advertising|ad) account (provider|supplier)\\b|"
+    r"\\b(if you are|if you'?re) looking for .{0,80}\\b(advertising account provider|ad account provider|account supplier)\\b.{0,80}\\b(contact|dm|message|reach)\\b|"
+    r"\\bsuitable for all (products|businesses|industries)\\b|"
     r"performance[- ]based collaboration.{0,180}no upfront payments?|"
     r"no upfront payments?.{0,180}(milestone|performance[- ]based|kpi)|"
     r"we (offer|provide|specialize in|are offering|can provide) (web3 |crypto )?(marketing|promotion|kol|influencer|pr|ama|community management|social media|advertising|lead generation|ad account|campaign management|growth) (services|packages|solutions|support|campaigns)|"
