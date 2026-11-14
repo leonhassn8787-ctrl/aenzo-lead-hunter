@@ -559,6 +559,16 @@ def enrich_candidate(candidate):
         result["enrichment_error"] = str(exc)[:220]
     return result
 
+
+def candidate_review_status(enrichment):
+    """Only surface web candidates as reviewable when enrichment found a clear buyer need."""
+    if (
+        enrichment.get("enrichment_status") == "completed"
+        and enrichment.get("buyer_intent_status") == "no_explicit_need"
+    ):
+        return "rejected"
+    return "new"
+
 def main():
     started = datetime.now(timezone.utc)
     run = api("POST", "scan_runs", {"owner_id": OWNER_ID, "status": "running"}, "return=representation")
@@ -629,6 +639,7 @@ def main():
     enriched_rows = []
     for candidate in (pending or []):
         details = enrich_candidate(candidate)
+        details["review_status"] = candidate_review_status(details)
         details["enriched_at"] = datetime.now(timezone.utc).isoformat()
         api("PATCH", "discovery_candidates?id=eq." + candidate["id"] + "&owner_id=eq." + OWNER_ID, details)
         enriched_rows.append({"title":candidate.get("title","Project candidate"), **details})
