@@ -45,6 +45,11 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 SUPABASE_OWNER_ID = os.environ["SUPABASE_OWNER_ID"]
 BOT_TOKEN = os.getenv("AENZO_BOT_TOKEN", "").strip()
 BOT_CHAT_ID = os.getenv("AENZO_BOT_CHAT_ID", "").strip()
+BOT_CHAT_IDS = list(dict.fromkeys(
+    chat_id.strip()
+    for chat_id in [BOT_CHAT_ID, *os.getenv("AENZO_BOT_CHAT_IDS", "").split(",")]
+    if chat_id.strip()
+))
 POLL_SECONDS = bounded_int_env("POLL_SECONDS", 14400, 60, 86400)
 LOOKBACK_DAYS = bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)
 GLOBAL_SEARCH_MAX_PAGES = bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)
@@ -1042,9 +1047,28 @@ def telegram_notification_block_reason(lead):
     return None
 
 
+async def send_telegram_to_all(http, message, timeout=30):
+    """Send the same alert to the primary and all explicitly configured Telegram chats."""
+    if not BOT_TOKEN or not BOT_CHAT_IDS:
+        return False, ["No Telegram chat IDs configured."]
+    errors = []
+    for chat_id in BOT_CHAT_IDS:
+        try:
+            response = await http.post(
+                "https://api.telegram.org/bot" + BOT_TOKEN + "/sendMessage",
+                json={"chat_id": chat_id, "text": message, "disable_web_page_preview": True},
+                timeout=timeout,
+            )
+            if response.status_code != 200 or not response.json().get("ok"):
+                errors.append(f"{chat_id}: {response.text[:300]}")
+        except Exception as exc:
+            errors.append(f"{chat_id}: {type(exc).__name__}: {exc}")
+    return not errors, errors
+
+
 async def notify_saved_lead(http, dedupe_key):
     """Send a newly inserted qualified lead immediately, without waiting for scan completion."""
-    if not BOT_TOKEN or not BOT_CHAT_ID:
+    if not BOT_TOKEN or not BOT_CHAT_IDS:
         return
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
     url = SUPABASE_URL + "/rest/v1/leads"
@@ -1069,13 +1093,9 @@ async def notify_saved_lead(http, dedupe_key):
         if reason:
             log.info("Immediate Telegram alert held for lead %s: %s", lead.get("id"), reason)
             return
-        sent = await http.post(
-            "https://api.telegram.org/bot" + BOT_TOKEN + "/sendMessage",
-            json={"chat_id": BOT_CHAT_ID, "text": format_telegram_lead(lead), "disable_web_page_preview": True},
-            timeout=20,
-        )
-        if sent.status_code != 200 or not sent.json().get("ok"):
-            log.warning("Immediate Telegram alert failed for lead %s: %s", lead.get("id"), sent.text[:300])
+        delivered, errors = await send_telegram_to_all(http, format_telegram_lead(lead), timeout=20)
+        if not delivered:
+            log.warning("Immediate Telegram alert failed for lead %s: %s", lead.get("id"), "; ".join(errors)[:500])
             return
         marked = await http.patch(
             url,
@@ -1094,7 +1114,7 @@ async def notify_saved_lead(http, dedupe_key):
 
 
 async def notify_pending_leads(http):
-    if not BOT_TOKEN or not BOT_CHAT_ID:
+    if not BOT_TOKEN or not BOT_CHAT_IDS:
         log.info('Telegram bot alerts not configured; scanning continues.')
         return
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
@@ -1131,9 +1151,9 @@ async def notify_pending_leads(http):
             # Keep the record for manual review; do not send a bot notification.
             continue
         try:
-            sent = await http.post('https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage', json={'chat_id': BOT_CHAT_ID, 'text': format_telegram_lead(lead), 'disable_web_page_preview': True}, timeout=30)
-            if sent.status_code != 200 or not sent.json().get('ok'):
-                detail = sent.text[:500]
+            delivered, errors = await send_telegram_to_all(http, format_telegram_lead(lead), timeout=30)
+            if not delivered:
+                detail = "; ".join(errors)[:500]
                 log.error('Telegram alert failed for lead %s: %s', lead_id, detail)
                 await http.patch(
                     url,
@@ -1165,7 +1185,7 @@ async def notify_pending_leads(http):
 
 async def send_scan_report(http, stats):
     """Send a compact per-run scan-usage report to the owner's Telegram chat."""
-    if not BOT_TOKEN or not BOT_CHAT_ID:
+    if not BOT_TOKEN or not BOT_CHAT_IDS:
         log.info("Telegram scan reports are not configured; skipping scan report.")
         return
     minutes = int(stats.get("duration_seconds", 0)) // 60
@@ -1199,15 +1219,11 @@ async def send_scan_report(http, stats):
         "older messages are not intentionally rescanned."
     )
     try:
-        response = await http.post(
-            "https://api.telegram.org/bot" + BOT_TOKEN + "/sendMessage",
-            json={"chat_id": BOT_CHAT_ID, "text": report, "disable_web_page_preview": True},
-            timeout=30,
-        )
-        if response.status_code != 200 or not response.json().get("ok"):
-            log.error("Telegram scan report failed: %s", response.text[:500])
+        delivered, errors = await send_telegram_to_all(http, report, timeout=30)
+        if not delivered:
+            log.error("Telegram scan report failed: %s", "; ".join(errors)[:500])
         else:
-            log.info("Telegram scan report delivered.")
+            log.info("Telegram scan report delivered to %s chat(s).", len(BOT_CHAT_IDS))
     except Exception:
         log.exception("Could not send Telegram scan report.")
 
