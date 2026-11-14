@@ -173,6 +173,7 @@ jobs:
         env:
           AENZO_BOT_TOKEN: ${{ secrets.AENZO_BOT_TOKEN }}
           AENZO_BOT_CHAT_ID: ${{ secrets.AENZO_BOT_CHAT_ID }}
+          AENZO_BOT_CHAT_IDS: ${{ secrets.AENZO_BOT_CHAT_IDS }}
         run: |
           python - <<'PY'
           import os
@@ -204,6 +205,7 @@ jobs:
           SUPABASE_OWNER_ID: ${{ secrets.SUPABASE_OWNER_ID }}
           AENZO_BOT_TOKEN: ${{ secrets.AENZO_BOT_TOKEN }}
           AENZO_BOT_CHAT_ID: ${{ secrets.AENZO_BOT_CHAT_ID }}
+          AENZO_BOT_CHAT_IDS: ${{ secrets.AENZO_BOT_CHAT_IDS }}
           STATE_FILE: scan_state.json
           LOOKBACK_DAYS: "30"
           GLOBAL_SEARCH_MAX_PAGES: "3"
