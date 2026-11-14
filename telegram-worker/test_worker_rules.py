@@ -163,6 +163,26 @@ class LeadSignalTests(unittest.TestCase):
             with self.subTest(query=query):
                 self.assertIn(query, source)
 
+    def test_ad_account_provider_pitch_is_rejected_even_with_looking_for_cta(self):
+        message = (
+            "Hi, Sigma! Here is Malt Interactive which specializes in proving "
+            "meta/Tiktok/Google ad accounts. We have credit lines enterprise-level "
+            "and We provide a wide range of advertising accounts and related services. "
+            "Suitable for all products. If you're looking for a reliable advertising "
+            "account provider, feel free to contact me."
+        )
+        self.assertEqual(self.classify(message), [])
+
+    def test_ad_account_supplier_variants_are_rejected(self):
+        self.assertEqual(
+            self.classify("We provide Meta and TikTok advertising accounts. DM us if you need a provider."),
+            [],
+        )
+        self.assertEqual(
+            self.classify("I specialize in supplying Google ad accounts and credit lines. Contact me."),
+            [],
+        )
+
     def test_expanded_buyer_detection_does_not_admit_vendor_promotion_ads(self):
         self.assertEqual(
             self.classify("We provide KOL marketing and paid promotion for crypto projects. DM us for rates."),
