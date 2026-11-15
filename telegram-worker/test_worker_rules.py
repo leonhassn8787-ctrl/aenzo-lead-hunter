@@ -1176,6 +1176,9 @@ class LeadSignalTests(unittest.TestCase):
             "We provide targeted traffic and qualified registrations for casino brands. DM us.",
             "We deliver sportsbook FTDs across multiple GEOs through paid ads and influencers.",
             "Our agency offers iGaming traffic packages. Contact us for pricing.",
+            "GET REAL USERS FOR YOUR MINI-APP OR CHANNEL. We deliver high-velocity traffic. "
+            "Services Offered: giveaways, targeted growth and API integration. Price List: "
+            "Standard Traffic $0.02+. Book your slot today.",
         ):
             with self.subTest(message=message):
                 self.assertEqual(self.classify(message), [])
