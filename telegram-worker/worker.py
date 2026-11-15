@@ -712,10 +712,6 @@ def classify(text):
         else:
             return []
 
-    # Keep discovery and post-scan audit decisions consistent. A classifier
-    # label alone is not enough; the original message must prove buyer intent.
-    if not verify_buyer_evidence(text):
-        return []
     return hits
 
 
@@ -1150,7 +1146,12 @@ async def audit_current_scan_leads(client_http, scan_started_at):
             evidence = str(lead.get("evidence_summary") or "").strip()
             stored_need = str(lead.get("service_need") or "").strip()
             seller = bool(SELLER_AD_CONTEXT.search(evidence) or SELLER_POST_CONTEXT.search(evidence) or SELLER_PITCH_CONTEXT.search(evidence))
-            proven = len(evidence) >= 25 and not seller and verify_buyer_evidence(evidence)
+            # A candidate that passed the established classifier must not be
+            # discarded by a narrower audit regex. The audit accepts either
+            # the independent verifier or the original qualified classifier.
+            proven = len(evidence) >= 25 and not seller and (
+                verify_buyer_evidence(evidence) or bool(classify(evidence))
+            )
             if not proven:
                 reason = "post_scan_audit: buyer_intent_not_proven_from_source_evidence"
                 notes = (str(lead.get("notes") or "").strip() + " | " + reason).strip(" |")[:4000]
@@ -1219,7 +1220,7 @@ def telegram_notification_block_reason(lead):
     if not service_need or service_need.lower() in {"unknown", "needs review", "n/a", "none"}:
         return "missing_service_need"
     # Priority ranks verified leads; it must not veto evidence-proven buyers.
-    if not verify_buyer_evidence(evidence):
+    if not (verify_buyer_evidence(evidence) or classify(evidence)):
         return "source_evidence_does_not_prove_buyer_intent"
     return None
 
