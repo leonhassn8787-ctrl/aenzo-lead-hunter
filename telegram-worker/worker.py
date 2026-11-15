@@ -58,7 +58,7 @@ MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 1300, 1, 2000)
 MAX_PUBLIC_MESSAGES_PER_RUN = min(bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500), MAX_MESSAGES_PER_RUN)
 MAX_JOINED_MESSAGES_PER_RUN = bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 1000, 1, 1500)
 MAX_MESSAGES_PER_GROUP_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_GROUP_PER_RUN", 10, 1, 50)
-CLASSIFIER_RULES_VERSION = 20
+CLASSIFIER_RULES_VERSION = 21
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for beta testers",
@@ -417,6 +417,33 @@ SELLER_POST_CONTEXT = re.compile(
     re.I,
 )
 
+# Clear first-person service pitches are vendor posts, even when they mention client demand.
+SELLER_PITCH_CONTEXT = re.compile(
+    r"\\b("
+    r"(we|i) (offer|provide|deliver|sell|supply|run|manage) .{0,120}\\b(kol|influencer|shilling|traffic|promotion|marketing|pr|ama|community management|social media|advertising|lead generation|campaign management)\\b.{0,100}\\b(services?|packages?|solutions?|campaigns?|clients?|projects?)\\b|"
+    r"(we|i) (are|am) (a|an) .{0,50}\\b(marketing|promotion|influencer|kol|traffic|advertising|growth) (agency|provider|team|service)\\b|"
+    r"(we|i) (are )?(looking for|seeking) (new )?(clients|projects) (to promote|for promotion|for marketing)|"
+    r"looking for clients.{0,100}(marketing|promotion|kol|influencer|pr|traffic)|"
+    r"(dm|contact|message) (me|us) (for )?(rates|pricing|packages|to book|for services)|"
+    r"available for (paid )?(promotions?|campaigns?|marketing services)|"
+    r"(marketing|kol|influencer|traffic|promotion) packages available|"
+    r"we work with .{0,100}\\b(projects|brands|clients)\\b.{0,100}\\b(promote|promotion|campaigns|traffic|leads)\\b"
+    r")\\b",
+    re.I,
+)
+
+# A recruitment signal is buyer intent only when the post clearly speaks for a
+# project/team, not when a member is advertising their own availability.
+RECRUITMENT_BUYER_CONTEXT = re.compile(
+    r"\\b(our project|our team|our company|our platform|our protocol|we are hiring|we're hiring|hiring for our|need (a |an )?(moderator|community manager|developer) for|looking for (a |an )?(moderator|community manager|developer) for)\\b",
+    re.I,
+)
+
+KOL_PROJECT_CONTEXT = re.compile(
+    r"\\b(our (project|token|launch|campaign|protocol|wallet|exchange|platform|community)|for our (web3|crypto|token|project|launch|campaign)|token launch|web3 launch|crypto launch|paid (kol|influencer) campaign|kol campaign|influencer campaign|budget|hire (a |an )?(kol|kols|influencer))\\b",
+    re.I,
+)
+
 NON_BUYER_CONTEXT = re.compile(
     r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
     r"open to (the )?(next|new) (opportunity|role|position)|open to opportunities|"
@@ -556,6 +583,7 @@ def classify(text):
         )
         or SELLER_AD_CONTEXT.search(text)
         or SELLER_POST_CONTEXT.search(text)
+        or SELLER_PITCH_CONTEXT.search(text)
     ):
         return []
 
@@ -614,6 +642,15 @@ def classify(text):
         and marketing_intent.search(text)
     )
     if not buyer_intent.search(text) and not indirect_growth:
+        return []
+
+    # Vague KOL questions are not buying intent unless tied to a real project/campaign.
+    if "KOL & Influencer Marketing" in hits and not KOL_PROJECT_CONTEXT.search(text):
+        return []
+
+    # Recruitment must be an employer-side request, not a member asking whether
+    # someone might need their services or advertising their availability.
+    if "Recruitment" in hits and not RECRUITMENT_BUYER_CONTEXT.search(text):
         return []
 
     # Do not turn technical token-launch requests into marketing prospects.
