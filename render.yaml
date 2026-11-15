@@ -30,16 +30,12 @@ services:
         value: "14400"
       - key: LOOKBACK_DAYS
         value: "30"
-      - key: GLOBAL_SEARCH_MAX_PAGES
-        value: "3"
       - key: SCAN_BUDGET_SECONDS
         value: "1320"
       - key: MAX_MESSAGES_PER_RUN
         value: "1300"
-      - key: MAX_PUBLIC_MESSAGES_PER_RUN
-        value: "300"
       - key: MAX_JOINED_MESSAGES_PER_RUN
-        value: "1000"
+        value: "100"
       - key: AENZO_BOT_TOKEN
         sync: false
       - key: AENZO_BOT_CHAT_ID
