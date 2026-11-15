@@ -905,14 +905,16 @@ async def save_lead(client_http, payload):
         return "error"
 
 async def audit_current_scan_leads(client_http, scan_started_at):
-    """Keep uncertain candidates in review; only clear seller/non-buyer evidence is cancelled."""
+    """Audit only leads created during this completed message window."""
+
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
     url = f"{SUPABASE_URL}/rest/v1/leads"
     base_params = {
         "select": "id,evidence_summary,service_need,notes,priority_score",
         "owner_id": f"eq.{SUPABASE_OWNER_ID}",
         "status": "eq.new",
-        "order": "created_at.asc", "limit": "200",
+        "created_at": "gte." + str(scan_started_at),
+        "order": "created_at.asc,id.asc", "limit": "200",
     }
     audited = rejected = verified = review = 0
     try:
@@ -1006,14 +1008,12 @@ def telegram_notification_block_reason(lead):
     """Fail closed: only notify when stored evidence independently passes buyer rules."""
     evidence = str(lead.get("evidence_summary") or "").strip()
     service_need = str(lead.get("service_need") or "").strip()
-    try:
-        priority = int(lead.get("priority_score") or 0)
-    except (TypeError, ValueError):
-        priority = 0
     if len(evidence) < 25:
         return "missing_or_too_short_evidence"
     if not service_need or service_need.lower() in {"unknown", "needs review", "n/a", "none"}:
         return "missing_service_need"
+    if SELLER_AD_CONTEXT.search(evidence) or SELLER_POST_CONTEXT.search(evidence) or SELLER_PITCH_CONTEXT.search(evidence):
+        return "seller_or_vendor_post"
     # Priority ranks verified leads; it must not veto evidence-proven buyers.
     if not (verify_buyer_evidence(evidence) or classify(evidence)):
         return "source_evidence_does_not_prove_buyer_intent"
@@ -1048,7 +1048,7 @@ async def notify_pending_leads(http, scan_started_at=None):
         return
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
     url = SUPABASE_URL + '/rest/v1/leads'
-    base_params = {'select': 'id,company_name,service_need,priority_score,evidence_date,evidence_summary,evidence_url,telegram_group_url,contacts,outreach_english,outreach_bengali,telegram_deliveries', 'owner_id': 'eq.' + SUPABASE_OWNER_ID, 'status': 'eq.new', 'telegram_notified_at': 'is.null', 'order': 'created_at.asc', 'limit': '100'}
+    base_params = {'select': 'id,company_name,service_need,priority_score,evidence_date,evidence_summary,evidence_url,telegram_group_url,contacts,outreach_english,outreach_bengali,telegram_deliveries,notes', 'owner_id': 'eq.' + SUPABASE_OWNER_ID, 'status': 'eq.new', 'telegram_notified_at': 'is.null', 'order': 'created_at.asc,id.asc', 'limit': '100'}
     # Do not restrict by scan start time: older unsent leads must survive retries.
     # Load every pending row before sending or updating any row. This keeps
     # offset pagination stable while successful notifications leave the query.
@@ -1078,7 +1078,30 @@ async def notify_pending_leads(http, scan_started_at=None):
                 "Telegram alert blocked for lead %s by strict buyer-evidence gate: %s",
                 lead_id, block_reason,
             )
-            # Keep the record for manual review; do not send a bot notification.
+            # Keep uncertain or seller-like records visible for manual review;
+            # do not let a blocked record clog the pending-alert queue forever.
+            try:
+                old_notes = str(lead.get("notes") or "").strip()
+                review_note = "telegram_gate: " + block_reason
+                if review_note not in old_notes:
+                    old_notes = (old_notes + " | " + review_note).strip(" |")[:4000]
+                reviewed = await http.patch(
+                    url,
+                    headers={**headers, "Prefer": "return=minimal"},
+                    params={
+                        "id": "eq." + str(lead_id),
+                        "owner_id": "eq." + SUPABASE_OWNER_ID,
+                        "status": "eq.new",
+                    },
+                    json={"status": "review", "notes": old_notes},
+                    timeout=30,
+                )
+                if reviewed.status_code not in (200, 204):
+                    log.error("Could not move blocked lead %s to manual review (%s): %s", lead_id, reviewed.status_code, reviewed.text[:300])
+                else:
+                    log.info("Blocked lead %s safely retained in manual review: %s", lead_id, block_reason)
+            except Exception:
+                log.exception("Could not move blocked lead %s to manual review.", lead_id)
             continue
         try:
             delivery_state = lead.get("telegram_deliveries") or {}
@@ -1177,7 +1200,7 @@ async def start_scan_run(http, window_start, window_end):
 
 
 async def finish_scan_run(http, run_id, stats):
-    """Persist joined-group Telegram scan telemetry using existing scan_runs columns."""
+    """Persist scan-window columns and detailed joined-group telemetry to Supabase."""
     if not run_id:
         return
     url = f"{SUPABASE_URL}/rest/v1/scan_runs"
