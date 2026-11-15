@@ -36,7 +36,8 @@ The scheduled GitHub Actions workflow needs these six repository secrets for sca
 - `SUPABASE_SERVICE_ROLE_KEY` — the modern Supabase `sb_secret_...` key, server-side only
 - `SUPABASE_OWNER_ID`
 - `AENZO_BOT_TOKEN` — BotFather token for your private AENZO notification bot
-- `AENZO_BOT_CHAT_ID` — your private chat ID with that bot
+- `AENZO_BOT_CHAT_ID` — your primary private chat ID with that bot
+- `AENZO_BOT_CHAT_IDS` — optional comma-separated additional chat IDs
 - At least one chat ID is required for automatic Telegram alerts. If the bot token is present but no chat ID is configured, scanning continues but alerts are disabled; the workflow now prints a warning.
 
 The Supabase secret key is sent only in the `apikey` header. It is not a JWT and must not be sent as `Authorization: Bearer`.
