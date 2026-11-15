@@ -1359,7 +1359,7 @@ class TelegramNotificationGateTests(unittest.TestCase):
     def test_non_buyer_evidence_is_blocked(self):
         self.assertEqual(
             self.check({"evidence_summary": "We offer marketing services to crypto projects and need clients.", "service_need": "Project Promotion", "priority_score": 90}),
-            "evidence_does_not_pass_buyer_intent_rules",
+            "source_evidence_does_not_prove_buyer_intent",
         )
 
     def test_missing_service_category_is_blocked(self):
