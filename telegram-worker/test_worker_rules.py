@@ -133,7 +133,7 @@ class LeadSignalTests(unittest.TestCase):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("async def audit_current_scan_leads", source)
         self.assertIn("post_scan_audit: buyer_intent_uncertain_manual_review_required", source)
-        self.assertIn("Keep ambiguous candidates in a review queue instead of discarding them", source)
+        self.assertIn("Keep uncertain candidates in review", source)
         self.assertIn("def verify_buyer_evidence(text):", source)
         self.assertIn("buyer_intent_verified; service_label_repaired", source)
         self.assertIn("source_evidence_does_not_prove_buyer_intent", source)
@@ -144,7 +144,6 @@ class LeadSignalTests(unittest.TestCase):
         self.assertNotIn('"telegram_notified_at": "is.null"', audit_code)
         self.assertNotIn('"created_at": f"gte.', audit_code)
         self.assertNotIn("for human review to protect buyers", source)
-        self.assertNotIn("post_scan_review", source)
         self.assertNotIn("await notify_saved_lead(", source)
         self.assertIn("await notify_pending_leads(http)", source)
         self.assertIn("audit_result = await audit_current_scan_leads(http, scan_started_at_utc)", source)
@@ -178,27 +177,6 @@ class LeadSignalTests(unittest.TestCase):
             with self.subTest(post=post):
                 self.assertFalse(self.verify_buyer_evidence(post))
 
-    def test_global_search_scans_groups_without_joining(self):
-        source = WORKER.read_text(encoding="utf-8")
-        self.assertIn("SearchGlobalRequest", source)
-        self.assertIn("groups_only=True", source)
-        self.assertIn("GLOBAL_GROUP_SEARCH_QUERIES", source)
-        self.assertIn('state.setdefault("global_search", {})', source)
-
-    def test_public_queries_cover_verdict_recruitment_and_website_services(self):
-        source = WORKER.read_text(encoding="utf-8")
-        for query in (
-            "looking for beta testers",
-            "looking for influencer marketing",
-            "need community manager",
-            "looking for website developer",
-            "need AMA host",
-            "looking for airdrop partner",
-            "looking for launch promotion",
-        ):
-            with self.subTest(query=query):
-                self.assertIn(query, source)
-
     def test_new_web3_marketing_partner_request_is_detected(self):
         # A general marketing-partner request is classified under the broad
         # Content Distribution & Marketing service signal.
@@ -212,18 +190,6 @@ class LeadSignalTests(unittest.TestCase):
             "Project Promotion",
             self.classify("Need a user acquisition agency for our crypto wallet launch"),
         )
-
-    def test_new_public_search_queries_cover_growth_and_visibility(self):
-        source = WORKER.read_text(encoding="utf-8")
-        for query in (
-            "need web3 marketing agency",
-            "looking for growth agency",
-            "need user acquisition",
-            "looking for paid promotion",
-            "need project visibility",
-        ):
-            with self.subTest(query=query):
-                self.assertIn(query, source)
 
     def test_reciprocal_cross_promotion_and_exposure_swaps_are_not_buyers(self):
         posts = [
@@ -772,27 +738,18 @@ class LeadSignalTests(unittest.TestCase):
             [],
         )
 
-    def test_scan_budgets_and_two_hour_schedule_settings(self):
+    def test_joined_group_only_scan_budget_and_two_hour_schedule(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 2000)', source)
-        self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 30, 1, 500)', source)
-        self.assertIn('bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 70, 1, 1500)', source)
-        self.assertIn("public_messages_processed >= MAX_PUBLIC_MESSAGES_PER_RUN", source)
+        self.assertIn('bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 100, 1, 2000)', source)
         self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
         self.assertIn("messages_processed >= MAX_MESSAGES_PER_RUN", source)
-        self.assertIn('query_meta["cursor"]', source)
-        self.assertIn("public_cursor_is_after(msg, cursor)", source)
-        self.assertIn("global_search_query_index", source)
-        self.assertIn("rotate_global_search_queries(GLOBAL_GROUP_SEARCH_QUERIES", source)
-        self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 30, 1, 500)', source)
-        self.assertIn('CLASSIFIER_RULES_VERSION = 25', source)
-        for phrase in (
-            '"hiring Telegram promoters"',
-            '"looking for Telegram promoters"',
-            '"looking for CEX KOLs"',
-            '"looking for early users"',
-        ):
-            self.assertIn(phrase, source)
+        self.assertIn("joined_messages_processed >= MAX_JOINED_MESSAGES_PER_RUN", source)
+        self.assertIn("async for dialog in client.iter_dialogs()", source)
+        self.assertIn('if not bool(getattr(dialog, "is_group", False))', source)
+        run_code = source[source.index("async def run("):]
+        self.assertNotIn("SearchGlobalRequest", run_code)
+        self.assertNotIn("fetch_global_group_messages", run_code)
 
     def test_verdict_testing_service_buyer_request(self):
         self.assert_signal(
@@ -910,31 +867,6 @@ class LeadSignalTests(unittest.TestCase):
         for message in examples:
             with self.subTest(message=message):
                 self.assertEqual(self.classify(message), [])
-
-    def test_busy_public_search_windows_are_recursively_split(self):
-        source = WORKER.read_text(encoding="utf-8")
-        self.assertIn("await fetch_window(window_min, midpoint, depth + 1)", source)
-        self.assertIn("await fetch_window(midpoint, window_max, depth + 1)", source)
-        self.assertIn("window_max - window_min <= 1", source)
-
-    def test_public_search_deduplicates_messages_and_counts_vendor_ads(self):
-        source = WORKER.read_text(encoding="utf-8")
-        self.assertIn("run_seen_public_messages = set()", source)
-        self.assertIn("if public_message_key in run_seen_public_messages", source)
-        self.assertIn("seller_posts += 1", source)
-
-    def test_incomplete_public_search_still_processes_partial_messages_without_advancing_cursor(self):
-        source = WORKER.read_text(encoding="utf-8")
-        start = source.index("if not complete:", source.index("async def run"))
-        end = source.index("query_failed = not complete", start)
-        incomplete_branch = source[start:end]
-        self.assertIn("processing available messages", incomplete_branch)
-        self.assertNotIn("continue", incomplete_branch)
-        self.assertIn("if query_failed:", source[end:])
-
-    def test_global_search_cursor_overlaps_boundary_to_avoid_missed_seconds(self):
-        source = WORKER.read_text(encoding="utf-8")
-        self.assertIn("previous_scan - 2 if previous_scan", source)
 
     def test_pinksale_tokenomics_support_is_not_a_marketing_client_lead(self):
         self.assertEqual(
@@ -1484,16 +1416,17 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
         self.assertIn('bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)', source)
-        self.assertIn('bounded_int_env("GLOBAL_SEARCH_MAX_PAGES", 3, 1, 20)', source)
         self.assertIn('bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1920)', source)
         self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 2000)', source)
+        self.assertIn('bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 100, 1, 2000)', source)
 
-    def test_scan_report_separates_joined_groups_from_public_search_signals(self):
+    def test_scan_report_is_joined_group_only(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("Joined groups available:", source)
         self.assertIn("Joined groups checked:", source)
-        self.assertIn("Public groups with qualified buyer signals:", source)
-        self.assertNotIn('f"Groups scanned:', source)
+        self.assertIn("Joined-group messages processed:", source)
+        self.assertNotIn("Public groups with qualified buyer signals:", source)
+        self.assertNotIn("Non-joined public groups", source)
 
     def test_scan_report_exposes_post_scan_audit_result(self):
         source = WORKER.read_text(encoding="utf-8")
@@ -1521,192 +1454,6 @@ class JoinedGroupCheckpointTests(unittest.TestCase):
         self.assertLess(save_cursor, update_current)
         self.assertLess(update_current, increment)
         self.assertIn("if getattr(msg, \"out\", False):", loop_start)
-
-
-class PublicSearchCursorTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        tree = ast.parse(WORKER.read_text(encoding="utf-8"))
-        nodes = {
-            node.name: node for node in tree.body
-            if isinstance(node, ast.FunctionDef)
-        }
-        namespace = {"getattr": getattr}
-        selected = [
-            nodes["public_message_cursor_key"],
-            nodes["public_cursor_is_after"],
-            nodes["store_public_cursor"],
-            nodes["rotate_global_search_queries"],
-        ]
-        exec(compile(ast.Module(body=selected, type_ignores=[]), str(WORKER), "exec"), namespace)
-        cls.cursor_key = staticmethod(namespace["public_message_cursor_key"])
-        cls.is_after = staticmethod(namespace["public_cursor_is_after"])
-        cls.store = staticmethod(namespace["store_public_cursor"])
-        cls.rotate_queries = staticmethod(namespace["rotate_global_search_queries"])
-
-    def test_public_cursor_resumes_by_timestamp_peer_and_message_id(self):
-        from datetime import datetime, timezone
-        from types import SimpleNamespace
-
-        moment = datetime(2026, 11, 13, 10, 0, tzinfo=timezone.utc)
-        first = SimpleNamespace(date=moment, peer_id="peer-a", id=10)
-        same = SimpleNamespace(date=moment, peer_id="peer-a", id=10)
-        next_id = SimpleNamespace(date=moment, peer_id="peer-a", id=11)
-        next_peer = SimpleNamespace(date=moment, peer_id="peer-b", id=1)
-        key = self.cursor_key(first)
-        cursor = {"date": key[0], "peer": key[1], "message_id": key[2]}
-
-        self.assertFalse(self.is_after(same, cursor))
-        self.assertTrue(self.is_after(next_id, cursor))
-        self.assertTrue(self.is_after(next_peer, cursor))
-
-    def test_public_search_query_order_rotates_without_starving_later_phrases(self):
-        self.assertEqual(
-            self.rotate_queries(["first", "second", "third"], 1),
-            [(1, "second"), (2, "third"), (0, "first")],
-        )
-        self.assertEqual(self.rotate_queries([], 0), [])
-
-    def test_public_cursor_is_persisted_in_query_state(self):
-        from datetime import datetime, timezone
-        from types import SimpleNamespace
-
-        message = SimpleNamespace(
-            date=datetime(2026, 11, 13, 10, 0, tzinfo=timezone.utc),
-            peer_id="peer-a",
-            id=42,
-        )
-        state = {}
-        self.store(state, message)
-        self.assertEqual(state["cursor"]["message_id"], 42)
-        self.assertEqual(state["cursor"]["date"], int(message.date.timestamp()))
-
-
-class GlobalSearchPaginationTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        tree = ast.parse(WORKER.read_text(encoding="utf-8"))
-        node = next(
-            node for node in tree.body
-            if isinstance(node, ast.AsyncFunctionDef)
-            and node.name == "fetch_global_group_messages"
-        )
-
-        class Request:
-            def __init__(self, **kwargs):
-                self.__dict__.update(kwargs)
-
-        class EmptyPeer:
-            pass
-
-        class EmptyFilter:
-            pass
-
-        class QuietLog:
-            def info(self, *args, **kwargs):
-                pass
-
-            def warning(self, *args, **kwargs):
-                pass
-
-            def exception(self, *args, **kwargs):
-                pass
-
-        namespace = {
-            "SearchGlobalRequest": Request,
-            "InputPeerEmpty": EmptyPeer,
-            "InputMessagesFilterEmpty": EmptyFilter,
-            "GLOBAL_SEARCH_MAX_PAGES": 3,
-            "log": QuietLog(),
-        }
-        exec(
-            compile(ast.Module(body=[node], type_ignores=[]), str(WORKER), "exec"),
-            namespace,
-        )
-        cls.fetch = staticmethod(namespace["fetch_global_group_messages"])
-
-    def test_saturated_public_search_recursively_splits_and_merges(self):
-        import asyncio
-        from datetime import datetime, timezone
-        from types import SimpleNamespace
-
-        class Message:
-            def __init__(self, peer_id, message_id, timestamp):
-                self.peer_id = peer_id
-                self.id = message_id
-                self.date = datetime.fromtimestamp(timestamp, timezone.utc)
-
-        class Client:
-            def __init__(self):
-                self.calls = []
-
-            async def __call__(self, request):
-                self.calls.append((request.min_date, request.max_date, request.offset_rate))
-                if request.max_date - request.min_date > 10:
-                    page = int(request.offset_rate)
-                    messages = [
-                        Message("wide-window", page * 100 + i + 1, request.min_date + 1)
-                        for i in range(100)
-                    ]
-                    return SimpleNamespace(messages=messages, next_rate=page + 1)
-                message = Message(
-                    f"peer-{request.min_date}",
-                    request.min_date + 10000,
-                    request.min_date,
-                )
-                return SimpleNamespace(messages=[message], next_rate=None)
-
-            async def get_input_entity(self, peer_id):
-                return peer_id
-
-        client = Client()
-        messages, complete = asyncio.run(
-            self.fetch(client, "looking for KOL", 0, 100)
-        )
-        identities = {
-            (repr(message.peer_id), message.id)
-            for message in messages
-        }
-        self.assertTrue(complete)
-        self.assertGreater(len(client.calls), 3)
-        self.assertGreater(len(messages), 1)
-        self.assertEqual(len(messages), len(identities))
-
-    def test_one_second_overflow_is_reported_incomplete_without_infinite_recursion(self):
-        import asyncio
-        from datetime import datetime, timezone
-        from types import SimpleNamespace
-
-        class Message:
-            def __init__(self, message_id):
-                self.peer_id = "same-peer"
-                self.id = message_id
-                self.date = datetime.fromtimestamp(1, timezone.utc)
-
-        class Client:
-            def __init__(self):
-                self.calls = 0
-
-            async def __call__(self, request):
-                self.calls += 1
-                page = int(request.offset_rate)
-                return SimpleNamespace(
-                    messages=[Message(page * 100 + i) for i in range(100)],
-                    next_rate=page + 1,
-                )
-
-            async def get_input_entity(self, peer_id):
-                return peer_id
-
-        client = Client()
-        messages, complete = asyncio.run(
-            self.fetch(client, "looking for KOL", 1, 2)
-        )
-        self.assertFalse(complete)
-        self.assertEqual(client.calls, 3)
-        self.assertEqual(len(messages), 300)
-
-
 
 
 class LeadDisplayLabelTests(unittest.TestCase):
@@ -1743,9 +1490,7 @@ class LeadDisplayLabelTests(unittest.TestCase):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("async def start_scan_run(http):", source)
         self.assertIn("async def finish_scan_run(http, run_id, stats):", source)
-        self.assertIn('"public_messages_processed"', source)
         self.assertIn('"joined_messages_processed"', source)
-        self.assertIn('"public_leads_saved"', source)
         self.assertIn('"joined_leads_saved"', source)
         self.assertIn("await finish_scan_run(http, scan_run_id, stats)", source)
 
