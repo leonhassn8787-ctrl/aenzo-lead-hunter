@@ -1486,10 +1486,39 @@ class LeadDisplayLabelTests(unittest.TestCase):
     def test_same_two_hour_window_is_not_scanned_twice(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("async def scan_window_already_recorded(http, window_start):", source)
-        self.assertIn('"error_summary": "like.*" + window_start.isoformat() + "*"', source)
+        self.assertIn('"window_start": "eq." + window_start.isoformat()', source)
+        self.assertIn('"window_start": window_start.isoformat()', source)
+        self.assertIn('if response.status_code == 409:', source)
         self.assertIn("if await scan_window_already_recorded(http, window_start):", source)
         self.assertIn("refusing to start an untracked Telegram scan", source)
 
+
+    def test_per_chat_lead_alert_delivery_is_persisted_without_raw_chat_ids(self):
+        source = WORKER.read_text(encoding="utf-8")
+        start = source.index("async def notify_pending_leads")
+        end = source.index("async def scan_window_already_recorded", start)
+        block = source[start:end]
+        self.assertIn("telegram_deliveries", block)
+        self.assertIn("recipient_key(chat_id)", block)
+        self.assertIn("telegram_notified_at", block)
+        self.assertNotIn("send_telegram_to_all", block)
+
+    def test_scan_report_delivery_is_recorded_in_scan_run(self):
+        source = WORKER.read_text(encoding="utf-8")
+        start = source.index("async def send_scan_report")
+        end = source.index("async def login", start)
+        block = source[start:end]
+        self.assertIn("report_deliveries", block)
+        self.assertIn("report_delivered_at", block)
+        self.assertIn("report_delivery_error", block)
+
+    def test_scan_processing_errors_are_not_reported_as_clean_success(self):
+        source = WORKER.read_text(encoding="utf-8")
+        start = source.index("async def finish_scan_run")
+        end = source.index("async def mark_scan_run_failed", start)
+        block = source[start:end]
+        self.assertIn('"scan_errors"', block)
+        self.assertIn('"status": "failed" if', block)
 
 
 if __name__ == "__main__":
