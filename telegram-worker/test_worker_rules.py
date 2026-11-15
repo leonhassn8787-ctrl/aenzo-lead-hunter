@@ -149,7 +149,7 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("audit_result = await audit_current_scan_leads(http, scan_started_at_utc)", source)
         self.assertLess(source.index("audit_result = await audit_current_scan_leads"), source.index("await notify_pending_leads(http)", source.index("audit_result = await audit_current_scan_leads")))
         self.assertIn("pending-lead notifications withheld for safety", source)
-        self.assertIn("'offset': str(offset)", audit_code)
+        self.assertIn('"offset": str(offset)', audit_code)
         self.assertIn("pending.extend(page)", audit_code)
         self.assertLess(audit_code.index("pending.extend(page)"), audit_code.index("for lead in pending"))
     def test_evidence_verifier_keeps_proven_project_buyers(self):
