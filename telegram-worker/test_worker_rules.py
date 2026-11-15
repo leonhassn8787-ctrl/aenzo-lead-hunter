@@ -170,6 +170,24 @@ class LeadSignalTests(unittest.TestCase):
             with self.subTest(query=query):
                 self.assertIn(query, source)
 
+    def test_real_world_vendor_and_noise_posts_from_latest_scan_are_rejected(self):
+        posts = [
+            "Hey everyone! I'm @San_mddf, BD at MyDollarFun. Looking for real users and genuine engagement on X (Twitter)? DM me! I'll offer you special discounts. You can also run your campaigns directly on our website. Also you can test any think in $1. For more details, feel free to DM me. Let's grow together!",
+            "We provide quality iGaming, casino & sportsbook traffic across 32+ GEOs through Google PPC, Meta Ads, TG Ads & Influencers. Our focus is quality registrations and FTDs. Looking for quality traffic or interested in a partnership? DM @SalesDiplomat0.",
+            "GET REAL USERS FOR YOUR MINI-APP OR CHANNEL. We deliver high-velocity traffic. 80k+ daily active users, 650k+ monthly reach. Services offered, price list, book your slot today.",
+            "Will anyone ever need a moderator here?",
+            "I'm a full-stack developer with 5+ years of experience building websites, applications, and digital products. I'm currently open to new projects and collaborations. If you need a developer, contact me.",
+            "Im looking for traders in Kols",
+        ]
+        for post in posts:
+            with self.subTest(post=post):
+                self.assertEqual(self.classify(post), [])
+
+    def test_buyer_requests_for_exchange_and_token_campaigns_are_preserved(self):
+        self.assertIn("KOL & Influencer Marketing", self.classify("Looking for CEX KOLs, if you can bring traders DM me."))
+        self.assertIn("KOL & Influencer Marketing", self.classify("Need KOLs that can generate volume for our exchange. DM me if you have a team."))
+        self.assertIn("KOL & Influencer Marketing", self.classify("Looking for KOLs which help in token sale and increasing volume!"))
+
     def test_mydollarfun_style_user_engagement_promotion_is_rejected(self):
         message = (
             "Looking for real users and genuine engagement on X (Twitter)? "
