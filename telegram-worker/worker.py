@@ -446,7 +446,7 @@ KOL_PROJECT_CONTEXT = re.compile(
 
 NON_BUYER_CONTEXT = re.compile(
     r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
-    r"open to (the )?(next|new) (opportunity|role|position)|open to opportunities|"
+    r"open to (the )?(next|new) (opportunity|role|position)|open to opportunities|open to new projects|open to projects|"
     r"looking for (my )?(next|new) (opportunity|role|position)|seeking (a )?(new )?(role|position|opportunity)|"
     r"looking for (a )?(new )?(role|position|opportunity)|available for (a )?(new )?(role|position|opportunity)|"
     r"anyone hiring|is anyone hiring|who is hiring|job opportunities|employment opportunities|"
