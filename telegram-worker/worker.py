@@ -1157,9 +1157,7 @@ async def audit_current_scan_leads(client_http, scan_started_at):
 
             # A classifier/service-label mismatch cannot erase a proven buyer.
             inferred = classify(evidence)
-            repaired_need = stored_need or ("; ".join(inferred) if inferred else "Project Promotion")
-            if not inferred and not stored_need:
-                repaired_need = "Project Promotion"
+            repaired_need = "; ".join(inferred) if inferred else (stored_need or "Project Promotion")
             if repaired_need != stored_need:
                 notes = (str(lead.get("notes") or "").strip() + " | post_scan_audit: buyer_intent_verified; service_label_repaired").strip(" |")[:4000]
                 patch = await client_http.patch(url, headers={**headers, "Prefer": "return=minimal"}, params={"id": "eq." + str(lead["id"]), "owner_id": "eq." + SUPABASE_OWNER_ID, "status": "eq.new"}, json={"service_need": repaired_need, "notes": notes}, timeout=30)
@@ -1212,10 +1210,7 @@ def telegram_notification_block_reason(lead):
         return "missing_or_too_short_evidence"
     if not service_need or service_need.lower() in {"unknown", "needs review", "n/a", "none"}:
         return "missing_service_need"
-    # The minimum qualified buyer-intent score is 55. Requiring 65 would
-    # suppress genuine, explicit requests that do not mention budget or urgency.
-    if priority < 55:
-        return "priority_below_notification_threshold"
+    # Priority ranks verified leads; it must not veto evidence-proven buyers.
     if not verify_buyer_evidence(evidence):
         return "source_evidence_does_not_prove_buyer_intent"
     return None
