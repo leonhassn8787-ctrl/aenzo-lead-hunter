@@ -1138,7 +1138,7 @@ async def audit_current_scan_leads(client_http, scan_started_at):
         "select": "id,evidence_summary,service_need,notes,priority_score",
         "owner_id": f"eq.{SUPABASE_OWNER_ID}",
         "status": "eq.new",
-        "created_at": f"gte.{scan_started_at}",
+        "telegram_notified_at": "is.null",
         "order": "created_at.asc", "limit": "200",
     }
     audited = rejected = verified = 0
@@ -1886,7 +1886,7 @@ async def run(once=False):
             write_state(state)
             audit_result = await audit_current_scan_leads(http, scan_started_at_utc)
             if audit_result["ok"]:
-                await notify_pending_leads(http, scan_started_at_utc)
+                await notify_pending_leads(http)
             else:
                 log.error("Post-scan audit failed; pending-lead notifications withheld for safety.")
             duration_seconds = asyncio.get_running_loop().time() - scan_started
