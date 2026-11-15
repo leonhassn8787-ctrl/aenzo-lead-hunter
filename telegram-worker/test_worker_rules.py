@@ -1581,6 +1581,20 @@ class LeadDisplayLabelTests(unittest.TestCase):
 
 
 
+    def test_scan_run_telemetry_uses_only_existing_schema_columns(self):
+        source = WORKER.read_text(encoding="utf-8")
+        start = source.index("async def finish_scan_run(http, run_id, stats):")
+        end = source.index("\nasync def ", start + 20)
+        block = source[start:end]
+        # scan_runs currently has only these writable reporting columns;
+        # source-separated counters are packed into error_summary JSON.
+        for column in ("finished_at", "status", "sources_checked", "leads_found", "leads_saved", "error_summary"):
+            with self.subTest(column=column):
+                self.assertIn('"' + column + '"', block)
+        for unsupported in ("public_messages_processed", "joined_messages_processed", "duration_seconds"):
+            with self.subTest(unsupported=unsupported):
+                self.assertNotIn('"' + unsupported + '":', block.split('payload = {', 1)[1].split('}', 1)[0])
+
     def test_telegram_scan_run_metrics_are_persisted_to_supabase(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("async def start_scan_run(http):", source)
