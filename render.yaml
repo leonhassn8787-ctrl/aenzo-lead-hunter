@@ -27,15 +27,11 @@ services:
       - key: STATE_FILE
         value: /data/scan_state.json
       - key: POLL_SECONDS
-        value: "14400"
+        value: "7200"
       - key: LOOKBACK_DAYS
         value: "30"
-      - key: SCAN_BUDGET_SECONDS
-        value: "1320"
-      - key: MAX_MESSAGES_PER_RUN
-        value: "100"
-      - key: MAX_JOINED_MESSAGES_PER_RUN
-        value: "100"
+      - key: MAX_JOINED_GROUPS_PER_RUN
+        value: "200"
       - key: AENZO_BOT_TOKEN
         sync: false
       - key: AENZO_BOT_CHAT_ID
