@@ -58,7 +58,7 @@ MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 1300, 1, 2000)
 MAX_PUBLIC_MESSAGES_PER_RUN = min(bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500), MAX_MESSAGES_PER_RUN)
 MAX_JOINED_MESSAGES_PER_RUN = bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 1000, 1, 1500)
 MAX_MESSAGES_PER_GROUP_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_GROUP_PER_RUN", 10, 1, 50)
-CLASSIFIER_RULES_VERSION = 23
+CLASSIFIER_RULES_VERSION = 24
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for beta testers",
@@ -470,6 +470,9 @@ NON_BUYER_CONTEXT = re.compile(
     r"anyone hiring|is anyone hiring|who is hiring|job opportunities|employment opportunities|"
     r"looking to join (a |your |any )?team|"
     r"you need (marketing|promotion|kols?|influencers?) (in|for)|you should (hire|look for|find) a? ?(marketing|growth) (agency|team)|"
+    r"will anyone ever need (a )?(moderator|community manager|developer)( here)?|"
+    r"does anyone need (a )?(moderator|community manager|developer) here|"
+    r"looking for traders? in kol(s)?|"
     r"looking for bd partners|bd partners to onboard|partner recruitment|"
     r"looking for (affiliate|affiliates|ambassadors?|referral partners?|regional representatives)|"
     r"join our (affiliate|ambassador|referral|partner) program|"
@@ -1712,7 +1715,7 @@ async def run(once=False):
                     text_body = msg.message.strip()
                     messages_checked += 1
                     meta["messages_seen"] = int(meta.get("messages_seen", 0)) + 1
-                    if SELLER_AD_CONTEXT.search(text_body) or SELLER_POST_CONTEXT.search(text_body):
+                    if SELLER_AD_CONTEXT.search(text_body) or SELLER_POST_CONTEXT.search(text_body) or SELLER_PITCH_CONTEXT.search(text_body):
                         seller_posts += 1
                         meta["seller_ads"] = int(meta.get("seller_ads", 0)) + 1
 
