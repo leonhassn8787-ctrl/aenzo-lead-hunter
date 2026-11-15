@@ -56,6 +56,7 @@ jobs:
         run: |
           python - <<'PY'
           import os
+          import uuid
           required = [
               "TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_SESSION_STRING",
               "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_OWNER_ID",
@@ -66,9 +67,12 @@ jobs:
               configured = "false"
           else:
               try:
-                  int(os.environ["TELEGRAM_API_ID"])
+                  api_id = int(os.environ["TELEGRAM_API_ID"])
+                  if api_id <= 0:
+                      raise ValueError("API ID must be positive")
+                  uuid.UUID(os.environ["SUPABASE_OWNER_ID"])
               except ValueError:
-                  print("Scan safely skipped: TELEGRAM_API_ID must be numeric.")
+                  print("Scan safely skipped: TELEGRAM_API_ID must be positive and SUPABASE_OWNER_ID must be a valid UUID.")
                   configured = "false"
               else:
                   if not os.environ["SUPABASE_URL"].startswith("https://"):
@@ -94,24 +98,45 @@ jobs:
         run: |
           python - <<'PY'
           import os
-          token = bool(os.getenv("AENZO_BOT_TOKEN", "").strip())
-          chats = [
+          import httpx
+          token = os.getenv("AENZO_BOT_TOKEN", "").strip()
+          chats = list(dict.fromkeys(
               value.strip()
               for value in (
                   os.getenv("AENZO_BOT_CHAT_ID", "") + "," +
                   os.getenv("AENZO_BOT_CHAT_IDS", "")
               ).split(",")
               if value.strip()
-          ]
+          ))
+          problems = []
           if token and chats:
-              print(f"PASS: Telegram lead alerts configured for {len(set(chats))} chat(s).")
+              try:
+                  base = "https://api.telegram.org/bot" + token
+                  me = httpx.get(base + "/getMe", timeout=15)
+                  if me.status_code != 200 or not me.json().get("ok"):
+                      problems.append("bot token validation failed")
+                  else:
+                      for chat_id in chats:
+                          check = httpx.get(base + "/getChat", params={"chat_id": chat_id}, timeout=15)
+                          if check.status_code != 200 or not check.json().get("ok"):
+                              problems.append("one or more configured chats are not reachable by the bot")
+                              break
+              except Exception:
+                  problems.append("Telegram validation request failed")
+              if problems:
+                  message = "WARNING: " + "; ".join(problems) + ". No test messages were sent; the scan will continue and delivery errors will be recorded."
+                  print(message)
+              else:
+                  message = f"PASS: Telegram bot token and all {len(chats)} configured chat(s) are reachable. No test messages were sent."
+                  print(message)
           else:
               message = (
                   "WARNING: Telegram lead alerts are DISABLED. "
-                  "Set both AENZO_BOT_TOKEN and at least one chat ID "
+                  "Set AENZO_BOT_TOKEN and at least one chat ID "
                   "(AENZO_BOT_CHAT_ID or AENZO_BOT_CHAT_IDS) in GitHub Actions secrets."
               )
               print(message)
+          if not message.startswith("PASS:"):
               with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
                   summary.write("### Telegram lead alerts\n\n" + message + "\n")
           PY
