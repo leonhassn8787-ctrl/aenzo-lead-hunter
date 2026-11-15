@@ -1089,8 +1089,8 @@ def telegram_notification_block_reason(lead):
         return "missing_or_too_short_evidence"
     if not service_need or service_need.lower() in {"unknown", "needs review", "n/a", "none"}:
         return "missing_service_need"
-    # A direct, classified buyer-intent message normally starts at 55.
-    # Requiring 65 suppresses genuine requests without budget or urgency wording.
+    # The minimum qualified buyer-intent score is 55. Requiring 65 would
+    # suppress genuine, explicit requests that do not mention budget or urgency.
     if priority < 55:
         return "priority_below_notification_threshold"
     if not classify(evidence):
