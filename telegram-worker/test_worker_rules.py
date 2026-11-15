@@ -1495,6 +1495,16 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         self.assertIn("Public groups with qualified buyer signals:", source)
         self.assertNotIn('f"Groups scanned:', source)
 
+    def test_scan_report_exposes_post_scan_audit_result(self):
+        source = WORKER.read_text(encoding="utf-8")
+        start = source.index("async def send_scan_report")
+        end = source.index("async def login", start)
+        report = source[start:end]
+        self.assertIn("Post-scan audit status:", report)
+        self.assertIn("post_scan_audited", report)
+        self.assertIn("post_scan_verified", report)
+        self.assertIn("post_scan_rejected", report)
+
 
 
 class JoinedGroupCheckpointTests(unittest.TestCase):
