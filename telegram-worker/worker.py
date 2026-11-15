@@ -719,6 +719,67 @@ def classify(text):
 
     return hits
 
+
+def verify_buyer_evidence(text):
+    """Independent evidence gate: prove project context, a buyer request, and an AENZO service need."""
+    if not text:
+        return False
+    if SELLER_AD_CONTEXT.search(text) or SELLER_POST_CONTEXT.search(text) or SELLER_PITCH_CONTEXT.search(text):
+        return False
+    if NON_BUYER_CONTEXT.search(text) and not (
+        CRYPTO_CONTEXT.search(text)
+        and re.search(
+            r"\\b(early users?|early adopters?|beta testers?|product feedback|mvp testing|"
+            r"looking to hire .{0,60}(kol|kols|influencer|marketing|growth)|"
+            r"hiring .{0,60}(kol|kols|influencer|marketing|growth))\\b",
+            text, re.I,
+        )
+    ):
+        return False
+
+    buyer_request = BUYING_CONTEXT.search(text) or re.search(
+        r"\\b(we need|we're seeking|we are seeking|want to hire|ready to hire|"
+        r"can you promote|please promote|help us promote|need a partner)\\b",
+        text, re.I,
+    )
+    indirect_growth = re.search(
+        r"\\b(struggling to|having trouble|not getting (enough|many)|"
+        r"trying to (increase|grow|attract|reach)|want to (grow|increase|attract|reach)|"
+        r"could use more|how can we (get|attract|reach|grow|increase))\\b",
+        text, re.I,
+    )
+    service_need = re.search(
+        r"\\b(kol|kols|influencers?|marketing|promotion|promote|"
+        r"community (growth|promotion|management)|telegram promotion|"
+        r"pr agency|media coverage|press release|ama hosting|"
+        r"giveaway campaign|airdrop campaign|social media management|"
+        r"content marketing|content distribution|brand awareness|"
+        r"user acquisition|launch promotion|project promotion|"
+        r"advertising|paid campaign|website (design|development|developer)|"
+        r"community manager|moderators?|beta testers?|early users?|"
+        r"product testing|product review|product feedback|mvp testing|"
+        r"video production|graphic design|fundraising promotion|"
+        r"exchange promotion|wallet promotion|gamefi promotion|"
+        r"staking promotion|mining promotion)\\b",
+        text, re.I,
+    )
+    project_context = CRYPTO_CONTEXT.search(text) or re.search(
+        r"\\b(project|product|app|platform|website|software|saas|"
+        r"digital product|startup|brand|game|exchange|wallet)\\b",
+        text, re.I,
+    )
+    if not project_context or not service_need:
+        return False
+    if not buyer_request and not (indirect_growth and service_need):
+        return False
+    if re.search(r"\\b(kol|kols|influencers?)\\b", text, re.I) and not KOL_PROJECT_CONTEXT.search(text):
+        return False
+    if re.search(r"\\b(recruit|hiring|hire|moderator|community manager|developer)\\b", text, re.I):
+        if not RECRUITMENT_BUYER_CONTEXT.search(text):
+            return False
+    return True
+
+
 def public_message_cursor_key(message):
     """Stable cursor ordering for public search results spanning multiple Telegram groups."""
     return (
@@ -1060,48 +1121,57 @@ async def save_lead(client_http, payload):
         return "error"
 
 async def audit_current_scan_leads(client_http, scan_started_at):
-    """Conservatively audit this run: never reject a plausible buyer on classifier disagreement."""
+    """Only pass evidence-backed buyers; reject every unproven candidate."""
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
     url = f"{SUPABASE_URL}/rest/v1/leads"
     params = {
-        "select": "id,evidence_summary,service_need,notes",
+        "select": "id,evidence_summary,service_need,notes,priority_score",
         "owner_id": f"eq.{SUPABASE_OWNER_ID}",
         "status": "eq.new",
         "created_at": f"gte.{scan_started_at}",
         "order": "created_at.asc", "limit": "200",
     }
-    audited = rejected = review = 0
+    audited = rejected = verified = 0
     try:
         response = await client_http.get(url, headers=headers, params=params, timeout=30)
         if response.status_code != 200:
             log.error("Post-scan audit could not load leads (%s): %s", response.status_code, response.text[:400])
-            return {"audited": 0, "rejected": 0, "review": 0, "ok": False}
+            return {"audited": 0, "rejected": 0, "verified": 0, "ok": False}
         for lead in response.json():
             audited += 1
             evidence = str(lead.get("evidence_summary") or "").strip()
-            # Only high-confidence seller advertisements are auto-rejected.
-            # A classifier miss, short excerpt, or service-label mismatch is NOT proof
-            # that a prospect is invalid; keep it for human review to protect buyers.
+            stored_need = str(lead.get("service_need") or "").strip()
             seller = bool(SELLER_AD_CONTEXT.search(evidence) or SELLER_POST_CONTEXT.search(evidence) or SELLER_PITCH_CONTEXT.search(evidence))
-            if not seller:
-                if len(evidence) < 25 or not classify(evidence):
-                    review += 1
-                    log.info("Post-scan audit retained lead %s for human review; evidence/classifier uncertain.", lead["id"])
+            proven = len(evidence) >= 25 and not seller and verify_buyer_evidence(evidence)
+            if not proven:
+                reason = "post_scan_audit: buyer_intent_not_proven_from_source_evidence"
+                notes = (str(lead.get("notes") or "").strip() + " | " + reason).strip(" |")[:4000]
+                patch = await client_http.patch(url, headers={**headers, "Prefer": "return=minimal"}, params={"id": "eq." + str(lead["id"]), "owner_id": "eq." + SUPABASE_OWNER_ID, "status": "eq.new"}, json={"status": "rejected", "notes": notes}, timeout=30)
+                if patch.status_code in (200, 204):
+                    rejected += 1
+                    log.info("Post-scan audit rejected unproven candidate %s.", lead["id"])
+                else:
+                    log.error("Post-scan audit could not reject lead %s (%s): %s", lead["id"], patch.status_code, patch.text[:300])
+                    return {"audited": audited, "rejected": rejected, "verified": verified, "ok": False}
                 continue
-            reason = "post_scan_audit: high_confidence_vendor_or_service_seller_pitch"
-            notes = (str(lead.get("notes") or "").strip() + " | " + reason).strip(" |")[:4000]
-            patch = await client_http.patch(url, headers={**headers, "Prefer": "return=minimal"}, params={"id": "eq." + str(lead["id"]), "owner_id": "eq." + SUPABASE_OWNER_ID, "status": "eq.new"}, json={"status": "rejected", "notes": notes}, timeout=30)
-            if patch.status_code in (200, 204):
-                rejected += 1
-                log.warning("Post-scan audit rejected clear seller lead %s.", lead["id"])
-            else:
-                log.error("Post-scan audit could not reject lead %s (%s): %s", lead["id"], patch.status_code, patch.text[:300])
-                return {"audited": audited, "rejected": rejected, "review": review, "ok": False}
-        log.info("Post-scan audit complete: %s checked, %s clear sellers rejected, %s retained for review.", audited, rejected, review)
-        return {"audited": audited, "rejected": rejected, "review": review, "ok": True}
+
+            # A classifier/service-label mismatch cannot erase a proven buyer.
+            inferred = classify(evidence)
+            repaired_need = stored_need or ("; ".join(inferred) if inferred else "Project Promotion")
+            if not inferred and not stored_need:
+                repaired_need = "Project Promotion"
+            if repaired_need != stored_need:
+                notes = (str(lead.get("notes") or "").strip() + " | post_scan_audit: buyer_intent_verified; service_label_repaired").strip(" |")[:4000]
+                patch = await client_http.patch(url, headers={**headers, "Prefer": "return=minimal"}, params={"id": "eq." + str(lead["id"]), "owner_id": "eq." + SUPABASE_OWNER_ID, "status": "eq.new"}, json={"service_need": repaired_need, "notes": notes}, timeout=30)
+                if patch.status_code not in (200, 204):
+                    log.error("Could not repair service label for verified lead %s (%s): %s", lead["id"], patch.status_code, patch.text[:300])
+                    return {"audited": audited, "rejected": rejected, "verified": verified, "ok": False}
+            verified += 1
+        log.info("Post-scan evidence audit complete: %s checked, %s verified buyers kept, %s unproven candidates rejected.", audited, verified, rejected)
+        return {"audited": audited, "rejected": rejected, "verified": verified, "ok": True}
     except Exception:
         log.exception("Post-scan lead audit failed.")
-        return {"audited": audited, "rejected": rejected, "review": review, "ok": False}
+        return {"audited": audited, "rejected": rejected, "verified": verified, "ok": False}
 
 
 
@@ -1146,8 +1216,8 @@ def telegram_notification_block_reason(lead):
     # suppress genuine, explicit requests that do not mention budget or urgency.
     if priority < 55:
         return "priority_below_notification_threshold"
-    if not classify(evidence):
-        return "evidence_does_not_pass_buyer_intent_rules"
+    if not verify_buyer_evidence(evidence):
+        return "source_evidence_does_not_prove_buyer_intent"
     return None
 
 
@@ -1884,7 +1954,7 @@ async def run(once=False):
                 "duration_seconds": duration_seconds,
                 "post_scan_audited": audit_result["audited"],
                 "post_scan_rejected": audit_result["rejected"],
-                "post_scan_review": audit_result["review"],
+                "post_scan_verified": audit_result["verified"],
                 "post_scan_audit_ok": audit_result["ok"],
             }
             await finish_scan_run(http, scan_run_id, stats)
