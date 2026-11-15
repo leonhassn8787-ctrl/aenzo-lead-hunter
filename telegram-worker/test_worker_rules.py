@@ -133,7 +133,7 @@ class LeadSignalTests(unittest.TestCase):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("async def audit_current_scan_leads(client_http, scan_run_id)", source)
         self.assertIn("post_scan_audit: buyer_intent_uncertain_manual_review_required", source)
-        self.assertIn("Keep uncertain candidates in review", source)
+        self.assertIn("ambiguous or incomplete evidence", source)
         self.assertIn("def verify_buyer_evidence(text):", source)
         self.assertIn("buyer_intent_verified; service_label_repaired", source)
         self.assertIn("source_evidence_does_not_prove_buyer_intent", source)
@@ -1311,7 +1311,7 @@ class TelegramNotificationGateTests(unittest.TestCase):
     def test_non_buyer_evidence_is_blocked(self):
         self.assertEqual(
             self.check({"evidence_summary": "We offer marketing services to crypto projects and need clients.", "service_need": "Project Promotion", "priority_score": 90}),
-            "source_evidence_does_not_prove_buyer_intent",
+            "seller_or_vendor_post",
         )
 
     def test_missing_service_category_is_blocked(self):
