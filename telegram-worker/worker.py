@@ -445,7 +445,8 @@ RECRUITMENT_BUYER_CONTEXT = re.compile(
 
 KOL_PROJECT_CONTEXT = re.compile(
     r"\b("
-    r"(our|the) (web3 |crypto |ai |defi |cefi )?(project|token|launch|campaign|protocol|wallet|exchange|platform|community|ecosystem)|"
+    r"(our|the) (new |upcoming |launched )?(web3|crypto|blockchain|ai|defi|cefi) (game|app|startup|project|token|launchpad|wallet|exchange|platform|ecosystem|protocol|campaign)|"
+    r"(our|the) (web3 |crypto |ai |defi |cefi )?(project|token|launch|campaign|protocol|wallet|exchange|platform|community|ecosystem)|
     r"for our (web3|crypto|token|project|launch|campaign|exchange|platform|ecosystem)|"
     r"(web3|crypto|ai agent|defi|cefi|cex) (launch|project|ecosystem|exchange|platform)|"
     r"token launch|token sale|exchange volume|web3 launch|crypto launch|paid (kol|influencer) campaign|kol campaign|influencer campaign|"
@@ -608,6 +609,10 @@ def classify(text):
     ):
         return []
 
+    # KOL requests must identify a real project, campaign, or acquisition goal.
+    if "KOL & Influencer Marketing" in hits and not KOL_PROJECT_CONTEXT.search(text):
+        return []
+
     # Technical hiring/help (e.g. token launch specialists) is not automatically
     # a marketing lead. Keep these out unless a separate marketing request exists.
     technical_only = re.compile(
@@ -618,9 +623,9 @@ def classify(text):
     )
     marketing_intent = re.compile(
         r"\b(kol|kols|influencer|influencers|marketing|promotion|promote|"
-        r"community growth|community promotion|pr agency|media coverage|"
+        r"growth agency|growth team|growth partner|community growth|community promotion|community engagement|member acquisition|pr agency|pr partner|media coverage|"
         r"press release|ama hosting|giveaway campaign|airdrop campaign|"
-        r"social media management|content marketing|content distribution|"
+        r"social media management|content marketing|content distribution|content creators?|brand ambassadors?|"
         r"brand awareness|user acquisition|grow our audience|increase visibility|audience|user base|users|traction|attract users|more users|signups|registrations|"
         r"launch promotion|project promotion|advertising|paid campaign|promoter|promoters|"
         r"cross[- ]marketing|co[- ]marketing|collaboration|partnership|joint campaign|"
@@ -685,8 +690,9 @@ def classify(text):
 
     if not hits and marketing_intent.search(text):
         strong_marketing_intent = re.compile(
-            r"\b(kol|kols|influencer|influencers|marketing|promotion|promote|"
-            r"advertising|pr agency|media coverage|press release|ama hosting|"
+            r"\b(kol|kols|influencer|influencers|marketing|promotion|promote|growth agency|growth team|growth partner|"
+            r"community engagement|member acquisition|brand ambassadors?|content creators?|"
+            r"advertising|pr agency|pr partner|media coverage|press release|ama hosting|"
             r"giveaway campaign|airdrop campaign|social media management|"
             r"content marketing|content distribution|brand awareness|"
             r"user acquisition|launch promotion|project promotion|paid campaign)\b",
