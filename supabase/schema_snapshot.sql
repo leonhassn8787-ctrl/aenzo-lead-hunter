@@ -28,7 +28,7 @@ create table if not exists public.leads (
   priority_score integer not null default 50
     check (priority_score between 1 and 100),
   status text not null default 'new'
-    check (status in ('new', 'contacted', 'interested', 'negotiation', 'converted', 'rejected')),
+    check (status in ('review', 'new', 'contacted', 'interested', 'negotiation', 'converted', 'rejected')),
   evidence_summary text,
   evidence_url text,
   evidence_date date,
