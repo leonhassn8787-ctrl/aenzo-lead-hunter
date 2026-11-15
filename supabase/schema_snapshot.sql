@@ -19,6 +19,7 @@ create table if not exists public.lead_sources (
 create table if not exists public.leads (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  source_scan_run_id uuid,
   company_name text not null,
   website text,
   industry text,
