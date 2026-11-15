@@ -1329,7 +1329,7 @@ async def run(once=False):
                         continue
                     if not msg.message or not msg.date:
                         continue
-                    if not last_seen and msg.date.replace(tzinfo=timezone.utc) < cutoff:
+                    if not last_seen and msg.date.replace(tzinfo=timezone.utc) < initial_scan_cutoff:
                         continue
 
                     text_body = msg.message.strip()
