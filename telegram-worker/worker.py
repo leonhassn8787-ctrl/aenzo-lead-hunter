@@ -432,12 +432,11 @@ SELLER_PITCH_CONTEXT = re.compile(
     r"(marketing|kol|influencer|traffic|promotion) packages available|"
     r"we work with .{0,100}\b(projects|brands|clients)\b.{0,100}\b(promote|promotion|campaigns|traffic|leads)\b|"
     r"\b(google ppc|meta ads|facebook ads|instagram ads|telegram ads)\b.{0,180}\b(traffic|registrations?|ftds?|depositors?)\b.{0,180}\b(we provide|we offer|we deliver|our service|our traffic)\b|"
-    r"\b(igaming|casino|sportsbook)\b.{0,180}\b(traffic|ftds?|first[- ]time depositors?|registrations?)\b.{0,180}\b(we provide|we offer|we deliver|across [0-9]+ geos|geo[s]?)\b"
-    r"looking for (real|genuine|active) users?.{0,100}(genuine )?engagement.{0,60}\\b(x|twitter)\\b|"
-    r"(i|we)(?:\\s+will|\\x27ll) offer .{0,100}\\b(special )?discounts?\\b.{0,100}\\b(dm|message|contact)\\b|"
+    r"\b(igaming|casino|sportsbook)\b.{0,180}\b(traffic|ftds?|first[- ]time depositors?|registrations?)\b.{0,180}\b(we provide|we offer|we deliver|across [0-9]+ geos|geo[s]?)\b|"
+    r"looking for (real|genuine|active) users?.{0,100}(genuine )?engagement.{0,60}\b(x|twitter)\b|"
+    r"(i|we)(?:\s+will|'ll) offer .{0,100}\b(special )?discounts?\b.{0,100}\b(dm|message|contact)\b|"
     r"(run|launch) your campaigns? .{0,100}(directly )?(on|through) our website|"
-    r"test (anything|any service|any campaign) (for|at) \\$?1\\b"
-
+    r"test (anything|any service|any campaign) (for|at) \$?1\b"
     r")",
     re.I,
 )
