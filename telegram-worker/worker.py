@@ -855,17 +855,21 @@ def supabase_headers(secret_key):
     }
 
 
-def message_scan_kwargs(last_seen, cutoff):
-    """Fetch oldest unseen messages first so batches cannot skip busy-group traffic."""
-    kwargs = {
-        "min_id": last_seen,
-        "reverse": True,
-    }
-    # The initial batch is bounded to recent history. Later batches must finish
-    # any backlog even if messages have aged past LOOKBACK_DAYS.
-    if not last_seen:
-        kwargs["offset_date"] = cutoff
-    return kwargs
+def two_hour_window(anchor, now):
+    """Return the latest fully completed two-hour window anchored to the first start."""
+    anchor = anchor.astimezone(timezone.utc)
+    now = now.astimezone(timezone.utc)
+    elapsed = (now - anchor).total_seconds()
+    if elapsed < 7200:
+        return anchor, anchor + timedelta(hours=2)
+    completed_index = int(elapsed // 7200) - 1
+    start = anchor + timedelta(hours=2 * completed_index)
+    return start, start + timedelta(hours=2)
+
+
+def message_scan_kwargs(window_start):
+    """Read messages chronologically from this window start; caller stops at its end."""
+    return {"offset_date": window_start, "reverse": True}
 
 async def save_lead(client_http, payload):
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
@@ -1233,8 +1237,7 @@ async def run(once=False):
     if reset_group_quality_metrics(state):
         write_state(state)
     groups_state = state.setdefault("groups", {})
-    # Start a clean two-hour collection window once. Existing message cursors
-    # are reset so no messages from before the user's requested start are replayed.
+    # A fixed anchor defines consecutive two-hour windows. Missed windows expire.
     if not state.get("initial_scan_since"):
         initial_start = os.getenv("INITIAL_SCAN_START_AT", "").strip()
         if initial_start:
@@ -1245,7 +1248,7 @@ async def run(once=False):
             except ValueError as exc:
                 raise RuntimeError("INITIAL_SCAN_START_AT must be an ISO-8601 timestamp.") from exc
         else:
-            initial_dt = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
+            initial_dt = datetime.now(timezone.utc)
         state["initial_scan_since"] = initial_dt.astimezone(timezone.utc).isoformat()
         for group_meta in groups_state.values():
             group_meta["last_seen_id"] = 0
@@ -1254,12 +1257,15 @@ async def run(once=False):
     initial_scan_since = datetime.fromisoformat(state["initial_scan_since"])
     if initial_scan_since.tzinfo is None:
         initial_scan_since = initial_scan_since.replace(tzinfo=timezone.utc)
-    initial_scan_cutoff = initial_scan_since.astimezone(timezone.utc)
+    initial_scan_anchor = initial_scan_since.astimezone(timezone.utc)
     async with httpx.AsyncClient() as http:
         while True:
             scan_started = asyncio.get_running_loop().time()
             scan_run_id = await start_scan_run(http)
-            scan_started_at_utc = datetime.now(timezone.utc).isoformat()
+            scan_now_utc = datetime.now(timezone.utc)
+            window_start, window_end = two_hour_window(initial_scan_anchor, scan_now_utc)
+            scan_started_at_utc = window_start.isoformat()
+            log.info("Two-hour window UTC: %s to %s", window_start.isoformat(), window_end.isoformat())
             checked = 0
             saved = 0
             messages_checked = 0
@@ -1306,30 +1312,24 @@ async def run(once=False):
                     "qualified_leads": 0,
                     "paused_until": None,
                 })
-                last_seen = int(meta.get("last_seen_id", 0))
-                newest_seen = last_seen
                 group_write_failed = False
-                messages_since_checkpoint = 0
-                async for msg in client.iter_messages(entity, **message_scan_kwargs(last_seen, initial_scan_cutoff)):
-                    if not msg:
+                async for msg in client.iter_messages(entity, **message_scan_kwargs(window_start)):
+                    if not msg or not msg.date:
                         continue
-
-                    # Checkpoint only the previous batch before processing this message.
-                    # If the worker stops mid-message, this message remains eligible for retry.
-                    if messages_since_checkpoint >= 25 and not group_write_failed:
-                        meta["last_seen_id"] = max(last_seen, newest_seen)
-                        write_state(state)
-                        messages_since_checkpoint = 0
-
-                    newest_seen = max(newest_seen, int(msg.id))
-                    messages_since_checkpoint += 1
+                    message_date = msg.date
+                    if message_date.tzinfo is None:
+                        message_date = message_date.replace(tzinfo=timezone.utc)
+                    else:
+                        message_date = message_date.astimezone(timezone.utc)
+                    if message_date >= window_end:
+                        break
+                    if message_date < window_start:
+                        continue
                     messages_processed += 1
                     joined_messages_processed += 1
                     if getattr(msg, "out", False):
                         continue
-                    if not msg.message or not msg.date:
-                        continue
-                    if not last_seen and msg.date.replace(tzinfo=timezone.utc) < initial_scan_cutoff:
+                    if not msg.message:
                         continue
 
                     text_body = msg.message.strip()
@@ -1399,10 +1399,8 @@ async def run(once=False):
                     elif save_status == "error":
                         group_write_failed = True
 
-                if not group_write_failed:
-                    meta["last_seen_id"] = max(last_seen, newest_seen)
-                else:
-                    log.warning("Keeping cursor unchanged for group %s so failed writes can be retried.", group_id)
+                if group_write_failed:
+                    log.warning("Some messages in group %s failed during this window; expired windows will not be replayed.", group_id)
 
                 checked += 1
                 # Persist rotation progress after each completed group so a long
