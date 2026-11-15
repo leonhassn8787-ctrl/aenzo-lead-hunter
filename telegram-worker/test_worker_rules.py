@@ -1342,6 +1342,7 @@ class GroupScanningOptimizationTests(unittest.TestCase):
     def test_two_hour_windows_advance_without_replaying_expired_periods(self):
         from datetime import datetime, timedelta, timezone
         anchor = datetime(2026, 11, 16, 0, 0, tzinfo=timezone.utc)
+        self.assertIsNone(self.two_hour_window(anchor, anchor + timedelta(minutes=5)))
         first = self.two_hour_window(anchor, anchor + timedelta(hours=2, minutes=5))
         self.assertEqual(first, (anchor, anchor + timedelta(hours=2)))
         second = self.two_hour_window(anchor, anchor + timedelta(hours=4, minutes=5))
