@@ -126,8 +126,11 @@ class LeadSignalTests(unittest.TestCase):
     def test_post_scan_audit_runs_before_new_lead_notifications(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("async def audit_current_scan_leads", source)
-        self.assertIn("post_scan_audit: vendor_or_service_seller_pitch", source)
-        self.assertIn("post_scan_audit: no_valid_AENZO_buyer_intent", source)
+        self.assertIn("post_scan_audit: high_confidence_vendor_or_service_seller_pitch", source)
+        self.assertIn("never reject a plausible buyer on classifier disagreement", source)
+        self.assertIn("retained for human review", source)
+        self.assertNotIn("post_scan_audit: no_valid_AENZO_buyer_intent", source)
+        self.assertNotIn("post_scan_audit: stored_service_need_does_not_match_evidence", source)
         self.assertIn("audit_result = await audit_current_scan_leads(http, scan_started_at_utc)", source)
         self.assertLess(source.index("audit_result = await audit_current_scan_leads"), source.index("await notify_pending_leads(http)", source.index("audit_result = await audit_current_scan_leads")))
         self.assertIn("pending-lead notifications withheld for safety", source)
