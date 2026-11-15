@@ -1,12 +1,9 @@
 # AENZO LABS — Telegram Group Lead Hunter
 
 ## Purpose
-This worker has two Telegram group discovery paths:
+This worker has exactly one discovery source: **groups the connected Telegram account has already joined**. It scans accessible messages in those groups only. It does not search non-joined public groups, channels, websites, directories, RSS feeds, or other external sources.
 
-- **Joined groups:** scans new accessible messages in every group the account owner has already joined.
-- **Non-joined public groups:** uses Telegram's user-only global group message search (messages.searchGlobal, with groups_only) to discover matching messages from accessible public groups without joining them. Search queries are focused on AENZO buyer-intent phrases; this is not an exhaustive dump of every public group or every message.
-
-It does not bypass membership, privacy, or access controls. Private groups remain inaccessible unless the account is a member. Telegram may rate-limit global searches, and some public groups/messages may not appear in search.
+It does not bypass membership, privacy, or access controls. Only groups visible to the connected account can be scanned. Broadcast-only channels are excluded. Telegram may rate-limit message-history requests; saved per-group cursors allow the next run to resume.
 
 It looks for messages that request AENZO LABS services or show a relevant Web3 growth/partnership need, then stores:
 - the original message text as evidence and its UTC date;
@@ -19,16 +16,14 @@ A group title is not treated as a verified company name. Unverified identities a
 
 ## Accuracy and scan limits
 - Detection accepts direct AENZO service requests and relevant Web3 project growth/partnership opportunities; an explicit budget or payment promise is not required. Generic crypto discussion, generic upcoming-token-launch signals, USDT/arbitrage/payment promotions, job-seeking, bot posts, free media/vendor offers, agency sales pitches (including influencer/streamer networks selling FTDs or traffic), affiliate/partner recruitment ads, and paid-promotion reseller recruitment are excluded. Indirect growth problems are accepted only when marketing/audience/visibility context is present. This is rule-based, not a full language model: slang-heavy, multilingual, or context-dependent requests can still be missed or misclassified. Review every candidate before outreach.
-- Each scan run processes at most 100 unique incoming messages: up to 30 from public search first, then up to 70 from joined groups. Joined groups rotate between runs after the last visited group, and each group is capped at `MAX_MESSAGES_PER_GROUP_PER_RUN` messages per run (default 10), so one busy group cannot starve the rest. Public-search phrases rotate round-robin so a busy query cannot starve later phrases. Both public-search message/query cursors and joined-group message cursors are saved so the next scheduled run resumes where it stopped. GitHub Actions is scheduled every two hours (UTC). The first joined-group scan checks accessible history from the last `LOOKBACK_DAYS` days. Each GitHub Actions job has a 40-minute timeout and the worker scan budget is 1,920 seconds (32 minutes).
+- Each scan run processes at most 100 messages from joined groups only. Groups rotate between runs after the last visited group, and each group is capped at `MAX_MESSAGES_PER_GROUP_PER_RUN` messages per run (default 10), so one busy group cannot starve the rest. Per-group message cursors are saved so the next run resumes where it stopped. GitHub Actions is scheduled every two hours (UTC). The first scan for a group checks accessible history from the last `LOOKBACK_DAYS` days. Each GitHub Actions job has a 40-minute timeout and the worker scan budget is 1,920 seconds (32 minutes).
 - Joined-group messages are processed oldest-first. The saved per-group message cursor resumes any remaining backlog on the next run.
-- Global public-group searches run against a list of buyer-intent phrases. A per-query timestamp is saved only after all result pages complete, so an interrupted or rate-limited query is retried rather than silently skipped.
-- The global search pass is incremental by query time and uses Telegram's regular global group search. It does not use the separate paid global public-channel post-search method.
 - If saving or resolving a candidate fails, that group's cursor is held so the failed message can be retried.
 - The worker ignores messages sent by the account owner, bot accounts, and anonymous group/channel identities that cannot be verified as a human user.
 - No public username, project identity, or link is invented.
 
 ## Required private configuration
-The scheduled GitHub Actions workflow needs these six repository secrets for scanning, plus two optional secrets for Telegram lead alerts:
+The scheduled GitHub Actions workflow needs these six repository secrets for scanning joined groups only, plus two optional secrets for Telegram lead alerts:
 
 - `TELEGRAM_API_ID`
 - `TELEGRAM_API_HASH`
@@ -66,7 +61,7 @@ python session_login.py
 
 The helper asks for your Telegram API ID, API Hash, phone number, login code, and (if enabled) 2-step password. Enter them only in your own Termux terminal. It then prints a private StringSession. Copy that value directly into the GitHub Actions secret named `TELEGRAM_SESSION_STRING` at the repository's [Actions secrets page](https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter/settings/secrets/actions). Never send it to anyone. If a command fails, share only the error text with all phone numbers, codes, API values, and session strings removed.
 
-After saving the secret, run the [AENZO Telegram Group Lead Scan workflow](https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter/actions/workflows/telegram-scan.yml). A successful syntax check is not a real scan; confirm that the Telegram scan step itself completes. The GitHub Actions job tests the qualification rules before scanning. The scheduled worker currently uses `GLOBAL_SEARCH_MAX_PAGES=3` per date window, recursively splits saturated date windows, and caps each run at 100 unique messages (30 public-search messages first, then up to 70 joined-group messages). GitHub Actions runs every two hours (UTC), with a 32-minute scan budget. The optional Render configuration is separate: it polls every four hours with a 22-minute budget. Do not activate Render while GitHub Actions is scanning, or duplicate scans and extra Telegram rate-limit pressure may result.
+After saving the secret, run the [AENZO Telegram Group Lead Scan workflow](https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter/actions/workflows/telegram-scan.yml). A successful syntax check is not a real scan; confirm that the Telegram scan step itself completes. The GitHub Actions job tests the qualification rules before scanning. The worker caps each run at 100 messages from joined groups only, with a 32-minute scan budget. GitHub Actions runs every two hours (UTC). The optional Render configuration is separate: it polls every four hours with a 22-minute budget. Do not activate Render while GitHub Actions is scanning, or duplicate scans and extra Telegram rate-limit pressure may result.
 
 If Termux cannot install the pinned dependencies or the Telegram login fails, stop and share the redacted error text. Do not switch to an untrusted runtime or pay for hosting.
 
@@ -74,7 +69,7 @@ If Termux cannot install the pinned dependencies or the Telegram login fails, st
 The workflow is:
 https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter/actions/workflows/telegram-scan.yml
 
-It supports manual runs and a two-hour schedule (UTC). Each run scans once and exits; it does not keep a server running. Use either GitHub Actions or the optional Render worker as the active scanner, not both, to avoid duplicate Telegram scanning and unnecessary rate-limit pressure. When `AENZO_BOT_TOKEN` and `AENZO_BOT_CHAT_ID` are configured, it sends saved leads whose status is `new` and whose `telegram_notified_at` is empty, with evidence, source link, public contacts, priority, and English/Bengali outreach. It sends up to 25 pending leads per scan; unsent alerts remain pending and are retried on later scans. **Existing records are not automatically marked as handled.** Before enabling bot alerts for the first time, review old records: any historical row still marked `new` with an empty notification timestamp will be sent. Rejected records are excluded.
+It supports manual runs and a two-hour schedule (UTC). Each run scans only groups already joined by the connected Telegram account, then exits; it does not keep a server running. Use either GitHub Actions or the optional Render worker as the active scanner, not both, to avoid duplicate Telegram scanning and unnecessary rate-limit pressure. When `AENZO_BOT_TOKEN` and `AENZO_BOT_CHAT_ID` are configured, it sends saved leads whose status is `new` and whose `telegram_notified_at` is empty, with evidence, source link, public contacts, priority, and English/Bengali outreach. It sends up to 25 pending leads per scan; unsent alerts remain pending and are retried on later scans. **Existing records are not automatically marked as handled.** Before enabling bot alerts for the first time, review old records: any historical row still marked `new` with an empty notification timestamp will be sent. Rejected records are excluded.
 
 A green **Python syntax and dependency check** proves only that the code compiles and its rule tests pass. A green **AENZO Telegram Group Lead Scan** run proves a real scan only if the log shows that all credentials were configured, dependencies installed, and the Telegram scan step completed. A safe skip is not a scan.
 
