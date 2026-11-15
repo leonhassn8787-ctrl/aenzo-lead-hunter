@@ -665,14 +665,9 @@ def classify(text):
     if not buyer_intent.search(text) and not indirect_growth:
         return []
 
-    # Vague KOL questions are not buying intent unless tied to a real project/campaign.
-    if "KOL & Influencer Marketing" in hits and not KOL_PROJECT_CONTEXT.search(text):
-        return []
-
-    # Recruitment must be an employer-side request, not a member asking whether
-    # someone might need their services or advertising their availability.
-    if "Recruitment" in hits and not RECRUITMENT_BUYER_CONTEXT.search(text):
-        return []
+    # Buyer intent and project context are checked by the shared evidence
+    # verifier below. Avoid narrower legacy KOL/recruitment regex gates here:
+    # they incorrectly discard genuine project-side requests with new wording.
 
     # Do not turn technical token-launch requests into marketing prospects.
     if technical_only.search(text) and not marketing_intent.search(text):
@@ -717,6 +712,10 @@ def classify(text):
         else:
             return []
 
+    # Keep discovery and post-scan audit decisions consistent. A classifier
+    # label alone is not enough; the original message must prove buyer intent.
+    if not verify_buyer_evidence(text):
+        return []
     return hits
 
 
