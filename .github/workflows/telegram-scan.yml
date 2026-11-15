@@ -208,11 +208,9 @@ jobs:
           AENZO_BOT_CHAT_IDS: ${{ secrets.AENZO_BOT_CHAT_IDS }}
           STATE_FILE: scan_state.json
           LOOKBACK_DAYS: "30"
-          GLOBAL_SEARCH_MAX_PAGES: "3"
           SCAN_BUDGET_SECONDS: "1920"
           MAX_MESSAGES_PER_RUN: "100"
-          MAX_JOINED_MESSAGES_PER_RUN: "70"
-          MAX_PUBLIC_MESSAGES_PER_RUN: "30"
+          MAX_JOINED_MESSAGES_PER_RUN: "100"
           MAX_MESSAGES_PER_GROUP_PER_RUN: "10"
         run: python worker.py --once
 
