@@ -11,11 +11,6 @@ on:
   schedule:
     # Saudi Arabia local time: every two hours at :10 (UTC even hours).
     - cron: "10 0,2,4,6,8,10,12,14,16,18,20,22 * * *"
-  push:
-    # Run once when this workflow is updated, so the new scan configuration is
-    # exercised immediately instead of waiting for the next scheduled window.
-    paths:
-      - ".github/workflows/telegram-scan.yml"
 
 permissions:
   contents: read
@@ -89,6 +84,37 @@ jobs:
       - name: Install dependencies
         if: steps.preflight.outputs.configured == 'true'
         run: python -m pip install -r telegram-worker/requirements.txt
+
+      - name: Check optional Telegram alert configuration
+        if: steps.preflight.outputs.configured == 'true'
+        env:
+          AENZO_BOT_TOKEN: ${{ secrets.AENZO_BOT_TOKEN }}
+          AENZO_BOT_CHAT_ID: ${{ secrets.AENZO_BOT_CHAT_ID }}
+          AENZO_BOT_CHAT_IDS: ${{ secrets.AENZO_BOT_CHAT_IDS }}
+        run: |
+          python - <<'PY'
+          import os
+          token = bool(os.getenv("AENZO_BOT_TOKEN", "").strip())
+          chats = [
+              value.strip()
+              for value in (
+                  os.getenv("AENZO_BOT_CHAT_ID", "") + "," +
+                  os.getenv("AENZO_BOT_CHAT_IDS", "")
+              ).split(",")
+              if value.strip()
+          ]
+          if token and chats:
+              print(f"PASS: Telegram lead alerts configured for {len(set(chats))} chat(s).")
+          else:
+              message = (
+                  "WARNING: Telegram lead alerts are DISABLED. "
+                  "Set both AENZO_BOT_TOKEN and at least one chat ID "
+                  "(AENZO_BOT_CHAT_ID or AENZO_BOT_CHAT_IDS) in GitHub Actions secrets."
+              )
+              print(message)
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+                  summary.write("### Telegram lead alerts\n\n" + message + "\n")
+          PY
 
       - name: Validate Telegram session format
         id: session
