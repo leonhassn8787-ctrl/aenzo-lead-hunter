@@ -908,7 +908,7 @@ async def audit_current_scan_leads(client_http, scan_started_at):
     """Keep uncertain candidates in review; only clear seller/non-buyer evidence is cancelled."""
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
     url = f"{SUPABASE_URL}/rest/v1/leads"
-    params = {
+    base_params = {
         "select": "id,evidence_summary,service_need,notes,priority_score",
         "owner_id": f"eq.{SUPABASE_OWNER_ID}",
         "status": "eq.new",
@@ -916,11 +916,22 @@ async def audit_current_scan_leads(client_http, scan_started_at):
     }
     audited = rejected = verified = review = 0
     try:
-        response = await client_http.get(url, headers=headers, params=params, timeout=30)
-        if response.status_code != 200:
-            log.error("Post-scan audit could not load leads (%s): %s", response.status_code, response.text[:400])
-            return {"audited": 0, "rejected": 0, "verified": 0, "review": 0, "ok": False}
-        for lead in response.json():
+        # Fetch every page before changing statuses. Updating rows while using
+        # offset pagination would shift the remaining result set and skip leads.
+        pending = []
+        offset = 0
+        while True:
+            params = {**base_params, "offset": str(offset)}
+            response = await client_http.get(url, headers=headers, params=params, timeout=30)
+            if response.status_code != 200:
+                log.error("Post-scan audit could not load leads (%s): %s", response.status_code, response.text[:400])
+                return {"audited": 0, "rejected": 0, "verified": 0, "review": 0, "ok": False}
+            page = response.json()
+            pending.extend(page)
+            if len(page) < 200:
+                break
+            offset += len(page)
+        for lead in pending:
             audited += 1
             evidence = str(lead.get("evidence_summary") or "").strip()
             stored_need = str(lead.get("service_need") or "").strip()
@@ -1099,16 +1110,52 @@ async def notify_pending_leads(http, scan_started_at=None):
 
 
 
-async def start_scan_run(http):
-    """Create a durable Supabase scan_runs record for each Telegram scan cycle."""
+async def scan_window_already_recorded(http, window_start):
+    """Fail closed if this exact two-hour window has already started in Supabase."""
+    url = f"{SUPABASE_URL}/rest/v1/scan_runs"
+    headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
+    try:
+        response = await http.get(
+            url,
+            headers=headers,
+            params={
+                "select": "id,status",
+                "owner_id": "eq." + SUPABASE_OWNER_ID,
+                "error_summary": "like.*" + window_start.isoformat() + "*",
+                "limit": "1",
+            },
+            timeout=20,
+        )
+        if response.status_code != 200:
+            raise RuntimeError(
+                "Could not verify whether this two-hour window was already scanned "
+                f"(HTTP {response.status_code}): {response.text[:300]}"
+            )
+        return bool(response.json())
+    except Exception:
+        log.exception("Could not verify two-hour window uniqueness.")
+        raise
+
+
+async def start_scan_run(http, window_start, window_end):
+    """Create a durable scan record containing its window before scanning begins."""
     url = f"{SUPABASE_URL}/rest/v1/scan_runs"
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
     headers["Prefer"] = "return=representation"
+    window_marker = {
+        "window_start": window_start.isoformat(),
+        "window_end": window_end.isoformat(),
+        "phase": "running",
+    }
     try:
         response = await http.post(
             url,
             headers=headers,
-            json={"owner_id": SUPABASE_OWNER_ID, "status": "running"},
+            json={
+                "owner_id": SUPABASE_OWNER_ID,
+                "status": "running",
+                "error_summary": json.dumps(window_marker, separators=(",", ":")),
+            },
             timeout=20,
         )
         if response.status_code not in (200, 201):
@@ -1129,6 +1176,8 @@ async def finish_scan_run(http, run_id, stats):
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
     headers["Prefer"] = "return=minimal"
     telemetry = {
+        "window_start": stats.get("window_start"),
+        "window_end": stats.get("window_end"),
         "joined_groups_scanned": stats.get("joined_groups_scanned", 0),
         "joined_messages_processed": stats.get("joined_messages_processed", 0),
         "joined_messages_checked": stats.get("joined_messages_checked", 0),
@@ -1270,7 +1319,19 @@ async def run(once=False):
                 )
                 break
             window_start, window_end = current_window
-            scan_run_id = await start_scan_run(http)
+            if await scan_window_already_recorded(http, window_start):
+                log.info(
+                    "Two-hour window %s to %s was already started in a previous run; "
+                    "skipping it to prevent duplicate scans.",
+                    window_start.isoformat(), window_end.isoformat(),
+                )
+                break
+            scan_run_id = await start_scan_run(http, window_start, window_end)
+            if not scan_run_id:
+                raise RuntimeError(
+                    "Could not create a durable Supabase scan_runs record; "
+                    "refusing to start an untracked Telegram scan."
+                )
             scan_started_at_utc = window_start.isoformat()
             log.info("Two-hour window UTC: %s to %s", window_start.isoformat(), window_end.isoformat())
             checked = 0
