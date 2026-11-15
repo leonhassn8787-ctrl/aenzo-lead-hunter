@@ -132,8 +132,8 @@ class LeadSignalTests(unittest.TestCase):
     def test_post_scan_audit_runs_before_new_lead_notifications(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("async def audit_current_scan_leads", source)
-        self.assertIn("post_scan_audit: buyer_intent_not_proven_from_source_evidence", source)
-        self.assertIn("Re-audit every active candidate, including previously notified leads; reject unproven evidence", source)
+        self.assertIn("post_scan_audit: buyer_intent_uncertain_manual_review_required", source)
+        self.assertIn("Re-audit every active candidate; retain uncertain evidence for manual review", source)
         self.assertIn("def verify_buyer_evidence(text):", source)
         self.assertIn("buyer_intent_verified; service_label_repaired", source)
         self.assertIn("source_evidence_does_not_prove_buyer_intent", source)
