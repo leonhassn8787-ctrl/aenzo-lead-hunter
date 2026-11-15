@@ -1131,7 +1131,7 @@ async def save_lead(client_http, payload):
         return "error"
 
 async def audit_current_scan_leads(client_http, scan_started_at):
-    """Re-audit every active candidate, including previously notified leads; reject unproven evidence."""
+    """Keep uncertain candidates in review; only clear seller/non-buyer evidence is cancelled."""
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
     url = f"{SUPABASE_URL}/rest/v1/leads"
     params = {
@@ -1140,36 +1140,42 @@ async def audit_current_scan_leads(client_http, scan_started_at):
         "status": "eq.new",
         "order": "created_at.asc", "limit": "200",
     }
-    audited = rejected = verified = 0
+    audited = rejected = verified = review = 0
     try:
         response = await client_http.get(url, headers=headers, params=params, timeout=30)
         if response.status_code != 200:
             log.error("Post-scan audit could not load leads (%s): %s", response.status_code, response.text[:400])
-            return {"audited": 0, "rejected": 0, "verified": 0, "ok": False}
+            return {"audited": 0, "rejected": 0, "verified": 0, "review": 0, "ok": False}
         for lead in response.json():
             audited += 1
             evidence = str(lead.get("evidence_summary") or "").strip()
             stored_need = str(lead.get("service_need") or "").strip()
             seller = bool(SELLER_AD_CONTEXT.search(evidence) or SELLER_POST_CONTEXT.search(evidence) or SELLER_PITCH_CONTEXT.search(evidence))
-            # A candidate that passed the established classifier must not be
-            # discarded by a narrower audit regex. The audit accepts either
-            # the independent verifier or the original qualified classifier.
             proven = len(evidence) >= 25 and not seller and (
                 verify_buyer_evidence(evidence) or bool(classify(evidence))
             )
             if not proven:
-                reason = "post_scan_audit: buyer_intent_not_proven_from_source_evidence"
+                # A clear seller pitch is cancelled; ambiguous or incomplete evidence
+                # is retained for the owner's manual review instead of being lost.
+                target_status = "rejected" if seller else "review"
+                reason = "post_scan_audit: clear_service_seller_or_nonbuyer" if seller else "post_scan_audit: buyer_intent_uncertain_manual_review_required"
                 notes = (str(lead.get("notes") or "").strip() + " | " + reason).strip(" |")[:4000]
-                patch = await client_http.patch(url, headers={**headers, "Prefer": "return=minimal"}, params={"id": "eq." + str(lead["id"]), "owner_id": "eq." + SUPABASE_OWNER_ID, "status": "eq.new"}, json={"status": "rejected", "notes": notes}, timeout=30)
-                if patch.status_code in (200, 204):
+                patch = await client_http.patch(
+                    url, headers={**headers, "Prefer": "return=minimal"},
+                    params={"id": "eq." + str(lead["id"]), "owner_id": "eq." + SUPABASE_OWNER_ID, "status": "eq.new"},
+                    json={"status": target_status, "notes": notes}, timeout=30
+                )
+                if patch.status_code not in (200, 204):
+                    log.error("Post-scan audit could not update lead %s (%s): %s", lead["id"], patch.status_code, patch.text[:300])
+                    return {"audited": audited, "rejected": rejected, "verified": verified, "review": review, "ok": False}
+                if seller:
                     rejected += 1
-                    log.info("Post-scan audit rejected unproven candidate %s.", lead["id"])
+                    log.info("Post-scan audit cancelled clear seller/non-buyer candidate %s.", lead["id"])
                 else:
-                    log.error("Post-scan audit could not reject lead %s (%s): %s", lead["id"], patch.status_code, patch.text[:300])
-                    return {"audited": audited, "rejected": rejected, "verified": verified, "ok": False}
+                    review += 1
+                    log.info("Post-scan audit retained uncertain candidate %s for manual review.", lead["id"])
                 continue
 
-            # A classifier/service-label mismatch cannot erase a proven buyer.
             inferred = classify(evidence)
             repaired_need = "; ".join(inferred) if inferred else (stored_need or "Project Promotion")
             if repaired_need != stored_need:
@@ -1177,14 +1183,13 @@ async def audit_current_scan_leads(client_http, scan_started_at):
                 patch = await client_http.patch(url, headers={**headers, "Prefer": "return=minimal"}, params={"id": "eq." + str(lead["id"]), "owner_id": "eq." + SUPABASE_OWNER_ID, "status": "eq.new"}, json={"service_need": repaired_need, "notes": notes}, timeout=30)
                 if patch.status_code not in (200, 204):
                     log.error("Could not repair service label for verified lead %s (%s): %s", lead["id"], patch.status_code, patch.text[:300])
-                    return {"audited": audited, "rejected": rejected, "verified": verified, "ok": False}
+                    return {"audited": audited, "rejected": rejected, "verified": verified, "review": review, "ok": False}
             verified += 1
-        log.info("Post-scan evidence audit complete: %s checked, %s verified buyers kept, %s unproven candidates rejected.", audited, verified, rejected)
-        return {"audited": audited, "rejected": rejected, "verified": verified, "ok": True}
+        log.info("Post-scan evidence audit complete: %s checked, %s verified buyers kept, %s held for review, %s clear sellers/non-buyers cancelled.", audited, verified, review, rejected)
+        return {"audited": audited, "rejected": rejected, "verified": verified, "review": review, "ok": True}
     except Exception:
         log.exception("Post-scan lead audit failed.")
-        return {"audited": audited, "rejected": rejected, "verified": verified, "ok": False}
-
+        return {"audited": audited, "rejected": rejected, "verified": verified, "review": review, "ok": False}
 
 
 def format_telegram_lead(lead):
