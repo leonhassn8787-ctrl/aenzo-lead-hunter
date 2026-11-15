@@ -446,7 +446,7 @@ RECRUITMENT_BUYER_CONTEXT = re.compile(
 KOL_PROJECT_CONTEXT = re.compile(
     r"\b("
     r"(our|the) (new |upcoming |launched )?(web3|crypto|blockchain|ai|defi|cefi) (game|app|startup|project|token|launchpad|wallet|exchange|platform|ecosystem|protocol|campaign)|"
-    r"(our|the) (web3 |crypto |ai |defi |cefi )?(project|token|launch|campaign|protocol|wallet|exchange|platform|community|ecosystem)|
+    r"(our|the) (web3 |crypto |ai |defi |cefi )?(project|token|launch|campaign|protocol|wallet|exchange|platform|community|ecosystem)|"
     r"for our (web3|crypto|token|project|launch|campaign|exchange|platform|ecosystem)|"
     r"(web3|crypto|ai agent|defi|cefi|cex) (launch|project|ecosystem|exchange|platform)|"
     r"token launch|token sale|exchange volume|web3 launch|crypto launch|paid (kol|influencer) campaign|kol campaign|influencer campaign|"
