@@ -1438,19 +1438,24 @@ async def run(once=False):
     if reset_group_quality_metrics(state):
         write_state(state)
     groups_state = state.setdefault("groups", {})
-    # A fixed anchor defines consecutive two-hour windows. Missed windows expire.
-    if not state.get("initial_scan_since"):
-        initial_start = os.getenv("INITIAL_SCAN_START_AT", "").strip()
-        if initial_start:
-            try:
-                initial_dt = datetime.fromisoformat(initial_start.replace("Z", "+00:00"))
-                if initial_dt.tzinfo is None:
-                    initial_dt = initial_dt.replace(tzinfo=timezone.utc)
-            except ValueError as exc:
-                raise RuntimeError("INITIAL_SCAN_START_AT must be an ISO-8601 timestamp.") from exc
-        else:
-            initial_dt = datetime.now(timezone.utc)
-        state["initial_scan_since"] = initial_dt.astimezone(timezone.utc).isoformat()
+    # The configured anchor is authoritative across GitHub Actions and any
+    # optional worker instance. This prevents each host from inventing a
+    # different window schedule from its own first boot time.
+    initial_start = os.getenv("INITIAL_SCAN_START_AT", "").strip()
+    if initial_start:
+        try:
+            initial_dt = datetime.fromisoformat(initial_start.replace("Z", "+00:00"))
+            if initial_dt.tzinfo is None:
+                initial_dt = initial_dt.replace(tzinfo=timezone.utc)
+        except ValueError as exc:
+            raise RuntimeError("INITIAL_SCAN_START_AT must be an ISO-8601 timestamp.") from exc
+        configured_anchor = initial_dt.astimezone(timezone.utc).isoformat()
+        if state.get("initial_scan_since") != configured_anchor:
+            log.info("Applying the configured two-hour scan anchor to saved state.")
+            state["initial_scan_since"] = configured_anchor
+            write_state(state)
+    elif not state.get("initial_scan_since"):
+        state["initial_scan_since"] = datetime.now(timezone.utc).isoformat()
         for group_meta in groups_state.values():
             group_meta["last_seen_id"] = 0
             group_meta["paused_until"] = None
