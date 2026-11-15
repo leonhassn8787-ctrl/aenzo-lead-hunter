@@ -775,11 +775,9 @@ def verify_buyer_evidence(text):
         return False
     if not buyer_request and not (indirect_growth and service_need):
         return False
-    if re.search(r"\b(kol|kols|influencers?)\b", text, re.I) and not KOL_PROJECT_CONTEXT.search(text):
-        return False
-    if re.search(r"\b(recruit|hiring|hire|moderator|community manager|developer)\b", text, re.I):
-        if not RECRUITMENT_BUYER_CONTEXT.search(text):
-            return False
+    # project_context is already mandatory above. Do not apply narrower
+    # KOL/recruitment wording gates here: they reject legitimate requests such
+    # as "our new crypto game needs KOLs" or "hire moderators for our DeFi app".
     return True
 
 
