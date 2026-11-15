@@ -729,27 +729,27 @@ def verify_buyer_evidence(text):
     if NON_BUYER_CONTEXT.search(text) and not (
         CRYPTO_CONTEXT.search(text)
         and re.search(
-            r"\\b(early users?|early adopters?|beta testers?|product feedback|mvp testing|"
+            r"\b(early users?|early adopters?|beta testers?|product feedback|mvp testing|"
             r"looking to hire .{0,60}(kol|kols|influencer|marketing|growth)|"
-            r"hiring .{0,60}(kol|kols|influencer|marketing|growth))\\b",
+            r"hiring .{0,60}(kol|kols|influencer|marketing|growth))\b",
             text, re.I,
         )
     ):
         return False
 
     buyer_request = BUYING_CONTEXT.search(text) or re.search(
-        r"\\b(we need|we're seeking|we are seeking|want to hire|ready to hire|"
-        r"can you promote|please promote|help us promote|need a partner)\\b",
+        r"\b(we need|we're seeking|we are seeking|want to hire|ready to hire|"
+        r"can you promote|please promote|help us promote|need a partner)\b",
         text, re.I,
     )
     indirect_growth = re.search(
-        r"\\b(struggling to|having trouble|not getting (enough|many)|"
+        r"\b(struggling to|having trouble|not getting (enough|many)|"
         r"trying to (increase|grow|attract|reach)|want to (grow|increase|attract|reach)|"
-        r"could use more|how can we (get|attract|reach|grow|increase))\\b",
+        r"could use more|how can we (get|attract|reach|grow|increase))\b",
         text, re.I,
     )
     service_need = re.search(
-        r"\\b(kol|kols|influencers?|marketing|promotion|promote|"
+        r"\b(kol|kols|influencers?|marketing|promotion|promote|"
         r"community (growth|promotion|management)|telegram promotion|"
         r"pr agency|media coverage|press release|ama hosting|"
         r"giveaway campaign|airdrop campaign|social media management|"
@@ -760,21 +760,21 @@ def verify_buyer_evidence(text):
         r"product testing|product review|product feedback|mvp testing|"
         r"video production|graphic design|fundraising promotion|"
         r"exchange promotion|wallet promotion|gamefi promotion|"
-        r"staking promotion|mining promotion)\\b",
+        r"staking promotion|mining promotion)\b",
         text, re.I,
     )
     project_context = CRYPTO_CONTEXT.search(text) or re.search(
-        r"\\b(project|product|app|platform|website|software|saas|"
-        r"digital product|startup|brand|game|exchange|wallet)\\b",
+        r"\b(project|product|app|platform|website|software|saas|"
+        r"digital product|startup|brand|game|exchange|wallet)\b",
         text, re.I,
     )
     if not project_context or not service_need:
         return False
     if not buyer_request and not (indirect_growth and service_need):
         return False
-    if re.search(r"\\b(kol|kols|influencers?)\\b", text, re.I) and not KOL_PROJECT_CONTEXT.search(text):
+    if re.search(r"\b(kol|kols|influencers?)\b", text, re.I) and not KOL_PROJECT_CONTEXT.search(text):
         return False
-    if re.search(r"\\b(recruit|hiring|hire|moderator|community manager|developer)\\b", text, re.I):
+    if re.search(r"\b(recruit|hiring|hire|moderator|community manager|developer)\b", text, re.I):
         if not RECRUITMENT_BUYER_CONTEXT.search(text):
             return False
     return True
