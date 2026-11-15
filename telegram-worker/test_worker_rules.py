@@ -1309,7 +1309,7 @@ class TelegramNotificationGateTests(unittest.TestCase):
             if isinstance(item, ast.FunctionDef)
             and item.name == "telegram_notification_block_reason"
         )
-        namespace = {"re": re}
+        namespace = {"re": re, "classify": lambda evidence: ["Project Promotion"] if "our crypto project needs a paid marketing campaign" in evidence.lower() else []}
         needed_constants = {
             "BUYING_CONTEXT", "CRYPTO_CONTEXT", "NON_BUYER_CONTEXT",
             "SELLER_AD_CONTEXT", "SELLER_POST_CONTEXT", "SELLER_PITCH_CONTEXT",
