@@ -1171,7 +1171,7 @@ async def send_scan_report(http, stats):
         f"Joined groups available: {stats.get('joined_groups_available', 0)}\n"
         f"Joined groups checked: {stats.get('joined_groups_scanned', 0)}\n"
         f"Joined groups paused: {stats.get('groups_paused', 0)}\n"
-        f"Joined-group messages processed: {stats.get('joined_messages_processed', 0):,}\\n"
+        f"Joined-group messages processed: {stats.get('joined_messages_processed', 0):,}\n"
         f"Joined-group messages checked: {stats.get('joined_messages_checked', 0):,}\n"
         f"Joined-group buyer signals: {stats.get('joined_buyer_signals', 0):,}\n"
         f"Joined-group leads saved: {stats.get('joined_leads_saved', 0)}\n"
