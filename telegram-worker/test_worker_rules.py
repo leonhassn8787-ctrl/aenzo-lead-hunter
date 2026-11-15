@@ -69,6 +69,12 @@ class LeadSignalTests(unittest.TestCase):
             )
         exec(compile(ast.Module(body=[classify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
         cls.classify = staticmethod(namespace["classify"])
+        verify_node = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "verify_buyer_evidence"
+        )
+        exec(compile(ast.Module(body=[verify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
+        cls.verify_buyer_evidence = staticmethod(namespace["verify_buyer_evidence"])
         priority_node = next(
             node for node in tree.body
             if isinstance(node, ast.FunctionDef) and node.name == "priority"
@@ -127,7 +133,7 @@ class LeadSignalTests(unittest.TestCase):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("async def audit_current_scan_leads", source)
         self.assertIn("post_scan_audit: buyer_intent_not_proven_from_source_evidence", source)
-        self.assertIn("never reject a plausible buyer on classifier disagreement", source)
+        self.assertIn("Only pass evidence-backed buyers; reject every unproven candidate", source)
         self.assertIn("def verify_buyer_evidence(text):", source)
         self.assertIn("buyer_intent_verified; service_label_repaired", source)
         self.assertIn("source_evidence_does_not_prove_buyer_intent", source)
@@ -139,6 +145,27 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("audit_result = await audit_current_scan_leads(http, scan_started_at_utc)", source)
         self.assertLess(source.index("audit_result = await audit_current_scan_leads"), source.index("await notify_pending_leads(http, scan_started_at_utc)", source.index("audit_result = await audit_current_scan_leads")))
         self.assertIn("pending-lead notifications withheld for safety", source)
+    def test_evidence_verifier_keeps_proven_project_buyers(self):
+        posts = [
+            "Our blockchain project is looking for a marketing agency for launch promotion.",
+            "We need paid KOL marketing for our crypto wallet project.",
+            "We are seeking beta testers for our Web3 wallet and product feedback.",
+        ]
+        for post in posts:
+            with self.subTest(post=post):
+                self.assertTrue(self.verify_buyer_evidence(post))
+
+    def test_evidence_verifier_rejects_unproven_or_seller_posts(self):
+        posts = [
+            "I offer crypto marketing services and promotion packages.",
+            "Anyone want to exchange free cross-promotion with our project?",
+            "We need a Solidity auditor for our blockchain project.",
+            "Looking for users.",
+        ]
+        for post in posts:
+            with self.subTest(post=post):
+                self.assertFalse(self.verify_buyer_evidence(post))
+
     def test_global_search_scans_groups_without_joining(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("SearchGlobalRequest", source)
