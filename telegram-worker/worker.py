@@ -1236,53 +1236,6 @@ async def send_telegram_to_all(http, message, timeout=30):
     return not errors, errors
 
 
-async def notify_saved_lead(http, dedupe_key):
-    """Send a newly inserted qualified lead immediately, without waiting for scan completion."""
-    if not BOT_TOKEN or not BOT_CHAT_IDS:
-        return
-    headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
-    url = SUPABASE_URL + "/rest/v1/leads"
-    params = {
-        "select": "id,company_name,service_need,priority_score,evidence_date,evidence_summary,evidence_url,telegram_group_url,contacts,outreach_english,outreach_bengali",
-        "owner_id": "eq." + SUPABASE_OWNER_ID,
-        "dedupe_key": "eq." + str(dedupe_key),
-        "telegram_notified_at": "is.null",
-        "limit": "1",
-    }
-    try:
-        response = await http.get(url, headers=headers, params=params, timeout=15)
-        if response.status_code != 200:
-            log.warning("Could not load newly saved lead for immediate alert: %s", response.text[:300])
-            return
-        rows = response.json()
-        if not rows:
-            log.warning("Newly saved lead was not returned for immediate notification.")
-            return
-        lead = rows[0]
-        reason = telegram_notification_block_reason(lead)
-        if reason:
-            log.info("Immediate Telegram alert held for lead %s: %s", lead.get("id"), reason)
-            return
-        delivered, errors = await send_telegram_to_all(http, format_telegram_lead(lead), timeout=20)
-        if not delivered:
-            log.warning("Immediate Telegram alert failed for lead %s: %s", lead.get("id"), "; ".join(errors)[:500])
-            return
-        marked = await http.patch(
-            url,
-            headers=headers,
-            params={"id": "eq." + str(lead.get("id")), "owner_id": "eq." + SUPABASE_OWNER_ID},
-            json={"telegram_notified_at": datetime.now(timezone.utc).isoformat(), "telegram_notification_error": None},
-            timeout=15,
-        )
-        if marked.status_code not in (200, 204):
-            log.error("Immediate alert sent for lead %s but delivery timestamp was not saved (%s).", lead.get("id"), marked.status_code)
-        else:
-            log.info("Immediate Telegram alert delivered for new lead %s.", lead.get("id"))
-    except Exception:
-        # Do not interrupt scanning; the end-of-run pending queue retries it.
-        log.exception("Immediate notification failed for newly saved lead; it remains pending for retry.")
-
-
 async def notify_pending_leads(http, scan_started_at=None):
     if not BOT_TOKEN or not BOT_CHAT_IDS:
         log.info('Telegram bot alerts not configured; scanning continues.')
