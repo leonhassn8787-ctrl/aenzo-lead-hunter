@@ -78,8 +78,14 @@ BUYING = re.compile(
 INCIDENT = re.compile(r"\b(breach|hack(?:ed|ing)?|exploit(?:ed)?|attack(?:ed)?|scam|fraud|lawsuit|vulnerability|outage|liquidation|liquidated|price prediction|market update|rug pull|phishing|stolen funds|drained|compromised|data leak|security incident|bankruptcy|insolvency|investigation)\b", re.I)
 GENERIC_DIRECTORY = re.compile(r"funding rounds, token sale review & tokenomics analysis", re.I)
 VENDOR = re.compile(
-    r"\b(we offer|we provide|our services|marketing packages|"
-    r"available for promotion|dm for rates|buy our|sell our)\b", re.I
+    r"\b(we offer|we provide|we deliver|we sell|we supply|"
+    r"our services|marketing packages|kol services|influencer services|"
+    r"available for promotion|available for paid promotions?|"
+    r"dm for rates|contact us for pricing|book a call|"
+    r"buy our|sell our|"
+    r"we are (a|an) (web3 |crypto )?(marketing|promotion|influencer|kol|advertising|growth) agency|"
+    r"we help (web3 |crypto )?projects with (marketing|promotion|growth|influencer|kol)|"
+    r"looking for (new )?(clients|projects) (to promote|for promotion|for marketing))\b", re.I
 )
 
 def api(method, path, payload=None, prefer=None):
