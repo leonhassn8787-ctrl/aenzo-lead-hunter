@@ -294,7 +294,7 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_notification_alerts_fetch_all_pages_before_sending(self):
         source = WORKER.read_text(encoding="utf-8")
-        start = source.index("async def notify_pending_leads(http, scan_started_at=None):")
+        start = source.index("async def notify_pending_leads(http):")
         end = source.index("async def send_scan_report", start)
         notify = source[start:end]
         self.assertIn("'offset': str(offset)", notify)
@@ -1404,11 +1404,11 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         start = source.index("async def notify_pending_leads")
         end = source.index("async def send_scan_report", start)
         notification_code = source[start:end]
-        self.assertIn("'status': 'eq.new'", notification_code)
-        self.assertIn("'telegram_notified_at': 'is.null'", notification_code)
-        self.assertIn("'owner_id': 'eq.' + SUPABASE_OWNER_ID", notification_code)
-        self.assertIn("'limit': '100'", notification_code)
-        self.assertIn("'offset': str(offset)", notification_code)
+        self.assertIn('"status": "eq.new"', notification_code)
+        self.assertIn('"telegram_notified_at": "is.null"', notification_code)
+        self.assertIn('"owner_id": "eq." + SUPABASE_OWNER_ID', notification_code)
+        self.assertIn('"limit": "100"', notification_code)
+        self.assertIn('"offset": str(offset)', notification_code)
         self.assertIn('pending.extend(page)', notification_code)
 
     def test_worker_numeric_environment_settings_are_bounded(self):
@@ -1468,12 +1468,12 @@ class LeadDisplayLabelTests(unittest.TestCase):
 
     def test_pending_notifications_are_not_limited_to_current_scan_time(self):
         source = WORKER.read_text(encoding="utf-8")
-        start = source.index("async def notify_pending_leads(http, scan_started_at=None):")
+        start = source.index("async def notify_pending_leads(http):")
         end = source.index("\n\nasync def scan_window_already_recorded", start)
         block = source[start:end]
-        self.assertNotIn("'created_at':", block)
-        self.assertIn("'telegram_notified_at': 'is.null'", block)
-        self.assertIn("'order': 'created_at.asc,id.asc'", block)
+        self.assertNotIn('"created_at":', block)
+        self.assertIn('"telegram_notified_at": "is.null"', block)
+        self.assertIn('"order": "created_at.asc,id.asc"', block)
 
     def test_blocked_pending_leads_are_preserved_in_manual_review(self):
         source = WORKER.read_text(encoding="utf-8")
@@ -1557,6 +1557,25 @@ class LeadDisplayLabelTests(unittest.TestCase):
         block = source[start:end]
         self.assertIn('report_delivery_error', block)
         self.assertIn('disabled: bot token or chat ID is not configured', block)
+
+
+    def test_alert_delivery_counts_are_reported_and_persisted(self):
+        source = WORKER.read_text(encoding="utf-8")
+        finish_start = source.index("async def finish_scan_run")
+        finish_end = source.index("\n\nasync def mark_scan_run_failed", finish_start)
+        finish = source[finish_start:finish_end]
+        report_start = source.index("async def send_scan_report")
+        report_end = source.index("\n\nasync def login", report_start)
+        report = source[report_start:report_end]
+        for key in ("alerts_delivered", "alerts_failed", "leads_moved_to_review", "alert_load_error"):
+            self.assertIn('"' + key + '"', finish)
+            self.assertIn("stats.get('" + key + "'", report)
+
+    def test_audit_is_bound_to_the_exact_scan_run(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn('"source_scan_run_id": scan_run_id', source)
+        self.assertIn('"source_scan_run_id": "eq." + str(scan_run_id)', source)
+        self.assertIn("audit_current_scan_leads(http, scan_run_id)", source)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
