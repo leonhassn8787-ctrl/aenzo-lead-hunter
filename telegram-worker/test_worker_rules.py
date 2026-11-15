@@ -115,7 +115,7 @@ class LeadSignalTests(unittest.TestCase):
             node.name: node for node in tree.body
             if isinstance(node, ast.FunctionDef)
         }
-        pagination_namespace = {"MAX_MESSAGES_PER_GROUP": 200}
+        pagination_namespace = {}
         exec(compile(ast.Module(body=[helper_nodes["message_scan_kwargs"]], type_ignores=[]), str(WORKER), "exec"), pagination_namespace)
         cls.message_scan_kwargs = staticmethod(pagination_namespace["message_scan_kwargs"])
         headers_namespace = {}
@@ -274,18 +274,14 @@ class LeadSignalTests(unittest.TestCase):
         self.assertNotEqual(self.dedupe("group-a", 100), self.dedupe("group-a", 101))
         self.assertNotEqual(self.dedupe("group-a", 100), self.dedupe("group-b", 100))
 
-    def test_message_batches_are_oldest_first(self):
-        options = self.message_scan_kwargs(120, "cutoff")
+    def test_message_scan_is_date_windowed_and_old_backlog_is_not_requested(self):
+        from datetime import datetime, timezone
+        start = datetime(2026, 11, 16, 0, 0, tzinfo=timezone.utc)
+        options = self.message_scan_kwargs(start)
         self.assertTrue(options["reverse"])
-        self.assertEqual(options["min_id"], 120)
-
-    def test_first_message_batch_is_limited_to_recent_history(self):
-        options = self.message_scan_kwargs(0, "cutoff")
-        self.assertEqual(options["offset_date"], "cutoff")
-
-    def test_incremental_batch_keeps_backlog_even_after_lookback(self):
-        options = self.message_scan_kwargs(120, "cutoff")
-        self.assertNotIn("offset_date", options)
+        self.assertEqual(options["offset_date"], start)
+        self.assertNotIn("min_id", options)
+        self.assertNotIn("limit", options)
 
     def test_supabase_secret_is_not_sent_as_bearer_jwt(self):
         headers = self.supabase_headers("sb_secret_test")
@@ -1327,13 +1323,14 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         tree = ast.parse(WORKER.read_text(encoding="utf-8"))
         wanted = {
             "group_priority", "rotate_group_ids", "should_pause_group", "message_scan_kwargs",
-            "reset_group_quality_metrics",
+            "two_hour_window", "reset_group_quality_metrics",
         }
         nodes = [
             node for node in tree.body
             if isinstance(node, ast.FunctionDef) and node.name in wanted
         ]
-        namespace = {"CLASSIFIER_RULES_VERSION": 3}
+        from datetime import datetime, timedelta, timezone
+        namespace = {"CLASSIFIER_RULES_VERSION": 3, "datetime": datetime, "timedelta": timedelta, "timezone": timezone}
         exec(compile(ast.Module(body=nodes, type_ignores=[]), str(WORKER), "exec"), namespace)
         cls.group_priority = staticmethod(namespace["group_priority"])
         cls.rotate_group_ids = staticmethod(namespace["rotate_group_ids"])
@@ -1341,20 +1338,13 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         cls.message_scan_kwargs = staticmethod(namespace["message_scan_kwargs"])
         cls.reset_group_quality_metrics = staticmethod(namespace["reset_group_quality_metrics"])
 
-    def test_only_unseen_messages_are_requested_after_initial_scan(self):
-        from datetime import datetime, timezone
-        cutoff = datetime.now(timezone.utc)
-        kwargs = self.message_scan_kwargs(1234, cutoff)
-        self.assertEqual(kwargs["min_id"], 1234)
-        self.assertTrue(kwargs["reverse"])
-        self.assertNotIn("offset_date", kwargs)
-
-    def test_initial_scan_is_bounded_to_recent_history(self):
-        from datetime import datetime, timezone
-        cutoff = datetime.now(timezone.utc)
-        kwargs = self.message_scan_kwargs(0, cutoff)
-        self.assertEqual(kwargs["offset_date"], cutoff)
-        self.assertNotIn("limit", kwargs)
+    def test_two_hour_windows_advance_without_replaying_expired_periods(self):
+        from datetime import datetime, timedelta, timezone
+        anchor = datetime(2026, 11, 16, 0, 0, tzinfo=timezone.utc)
+        first = self.two_hour_window(anchor, anchor + timedelta(hours=2, minutes=5))
+        self.assertEqual(first, (anchor, anchor + timedelta(hours=2)))
+        second = self.two_hour_window(anchor, anchor + timedelta(hours=4, minutes=5))
+        self.assertEqual(second, (anchor + timedelta(hours=2), anchor + timedelta(hours=4)))
 
     def test_groups_with_real_leads_receive_higher_priority(self):
         good = {"qualified_leads": 2, "buyer_signals": 5, "seller_ads": 0}
@@ -1422,6 +1412,9 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         self.assertIn('bounded_int_env("MAX_JOINED_GROUPS_PER_RUN", 200, 1, 200)', source)
         self.assertIn('os.getenv("INITIAL_SCAN_START_AT"', source)
         self.assertIn('state["initial_scan_since"]', source)
+        self.assertIn("two_hour_window(initial_scan_anchor, scan_now_utc)", source)
+        self.assertIn("message_date >= window_end", source)
+        self.assertNotIn("message_scan_kwargs(last_seen", source)
 
     def test_scan_report_is_joined_group_only(self):
         source = WORKER.read_text(encoding="utf-8")
