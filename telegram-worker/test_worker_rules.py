@@ -1107,6 +1107,97 @@ class LeadSignalTests(unittest.TestCase):
             ),
         )
 
+    def test_recent_service_seller_false_positives_are_rejected(self):
+        provider_posts = [
+            "We provide targeted traffic, giveaways, targeting and API services. DM for rates and booking.",
+            "We offer iGaming traffic, Google Ads, Meta Ads, Telegram Ads and influencer services. Contact us for pricing.",
+            "We deliver KOL and influencer marketing services for Web3 projects. DM us for rates.",
+        ]
+        for message in provider_posts:
+            with self.subTest(message=message):
+                self.assertEqual(self.classify(message), [])
+
+    def test_freelancer_open_to_new_projects_is_not_a_buyer(self):
+        self.assertEqual(
+            self.classify("I am a full-stack developer, open to new projects and collaborations."),
+            [],
+        )
+
+    def test_ambiguous_moderator_question_is_not_a_recruitment_lead(self):
+        self.assertEqual(
+            self.classify("Will anyone ever need a moderator here?"),
+            [],
+        )
+
+    def test_employer_side_recruitment_request_is_preserved(self):
+        self.assertIn(
+            "Recruitment",
+            self.classify("Hiring a community manager and moderators for our crypto project."),
+        )
+        self.assertIn(
+            "Recruitment",
+            self.classify("We are looking for a developer for our Web3 wallet project."),
+        )
+
+    def test_ambiguous_kol_demand_is_not_promoted_to_buyer(self):
+        for message in [
+            "Anyone looking for KOLs?",
+            "Need KOLs.",
+            "Will anyone need influencers?",
+        ]:
+            with self.subTest(message=message):
+                self.assertEqual(self.classify(message), [])
+
+    def test_project_specific_kol_buying_intent_is_preserved(self):
+        self.assertIn(
+            "KOL & Influencer Marketing",
+            self.classify("Looking for KOLs for our crypto launch."),
+        )
+        self.assertIn(
+            "KOL & Influencer Marketing",
+            self.classify("We need a paid influencer campaign for our Web3 project."),
+        )
+
+
+
+
+    def test_latest_igaming_traffic_provider_pitch_is_rejected(self):
+        message = (
+            "We provide quality iGaming, casino & sportsbook traffic across 32+ GEOs "
+            "through Google PPC, Meta Ads (Facebook & Instagram), TG Ads & Influencers. "
+            "Our focus is on quality registrations and First-Time Depositors (FTDs) "
+            "to help brands grow. Looking for quality traffic or interested in a "
+            "partnership? Let's connect! DM @SalesDiplomat0"
+        )
+        self.assertEqual(self.classify(message), [])
+
+    def test_traffic_and_ftd_vendor_variants_are_rejected(self):
+        for message in (
+            "We provide targeted traffic and qualified registrations for casino brands. DM us.",
+            "We deliver sportsbook FTDs across multiple GEOs through paid ads and influencers.",
+            "Our agency offers iGaming traffic packages. Contact us for pricing.",
+        ):
+            with self.subTest(message=message):
+                self.assertEqual(self.classify(message), [])
+
+    def test_vendor_pitch_filters_use_real_word_boundaries(self):
+        source = WORKER.read_text(encoding="utf-8")
+        for name in ("SELLER_PITCH_CONTEXT", "RECRUITMENT_BUYER_CONTEXT", "KOL_PROJECT_CONTEXT"):
+            with self.subTest(name=name):
+                start = source.index(name + " = re.compile(")
+                end = source.index("\n)", start)
+                block = source[start:end]
+                self.assertIn(r"\b", block)
+                self.assertNotIn(r"\\b", block)
+
+    def test_job_seeker_moderator_post_is_rejected(self):
+        self.assertEqual(
+            self.classify("Will anyone ever need a moderator here? Since when did this job become so low-demand"),
+            [],
+        )
+
+
+
 class TelegramNotificationGateTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -1476,95 +1567,6 @@ class GlobalSearchPaginationTests(unittest.TestCase):
         self.assertEqual(client.calls, 3)
         self.assertEqual(len(messages), 300)
 
-
-    def test_recent_service_seller_false_positives_are_rejected(self):
-        provider_posts = [
-            "We provide targeted traffic, giveaways, targeting and API services. DM for rates and booking.",
-            "We offer iGaming traffic, Google Ads, Meta Ads, Telegram Ads and influencer services. Contact us for pricing.",
-            "We deliver KOL and influencer marketing services for Web3 projects. DM us for rates.",
-        ]
-        for message in provider_posts:
-            with self.subTest(message=message):
-                self.assertEqual(self.classify(message), [])
-
-    def test_freelancer_open_to_new_projects_is_not_a_buyer(self):
-        self.assertEqual(
-            self.classify("I am a full-stack developer, open to new projects and collaborations."),
-            [],
-        )
-
-    def test_ambiguous_moderator_question_is_not_a_recruitment_lead(self):
-        self.assertEqual(
-            self.classify("Will anyone ever need a moderator here?"),
-            [],
-        )
-
-    def test_employer_side_recruitment_request_is_preserved(self):
-        self.assertIn(
-            "Recruitment",
-            self.classify("Hiring a community manager and moderators for our crypto project."),
-        )
-        self.assertIn(
-            "Recruitment",
-            self.classify("We are looking for a developer for our Web3 wallet project."),
-        )
-
-    def test_ambiguous_kol_demand_is_not_promoted_to_buyer(self):
-        for message in [
-            "Anyone looking for KOLs?",
-            "Need KOLs.",
-            "Will anyone need influencers?",
-        ]:
-            with self.subTest(message=message):
-                self.assertEqual(self.classify(message), [])
-
-    def test_project_specific_kol_buying_intent_is_preserved(self):
-        self.assertIn(
-            "KOL & Influencer Marketing",
-            self.classify("Looking for KOLs for our crypto launch."),
-        )
-        self.assertIn(
-            "KOL & Influencer Marketing",
-            self.classify("We need a paid influencer campaign for our Web3 project."),
-        )
-
-
-
-
-    def test_latest_igaming_traffic_provider_pitch_is_rejected(self):
-        message = (
-            "We provide quality iGaming, casino & sportsbook traffic across 32+ GEOs "
-            "through Google PPC, Meta Ads (Facebook & Instagram), TG Ads & Influencers. "
-            "Our focus is on quality registrations and First-Time Depositors (FTDs) "
-            "to help brands grow. Looking for quality traffic or interested in a "
-            "partnership? Let's connect! DM @SalesDiplomat0"
-        )
-        self.assertEqual(self.classify(message), [])
-
-    def test_traffic_and_ftd_vendor_variants_are_rejected(self):
-        for message in (
-            "We provide targeted traffic and qualified registrations for casino brands. DM us.",
-            "We deliver sportsbook FTDs across multiple GEOs through paid ads and influencers.",
-            "Our agency offers iGaming traffic packages. Contact us for pricing.",
-        ):
-            with self.subTest(message=message):
-                self.assertEqual(self.classify(message), [])
-
-    def test_vendor_pitch_filters_use_real_word_boundaries(self):
-        source = WORKER.read_text(encoding="utf-8")
-        for name in ("SELLER_PITCH_CONTEXT", "RECRUITMENT_BUYER_CONTEXT", "KOL_PROJECT_CONTEXT"):
-            with self.subTest(name=name):
-                start = source.index(name + " = re.compile(")
-                end = source.index("\n)", start)
-                block = source[start:end]
-                self.assertIn(r"\b", block)
-                self.assertNotIn(r"\\b", block)
-
-    def test_job_seeker_moderator_post_is_rejected(self):
-        self.assertEqual(
-            self.classify("Will anyone ever need a moderator here? Since when did this job become so low-demand"),
-            [],
-        )
 
 
 
