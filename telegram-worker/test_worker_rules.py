@@ -717,7 +717,7 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("public_cursor_is_after(msg, cursor)", source)
         self.assertIn("global_search_query_index", source)
         self.assertIn("rotate_global_search_queries(GLOBAL_GROUP_SEARCH_QUERIES", source)
-        self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500)', source)
+        self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 30, 1, 500)', source)
         self.assertIn('CLASSIFIER_RULES_VERSION = 25', source)
         for phrase in (
             '"hiring Telegram promoters"',
