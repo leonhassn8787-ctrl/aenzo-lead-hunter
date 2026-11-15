@@ -705,13 +705,13 @@ class LeadSignalTests(unittest.TestCase):
             [],
         )
 
-    def test_scan_budgets_and_four_hour_schedule_settings(self):
+    def test_scan_budgets_and_two_hour_schedule_settings(self):
         source = WORKER.read_text(encoding="utf-8")
-        self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 1300, 1, 2000)', source)
-        self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500)', source)
-        self.assertIn('bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 1000, 1, 1500)', source)
+        self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 2000)', source)
+        self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 30, 1, 500)', source)
+        self.assertIn('bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 70, 1, 1500)', source)
         self.assertIn("public_messages_processed >= MAX_PUBLIC_MESSAGES_PER_RUN", source)
-        self.assertIn('bounded_int_env("POLL_SECONDS", 14400, 60, 86400)', source)
+        self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
         self.assertIn("messages_processed >= MAX_MESSAGES_PER_RUN", source)
         self.assertIn('query_meta["cursor"]', source)
         self.assertIn("public_cursor_is_after(msg, cursor)", source)
