@@ -1521,5 +1521,20 @@ class LeadDisplayLabelTests(unittest.TestCase):
         self.assertIn('"status": "failed" if', block)
 
 
+
+    def test_scan_metrics_persistence_failure_fails_the_worker(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn('finished = await finish_scan_run(http, scan_run_id, stats)', source)
+        self.assertIn('if not finished:', source)
+        self.assertIn('mark_scan_run_failed(http, scan_run_id, exc)', source)
+
+    def test_disabled_scan_report_is_recorded(self):
+        source = WORKER.read_text(encoding="utf-8")
+        start = source.index("async def send_scan_report")
+        end = source.index("async def login", start)
+        block = source[start:end]
+        self.assertIn('report_delivery_error', block)
+        self.assertIn('disabled: bot token or chat ID is not configured', block)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
