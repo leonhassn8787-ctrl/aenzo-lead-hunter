@@ -170,6 +170,16 @@ class LeadSignalTests(unittest.TestCase):
             with self.subTest(query=query):
                 self.assertIn(query, source)
 
+    def test_reciprocal_cross_promotion_and_exposure_swaps_are_not_buyers(self):
+        posts = [
+            "Looking for cross-promotion partners to exchange exposure between our crypto communities.",
+            "We are seeking co-marketing partnerships where we promote each other for free.",
+            "Open to mutual promotion and barter campaigns with other Web3 projects.",
+        ]
+        for post in posts:
+            with self.subTest(post=post):
+                self.assertEqual(self.classify(post), [])
+
     def test_real_world_vendor_and_noise_posts_from_latest_scan_are_rejected(self):
         posts = [
             "Hey everyone! I'm @San_mddf, BD at MyDollarFun. Looking for real users and genuine engagement on X (Twitter)? DM me! I'll offer you special discounts. You can also run your campaigns directly on our website. Also you can test any think in $1. For more details, feel free to DM me. Let's grow together!",
@@ -708,7 +718,7 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("global_search_query_index", source)
         self.assertIn("rotate_global_search_queries(GLOBAL_GROUP_SEARCH_QUERIES", source)
         self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500)', source)
-        self.assertIn('CLASSIFIER_RULES_VERSION = 24', source)
+        self.assertIn('CLASSIFIER_RULES_VERSION = 25', source)
         for phrase in (
             '"hiring Telegram promoters"',
             '"looking for Telegram promoters"',
