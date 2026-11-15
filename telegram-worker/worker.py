@@ -861,7 +861,7 @@ def two_hour_window(anchor, now):
     now = now.astimezone(timezone.utc)
     elapsed = (now - anchor).total_seconds()
     if elapsed < 7200:
-        return anchor, anchor + timedelta(hours=2)
+        return None
     completed_index = int(elapsed // 7200) - 1
     start = anchor + timedelta(hours=2 * completed_index)
     return start, start + timedelta(hours=2)
@@ -1262,9 +1262,15 @@ async def run(once=False):
     async with httpx.AsyncClient() as http:
         while True:
             scan_started = asyncio.get_running_loop().time()
-            scan_run_id = await start_scan_run(http)
             scan_now_utc = datetime.now(timezone.utc)
-            window_start, window_end = two_hour_window(initial_scan_anchor, scan_now_utc)
+            current_window = two_hour_window(initial_scan_anchor, scan_now_utc)
+            if current_window is None:
+                log.info(
+                    "Initial two-hour collection window is not complete yet; skipping this early scheduled trigger."
+                )
+                break
+            window_start, window_end = current_window
+            scan_run_id = await start_scan_run(http)
             scan_started_at_utc = window_start.isoformat()
             log.info("Two-hour window UTC: %s to %s", window_start.isoformat(), window_end.isoformat())
             checked = 0
