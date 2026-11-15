@@ -567,12 +567,9 @@ def enrich_candidate(candidate):
 
 
 def candidate_review_status(enrichment):
-    """Only surface web candidates as reviewable when enrichment found a clear buyer need."""
-    if (
-        enrichment.get("enrichment_status") == "completed"
-        and enrichment.get("buyer_intent_status") == "no_explicit_need"
-    ):
-        return "rejected"
+    """Keep candidates in the review queue; never auto-reject records on inferred intent."""
+    # Enrichment and buyer-intent evidence are displayed as review metadata.
+    # A human must decide whether a candidate is irrelevant or worth pursuing.
     return "new"
 
 def main():
