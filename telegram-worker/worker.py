@@ -1215,9 +1215,12 @@ async def finish_scan_run(http, run_id, stats):
             timeout=20,
         )
         if response.status_code not in (200, 204):
-            log.warning("Could not update Supabase scan_runs row (%s): %s", response.status_code, response.text[:300])
+            log.error("Could not update Supabase scan_runs row (%s): %s", response.status_code, response.text[:300])
+            return False
+        return True
     except Exception:
         log.exception("Could not update Supabase scan_runs row.")
+        return False
 
 
 async def mark_scan_run_failed(http, run_id, error):
@@ -1239,7 +1242,19 @@ async def send_scan_report(http, stats, scan_run_id=None):
     """Send a compact per-run scan-usage report to the owner's Telegram chat."""
     if not BOT_TOKEN or not BOT_CHAT_IDS:
         log.info("Telegram scan reports are not configured; skipping scan report.")
-        return
+        if scan_run_id:
+            try:
+                headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
+                await http.patch(
+                    f"{SUPABASE_URL}/rest/v1/scan_runs",
+                    headers={**headers, "Prefer": "return=minimal"},
+                    params={"id": "eq." + str(scan_run_id), "owner_id": "eq." + SUPABASE_OWNER_ID},
+                    json={"report_delivery_error": "disabled: bot token or chat ID is not configured"},
+                    timeout=20,
+                )
+            except Exception:
+                log.exception("Could not record that Telegram scan report delivery is disabled.")
+        return False
     minutes = int(stats.get("duration_seconds", 0)) // 60
     seconds = int(stats.get("duration_seconds", 0)) % 60
     report = (
@@ -1574,7 +1589,9 @@ async def run(once=False):
                     "post_scan_audit_ok": audit_result["ok"],
                     "scan_errors": scan_errors,
                 }
-                await finish_scan_run(http, scan_run_id, stats)
+                finished = await finish_scan_run(http, scan_run_id, stats)
+                if not finished:
+                    raise RuntimeError("Supabase could not persist the completed scan metrics.")
                 await send_scan_report(http, stats, scan_run_id)
                 log.info(
                     "Scan complete: %s/%s selected joined groups checked (%s joined groups available); %s joined-group messages processed with no message-count cap; %s text messages checked; %s new leads saved; %.1fs.",
