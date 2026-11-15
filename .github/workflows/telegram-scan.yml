@@ -9,8 +9,8 @@ on:
         type: boolean
         default: false
   schedule:
-    # Saudi Arabia local time: every two hours at :10 (UTC odd hours).
-    - cron: "10 1,3,5,7,9,11,13,15,17,19,21,23 * * *"
+    # Saudi Arabia local time: every two hours at :10 (UTC even hours).
+    - cron: "10 0,2,4,6,8,10,12,14,16,18,20,22 * * *"
 
 permissions:
   contents: read
@@ -207,7 +207,7 @@ jobs:
           AENZO_BOT_CHAT_ID: ${{ secrets.AENZO_BOT_CHAT_ID }}
           AENZO_BOT_CHAT_IDS: ${{ secrets.AENZO_BOT_CHAT_IDS }}
           STATE_FILE: scan_state.json
-          INITIAL_SCAN_START_AT: "2026-11-16T01:04:35+00:00"
+          INITIAL_SCAN_START_AT: "2026-11-15T22:04:35+00:00"
           MAX_JOINED_GROUPS_PER_RUN: "200"
         run: python worker.py --once
 
