@@ -9,8 +9,8 @@ on:
         type: boolean
         default: false
   schedule:
-    # Scan every two hours (UTC), away from the busy top of the hour.
-    - cron: "17 */2 * * *"
+    # Saudi Arabia local time: every two hours at :10 (UTC odd hours).
+    - cron: "10 1,3,5,7,9,11,13,15,17,19,21,23 * * *"
 
 permissions:
   contents: read
@@ -22,7 +22,7 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 110
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
@@ -207,11 +207,8 @@ jobs:
           AENZO_BOT_CHAT_ID: ${{ secrets.AENZO_BOT_CHAT_ID }}
           AENZO_BOT_CHAT_IDS: ${{ secrets.AENZO_BOT_CHAT_IDS }}
           STATE_FILE: scan_state.json
-          LOOKBACK_DAYS: "30"
-          SCAN_BUDGET_SECONDS: "1920"
-          MAX_MESSAGES_PER_RUN: "100"
-          MAX_JOINED_MESSAGES_PER_RUN: "100"
-          MAX_MESSAGES_PER_GROUP_PER_RUN: "10"
+          INITIAL_SCAN_START_AT: "2026-11-16T01:04:35+00:00"
+          MAX_JOINED_GROUPS_PER_RUN: "200"
         run: python worker.py --once
 
       - name: Save scan progress
