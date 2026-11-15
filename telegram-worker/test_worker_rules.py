@@ -131,7 +131,7 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_post_scan_audit_runs_before_new_lead_notifications(self):
         source = WORKER.read_text(encoding="utf-8")
-        self.assertIn("async def audit_current_scan_leads", source)
+        self.assertIn("async def audit_current_scan_leads(client_http, scan_run_id)", source)
         self.assertIn("post_scan_audit: buyer_intent_uncertain_manual_review_required", source)
         self.assertIn("Keep uncertain candidates in review", source)
         self.assertIn("def verify_buyer_evidence(text):", source)
@@ -142,12 +142,12 @@ class LeadSignalTests(unittest.TestCase):
         audit_end = source.index("\n\ndef format_telegram_lead", audit_start)
         audit_code = source[audit_start:audit_end]
         self.assertNotIn('"telegram_notified_at": "is.null"', audit_code)
-        self.assertIn('"created_at": "gte." + str(scan_started_at)', audit_code)
+        self.assertIn('"source_scan_run_id": "eq." + str(scan_run_id)', audit_code)
         self.assertIn('"order": "created_at.asc,id.asc"', audit_code)
         self.assertNotIn("for human review to protect buyers", source)
         self.assertNotIn("await notify_saved_lead(", source)
         self.assertIn("await notify_pending_leads(http)", source)
-        self.assertIn("audit_result = await audit_current_scan_leads(http, scan_started_at_utc)", source)
+        self.assertIn("audit_result = await audit_current_scan_leads(http, scan_run_id)", source)
         self.assertLess(source.index("audit_result = await audit_current_scan_leads"), source.index("await notify_pending_leads(http)", source.index("audit_result = await audit_current_scan_leads")))
         self.assertIn("pending-lead notifications withheld for safety", source)
         self.assertIn('"offset": str(offset)', audit_code)
@@ -1496,6 +1496,7 @@ class LeadDisplayLabelTests(unittest.TestCase):
 
     def test_telegram_scan_run_metrics_are_persisted_to_supabase(self):
         source = WORKER.read_text(encoding="utf-8")
+        self.assertIn('"source_scan_run_id": scan_run_id', source)
         self.assertIn("async def start_scan_run(http, window_start, window_end):", source)
         self.assertIn("async def finish_scan_run(http, run_id, stats):", source)
         self.assertIn('"window_start": stats.get("window_start")', source)
