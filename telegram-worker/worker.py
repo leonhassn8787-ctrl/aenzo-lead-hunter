@@ -1501,7 +1501,7 @@ async def run(once=False):
                         continue
                     messages_checked += 1
                     public_messages_checked += 1
-                    if SELLER_AD_CONTEXT.search(text_body) or SELLER_POST_CONTEXT.search(text_body):
+                    if SELLER_AD_CONTEXT.search(text_body) or SELLER_POST_CONTEXT.search(text_body) or SELLER_PITCH_CONTEXT.search(text_body):
                         seller_posts += 1
                     services = classify(text_body)
                     if not services:
