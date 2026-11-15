@@ -50,6 +50,21 @@ Deno.serve(async (req) => {
   if (candidate.review_status === "converted") return json({ error: "Already converted" }, 409);
   if (candidate.review_status === "rejected") return json({ error: "Already rejected" }, 409);
 
+  // News/funding/launch signals are discovery candidates, not qualified client leads.
+  // Never promote a candidate into Leads unless the source itself contains an explicit
+  // request for an AENZO service and that exact need was extracted from the evidence.
+  if (action === "convert" && (
+    candidate.buyer_intent_status !== "explicit_need" ||
+    typeof candidate.marketing_need !== "string" ||
+    !candidate.marketing_need.trim()
+  )) {
+    return json({
+      error: "This discovery item has no explicit request for a marketing service, so it cannot be converted into a client lead.",
+      buyer_intent_status: candidate.buyer_intent_status || "unverified",
+      marketing_need: candidate.marketing_need || null,
+    }, 422);
+  }
+
   if (action === "reject") {
     const { error } = await supabase.from("discovery_candidates")
       .update({ review_status: "rejected" }).eq("id", candidate_id).eq("owner_id", owner_id);
