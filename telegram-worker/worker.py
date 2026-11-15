@@ -1131,14 +1131,13 @@ async def save_lead(client_http, payload):
         return "error"
 
 async def audit_current_scan_leads(client_http, scan_started_at):
-    """Only pass evidence-backed buyers; reject every unproven candidate."""
+    """Re-audit every active candidate, including previously notified leads; reject unproven evidence."""
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
     url = f"{SUPABASE_URL}/rest/v1/leads"
     params = {
         "select": "id,evidence_summary,service_need,notes,priority_score",
         "owner_id": f"eq.{SUPABASE_OWNER_ID}",
         "status": "eq.new",
-        "telegram_notified_at": "is.null",
         "order": "created_at.asc", "limit": "200",
     }
     audited = rejected = verified = 0
