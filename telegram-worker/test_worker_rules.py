@@ -123,6 +123,14 @@ class LeadSignalTests(unittest.TestCase):
         exec(compile(ast.Module(body=[dedupe_node], type_ignores=[]), str(WORKER), "exec"), dedupe_namespace)
         cls.dedupe = staticmethod(dedupe_namespace["dedupe"])
 
+    def test_post_scan_audit_runs_before_new_lead_notifications(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn("async def audit_current_scan_leads", source)
+        self.assertIn("post_scan_audit: vendor_or_service_seller_pitch", source)
+        self.assertIn("post_scan_audit: no_valid_AENZO_buyer_intent", source)
+        self.assertIn("audit_result = await audit_current_scan_leads(http, scan_started_at_utc)", source)
+        self.assertLess(source.index("audit_result = await audit_current_scan_leads"), source.index("await notify_pending_leads(http)", source.index("audit_result = await audit_current_scan_leads")))
+        self.assertIn("pending-lead notifications withheld for safety", source)
     def test_global_search_scans_groups_without_joining(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("SearchGlobalRequest", source)
