@@ -609,10 +609,6 @@ def classify(text):
     ):
         return []
 
-    # KOL requests must identify a real project, campaign, or acquisition goal.
-    if "KOL & Influencer Marketing" in hits and not KOL_PROJECT_CONTEXT.search(text):
-        return []
-
     # Technical hiring/help (e.g. token launch specialists) is not automatically
     # a marketing lead. Keep these out unless a separate marketing request exists.
     technical_only = re.compile(
@@ -668,6 +664,10 @@ def classify(text):
         and marketing_intent.search(text)
     )
     if not buyer_intent.search(text) and not indirect_growth:
+        return []
+
+    # KOL requests must identify a real project, campaign, or acquisition goal.
+    if "KOL & Influencer Marketing" in hits and not KOL_PROJECT_CONTEXT.search(text):
         return []
 
     # Buyer intent and project context are checked by the shared evidence
