@@ -1308,10 +1308,9 @@ class TelegramNotificationGateTests(unittest.TestCase):
             "missing_or_too_short_evidence",
         )
 
-    def test_low_priority_is_blocked(self):
-        self.assertEqual(
-            self.check({"evidence_summary": "Our crypto project needs a paid marketing campaign before launch.", "service_need": "Project Promotion", "priority_score": 54}),
-            "priority_below_notification_threshold",
+    def test_low_priority_does_not_block_evidence_proven_buyer(self):
+        self.assertIsNone(
+            self.check({"evidence_summary": "Our crypto project needs a paid marketing campaign before launch.", "service_need": "Project Promotion", "priority_score": 1}),
         )
 
     def test_direct_buyer_at_minimum_qualified_score_can_be_notified(self):
@@ -1322,10 +1321,13 @@ class TelegramNotificationGateTests(unittest.TestCase):
         }
         self.assertIsNone(self.check(lead))
 
-    def test_new_leads_trigger_immediate_notification_from_both_sources(self):
+    def test_new_lead_notifications_run_only_after_post_scan_audit(self):
         source = WORKER.read_text(encoding="utf-8")
-        self.assertIn("async def notify_saved_lead(http, dedupe_key):", source)
-        self.assertEqual(source.count('await notify_saved_lead(http, payload["dedupe_key"])'), 2)
+        self.assertNotIn("async def notify_saved_lead(http, dedupe_key):", source)
+        self.assertNotIn('await notify_saved_lead(http, payload["dedupe_key"])', source)
+        audit = source.index("audit_result = await audit_current_scan_leads(http, scan_started_at_utc)")
+        notify = source.index("await notify_pending_leads(http, scan_started_at_utc)", audit)
+        self.assertLess(audit, notify)
 
     def test_non_buyer_evidence_is_blocked(self):
         self.assertEqual(
