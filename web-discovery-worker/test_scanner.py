@@ -58,11 +58,11 @@ class ScannerTests(unittest.TestCase):
         self.assertIsNotNone(scanner.extract_marketing_need("Need help with our community growth."))
         self.assertIsNone(scanner.extract_marketing_need("Our Web3 startup raised $8 million."))
     
-    def test_completed_candidate_without_explicit_buyer_need_is_rejected(self):
+    def test_completed_candidate_without_explicit_buyer_need_stays_for_human_review(self):
         self.assertEqual(scanner.candidate_review_status({
             "enrichment_status": "completed",
             "buyer_intent_status": "no_explicit_need",
-        }), "rejected")
+        }), "new")
 
     def test_candidate_with_explicit_need_remains_reviewable(self):
         self.assertEqual(scanner.candidate_review_status({
@@ -141,6 +141,15 @@ class ScannerTests(unittest.TestCase):
             scanner.validate_public_url("http://127.0.0.1/admin")
         with self.assertRaises(ValueError):
             scanner.validate_public_url("file:///etc/passwd")
+
+    def test_web_marketing_seller_pitches_are_filtered(self):
+        for text in [
+            "We offer KOL and influencer marketing services for Web3 projects. DM us for rates.",
+            "We provide traffic and promotion packages. Contact us for pricing.",
+            "We are a crypto marketing agency helping projects grow.",
+        ]:
+            with self.subTest(text=text):
+                self.assertIsNotNone(scanner.VENDOR.search(text))
 
     def test_irrelevant_vendor_incident_and_generic_directory_posts_are_filtered(self):
         self.assertIsNone(scanner.classify({"title":"Bitcoin price today","summary":"Market is moving."}, "news_signal"))
