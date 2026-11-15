@@ -681,7 +681,7 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("global_search_query_index", source)
         self.assertIn("rotate_global_search_queries(GLOBAL_GROUP_SEARCH_QUERIES", source)
         self.assertIn('bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500)', source)
-        self.assertIn('CLASSIFIER_RULES_VERSION = 20', source)
+        self.assertIn('CLASSIFIER_RULES_VERSION = 22', source)
         for phrase in (
             '"hiring Telegram promoters"',
             '"looking for Telegram promoters"',
@@ -1477,14 +1477,6 @@ class GlobalSearchPaginationTests(unittest.TestCase):
         self.assertEqual(len(messages), 300)
 
 
-class LeadDisplayLabelTests(unittest.TestCase):
-    def test_group_title_is_not_misrepresented_as_project_name(self):
-        worker_source = open(__file__.replace("test_worker_rules.py", "worker.py"), encoding="utf-8").read()
-        self.assertNotIn('f"Potential project (verify) — {group_name}"', worker_source)
-        self.assertEqual(worker_source.count('"company_name": "Potential project (verify)"'), 2)
-
-
-
     def test_recent_service_seller_false_positives_are_rejected(self):
         provider_posts = [
             "We provide targeted traffic, giveaways, targeting and API services. DM for rates and booking.",
@@ -1535,6 +1527,16 @@ class LeadDisplayLabelTests(unittest.TestCase):
             "KOL & Influencer Marketing",
             self.classify("We need a paid influencer campaign for our Web3 project."),
         )
+
+
+
+
+class LeadDisplayLabelTests(unittest.TestCase):
+    def test_group_title_is_not_misrepresented_as_project_name(self):
+        worker_source = open(__file__.replace("test_worker_rules.py", "worker.py"), encoding="utf-8").read()
+        self.assertNotIn('f"Potential project (verify) — {group_name}"', worker_source)
+        self.assertEqual(worker_source.count('"company_name": "Potential project (verify)"'), 2)
+
 
 
     def test_telegram_scan_run_metrics_are_persisted_to_supabase(self):
