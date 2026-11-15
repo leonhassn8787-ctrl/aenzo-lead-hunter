@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     const status = url.searchParams.get("status") || "new";
     const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 50)));
     const { data, error } = await supabase.from("discovery_candidates")
-      .select("id,source_name,title,summary,evidence_url,published_at,signal_type,signal_score,review_status,created_at")
+      .select("id,source_name,title,summary,evidence_url,published_at,signal_type,signal_score,review_status,buyer_intent_status,marketing_need,project_website,enrichment_status,created_at")
       .eq("owner_id", owner_id)
       .eq("review_status", status)
       .order("signal_score", { ascending: false })
