@@ -1264,11 +1264,11 @@ async def run(once=False):
             saved = 0
             messages_checked = 0
             messages_processed = 0
+            joined_messages_processed = 0
             seller_posts = 0
             buyer_signals = 0
             duplicates = 0
             run_seen_dedupe_keys = set()
-            now = datetime.now(timezone.utc)
             dialogs = []
             async for dialog in client.iter_dialogs():
                 entity = dialog.entity
