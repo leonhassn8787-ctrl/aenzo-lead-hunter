@@ -738,26 +738,32 @@ def verify_buyer_evidence(text):
 
     buyer_request = BUYING_CONTEXT.search(text) or re.search(
         r"\b(we need|we're seeking|we are seeking|want to hire|ready to hire|"
-        r"can you promote|please promote|help us promote|need a partner)\b",
+        r"looking to hire|looking to work with|searching for|seeking|hiring|"
+        r"can you promote|please promote|help us promote|need a partner|"
+        r"anyone know|does anyone know|can someone help|anyone able to|"
+        r"who can help|could use|recommend a)\b",
         text, re.I,
     )
     indirect_growth = re.search(
         r"\b(struggling to|having trouble|not getting (enough|many)|"
         r"trying to (increase|grow|attract|reach)|want to (grow|increase|attract|reach)|"
-        r"could use more|how can we (get|attract|reach|grow|increase))\b",
+        r"could use more|how can we (get|attract|reach|grow|increase)|"
+        r"what.s the best way to (get|attract|reach|grow|increase)|"
+        r"looking to grow|looking to increase|want to boost|need more)\b",
         text, re.I,
     )
     service_need = re.search(
         r"\b(kol|kols|influencers?|marketing|promotion|promote|"
-        r"growth (agency|team|partner|service|marketing)|"
-        r"community (growth|promotion|management|engagement)|"
+        r"growth (agency|team|partner|service|marketing)|growth|"
+        r"community (growth|promotion|management|engagement)|community growth|"
         r"telegram (promotion|member acquisition|community growth)|member acquisition|"
-        r"pr agency|media coverage|press release|ama hosting|\bama\b|"
+        r"pr agency|media coverage|press release|ama hosting|ama|"
         r"giveaway campaign|airdrop campaign|social media management|"
         r"content marketing|content distribution|content creators?|brand ambassadors?|"
         r"influencer outreach|sponsored posts?|brand awareness|"
-        r"user acquisition|launch promotion|project promotion|"
-        r"advertising|paid campaign|website (design|development|developer)|"
+        r"user acquisition|users?|user base|audience|traction|visibility|"
+        r"engagement|members|signups|registrations|launch promotion|project promotion|"
+        r"advertising|paid campaign|promoters?|website (design|development|developer)|"
         r"community manager|moderators?|developers?|beta testers?|early users?|"
         r"product testing|product review|product feedback|mvp testing|"
         r"video production|graphic design|fundraising promotion|"
@@ -767,7 +773,9 @@ def verify_buyer_evidence(text):
     )
     project_context = CRYPTO_CONTEXT.search(text) or re.search(
         r"\b(project|product|app|platform|website|software|saas|"
-        r"digital product|startup|brand|game|exchange|wallet)\b",
+        r"digital product|startup|brand|game|exchange|wallet|"
+        r"web3|crypto|blockchain|defi|cefi|cex|token|launchpad|"
+        r"ai agent|gamefi|rwa|protocol)\b",
         text, re.I,
     )
     if not project_context or not service_need:
