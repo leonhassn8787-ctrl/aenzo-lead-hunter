@@ -170,6 +170,15 @@ class LeadSignalTests(unittest.TestCase):
             with self.subTest(query=query):
                 self.assertIn(query, source)
 
+    def test_mydollarfun_style_user_engagement_promotion_is_rejected(self):
+        message = (
+            "Looking for real users and genuine engagement on X (Twitter)? "
+            "DM me! I will offer you special discounts. You can also run your "
+            "campaigns directly on our website. You can test anything for $1. "
+            "For more details, feel free to DM me. Let us grow together!"
+        )
+        self.assertEqual(self.classify(message), [])
+
     def test_ad_account_provider_pitch_is_rejected_even_with_looking_for_cta(self):
         message = (
             "Hi, Sigma! Here is Malt Interactive which specializes in proving "
