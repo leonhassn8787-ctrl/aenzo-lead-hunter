@@ -139,7 +139,7 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("source_evidence_does_not_prove_buyer_intent", source)
         self.assertIn("post_scan_verified", source)
         audit_start = source.index("async def audit_current_scan_leads")
-        audit_end = source.index("\\n\\ndef format_telegram_lead", audit_start)
+        audit_end = source.index("\n\ndef format_telegram_lead", audit_start)
         audit_code = source[audit_start:audit_end]
         self.assertIn('"telegram_notified_at": "is.null"', audit_code)
         self.assertNotIn('"created_at": f"gte.', audit_code)
