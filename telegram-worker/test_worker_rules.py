@@ -67,14 +67,14 @@ class LeadSignalTests(unittest.TestCase):
                 if isinstance(node, ast.Assign)
                 and any(target.id == name for target in node.targets if isinstance(target, ast.Name))
             )
-        exec(compile(ast.Module(body=[classify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
-        cls.classify = staticmethod(namespace["classify"])
         verify_node = next(
             node for node in tree.body
             if isinstance(node, ast.FunctionDef) and node.name == "verify_buyer_evidence"
         )
         exec(compile(ast.Module(body=[verify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
         cls.verify_buyer_evidence = staticmethod(namespace["verify_buyer_evidence"])
+        exec(compile(ast.Module(body=[classify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
+        cls.classify = staticmethod(namespace["classify"])
         priority_node = next(
             node for node in tree.body
             if isinstance(node, ast.FunctionDef) and node.name == "priority"
@@ -399,6 +399,18 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_first_person_buyer_request_is_not_excluded(self):
         self.assertIn("KOL & Influencer Marketing", self.classify("We are looking for KOLs for our crypto launch"))
+
+    def test_classifier_keeps_broader_verified_buyer_wording(self):
+        examples = [
+            ("Our new crypto game needs KOLs for promotion", "KOL & Influencer Marketing"),
+            ("We are looking for moderators for our DeFi app", "Recruitment"),
+            ("Our Web3 startup is looking for a growth agency to increase users", "Project Promotion"),
+            ("We need community engagement and Telegram member acquisition for our DeFi project", "Project Promotion"),
+            ("Our crypto exchange is hiring brand ambassadors for a paid campaign", "KOL & Influencer Marketing"),
+        ]
+        for message, expected in examples:
+            with self.subTest(message=message):
+                self.assertIn(expected, self.classify(message))
 
     def test_outreach_is_specific_to_detected_service(self):
         english, bengali = self.make_outreach(["Website Design & Development"])
