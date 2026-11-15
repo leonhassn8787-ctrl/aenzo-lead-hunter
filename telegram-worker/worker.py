@@ -1020,23 +1020,26 @@ def telegram_notification_block_reason(lead):
     return None
 
 
-async def send_telegram_to_all(http, message, timeout=30):
-    """Send the same alert to the primary and all explicitly configured Telegram chats."""
-    if not BOT_TOKEN or not BOT_CHAT_IDS:
-        return False, ["No Telegram chat IDs configured."]
-    errors = []
-    for chat_id in BOT_CHAT_IDS:
-        try:
-            response = await http.post(
-                "https://api.telegram.org/bot" + BOT_TOKEN + "/sendMessage",
-                json={"chat_id": chat_id, "text": message, "disable_web_page_preview": True},
-                timeout=timeout,
-            )
-            if response.status_code != 200 or not response.json().get("ok"):
-                errors.append(f"{chat_id}: {response.text[:300]}")
-        except Exception as exc:
-            errors.append(f"{chat_id}: {type(exc).__name__}: {exc}")
-    return not errors, errors
+async def send_telegram_to_chat(http, chat_id, message, timeout=30):
+    """Send to one destination so partial successes can be recorded independently."""
+    if not BOT_TOKEN or not chat_id:
+        return False, "Telegram bot token or chat ID is not configured."
+    try:
+        response = await http.post(
+            "https://api.telegram.org/bot" + BOT_TOKEN + "/sendMessage",
+            json={"chat_id": chat_id, "text": message, "disable_web_page_preview": True},
+            timeout=timeout,
+        )
+        if response.status_code != 200 or not response.json().get("ok"):
+            return False, response.text[:300]
+        return True, None
+    except Exception as exc:
+        return False, f"{type(exc).__name__}: {exc}"
+
+
+def recipient_key(chat_id):
+    """Store a stable hash, never the raw Telegram chat ID, in delivery state."""
+    return hashlib.sha256(str(chat_id).encode("utf-8")).hexdigest()[:20]
 
 
 async def notify_pending_leads(http, scan_started_at=None):
@@ -1045,7 +1048,7 @@ async def notify_pending_leads(http, scan_started_at=None):
         return
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
     url = SUPABASE_URL + '/rest/v1/leads'
-    base_params = {'select': 'id,company_name,service_need,priority_score,evidence_date,evidence_summary,evidence_url,telegram_group_url,contacts,outreach_english,outreach_bengali', 'owner_id': 'eq.' + SUPABASE_OWNER_ID, 'status': 'eq.new', 'telegram_notified_at': 'is.null', 'order': 'created_at.asc', 'limit': '100'}
+    base_params = {'select': 'id,company_name,service_need,priority_score,evidence_date,evidence_summary,evidence_url,telegram_group_url,contacts,outreach_english,outreach_bengali,telegram_deliveries', 'owner_id': 'eq.' + SUPABASE_OWNER_ID, 'status': 'eq.new', 'telegram_notified_at': 'is.null', 'order': 'created_at.asc', 'limit': '100'}
     # Do not restrict by scan start time: older unsent leads must survive retries.
     # Load every pending row before sending or updating any row. This keeps
     # offset pagination stable while successful notifications leave the query.
@@ -1078,35 +1081,35 @@ async def notify_pending_leads(http, scan_started_at=None):
             # Keep the record for manual review; do not send a bot notification.
             continue
         try:
-            delivered, errors = await send_telegram_to_all(http, format_telegram_lead(lead), timeout=30)
-            if not delivered:
-                detail = "; ".join(errors)[:500]
-                log.error('Telegram alert failed for lead %s: %s', lead_id, detail)
-                await http.patch(
-                    url,
-                    headers=headers,
-                    params={'id': 'eq.' + str(lead_id), 'owner_id': 'eq.' + SUPABASE_OWNER_ID},
-                    json={'telegram_notification_error': detail},
-                    timeout=30,
-                )
-                continue
-            marked = await http.patch(
-                url,
-                headers=headers,
-                params={'id': 'eq.' + str(lead_id), 'owner_id': 'eq.' + SUPABASE_OWNER_ID},
-                json={'telegram_notified_at': datetime.now(timezone.utc).isoformat(), 'telegram_notification_error': None},
-                timeout=30,
-            )
-            if marked.status_code not in (200, 204):
-                log.error(
-                    'Telegram delivered lead %s, but notification timestamp could not be saved (%s). '
-                    'It may be sent again on a later scan.',
-                    lead_id, marked.status_code,
-                )
-                continue
-            log.info('Telegram alert delivered and recorded for lead %s.', lead_id)
+            delivery_state = lead.get("telegram_deliveries") or {}
+            if not isinstance(delivery_state, dict):
+                delivery_state = {}
+            all_delivered = True
+            for chat_id in BOT_CHAT_IDS:
+                key = recipient_key(chat_id)
+                if delivery_state.get(key):
+                    continue
+                delivered, error = await send_telegram_to_chat(http, chat_id, format_telegram_lead(lead), timeout=30)
+                if not delivered:
+                    all_delivered = False
+                    detail = f"{key}: {error}"[:500]
+                    log.error("Telegram alert failed for lead %s: %s", lead_id, detail)
+                    await http.patch(url, headers=headers, params={"id": "eq." + str(lead_id), "owner_id": "eq." + SUPABASE_OWNER_ID}, json={"telegram_notification_error": detail}, timeout=30)
+                    continue
+                delivery_state[key] = datetime.now(timezone.utc).isoformat()
+                recorded = await http.patch(url, headers={**headers, "Prefer": "return=minimal"}, params={"id": "eq." + str(lead_id), "owner_id": "eq." + SUPABASE_OWNER_ID}, json={"telegram_deliveries": delivery_state}, timeout=30)
+                if recorded.status_code not in (200, 204):
+                    all_delivered = False
+                    log.error("Telegram delivered lead %s to one chat, but per-chat delivery state could not be recorded (%s).", lead_id, recorded.status_code)
+                    break
+            if all_delivered and all(delivery_state.get(recipient_key(chat_id)) for chat_id in BOT_CHAT_IDS):
+                marked = await http.patch(url, headers={**headers, "Prefer": "return=minimal"}, params={"id": "eq." + str(lead_id), "owner_id": "eq." + SUPABASE_OWNER_ID}, json={"telegram_notified_at": datetime.now(timezone.utc).isoformat(), "telegram_notification_error": None}, timeout=30)
+                if marked.status_code not in (200, 204):
+                    log.error("All recipients received lead %s, but final notification timestamp could not be recorded (%s).", lead_id, marked.status_code)
+                else:
+                    log.info("Telegram alert delivered and recorded for lead %s.", lead_id)
         except Exception:
-            log.exception('Telegram notification attempt failed for lead %s; it will be retried.', lead_id)
+            log.exception("Telegram notification attempt failed for lead %s; it will be retried.", lead_id)
 
 
 
@@ -1121,7 +1124,7 @@ async def scan_window_already_recorded(http, window_start):
             params={
                 "select": "id,status",
                 "owner_id": "eq." + SUPABASE_OWNER_ID,
-                "error_summary": "like.*" + window_start.isoformat() + "*",
+                "window_start": "eq." + window_start.isoformat(),
                 "limit": "1",
             },
             timeout=20,
@@ -1154,10 +1157,15 @@ async def start_scan_run(http, window_start, window_end):
             json={
                 "owner_id": SUPABASE_OWNER_ID,
                 "status": "running",
+                "window_start": window_start.isoformat(),
+                "window_end": window_end.isoformat(),
                 "error_summary": json.dumps(window_marker, separators=(",", ":")),
             },
             timeout=20,
         )
+        if response.status_code == 409:
+            log.info("The two-hour window was claimed by another run before this insert.")
+            return "duplicate"
         if response.status_code not in (200, 201):
             log.warning("Could not create Supabase scan_runs row (%s): %s", response.status_code, response.text[:300])
             return None
@@ -1186,10 +1194,13 @@ async def finish_scan_run(http, run_id, stats):
         "joined_duplicates": stats.get("joined_duplicates", 0),
         "seller_posts": stats.get("seller_posts", 0),
         "duration_seconds": round(stats.get("duration_seconds", 0), 1),
+        "scan_errors": int(stats.get("scan_errors", 0)),
+        "post_scan_audit_ok": bool(stats.get("post_scan_audit_ok")),
+        "post_scan_review": int(stats.get("post_scan_review", 0)),
     }
     payload = {
         "finished_at": datetime.now(timezone.utc).isoformat(),
-        "status": "completed",
+        "status": "failed" if int(stats.get("scan_errors", 0)) > 0 or not stats.get("post_scan_audit_ok") else "completed",
         "sources_checked": int(stats.get("joined_groups_scanned", 0)),
         "leads_found": int(stats.get("buyer_signals", 0)),
         "leads_saved": int(stats.get("leads_saved", 0)),
@@ -1209,7 +1220,22 @@ async def finish_scan_run(http, run_id, stats):
         log.exception("Could not update Supabase scan_runs row.")
 
 
-async def send_scan_report(http, stats):
+async def mark_scan_run_failed(http, run_id, error):
+    """Close a started scan as failed if Telegram iteration or processing raises."""
+    if not run_id:
+        return
+    url = f"{SUPABASE_URL}/rest/v1/scan_runs"
+    headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
+    headers["Prefer"] = "return=minimal"
+    try:
+        response = await http.patch(url, headers=headers, params={"id": "eq." + str(run_id), "owner_id": "eq." + SUPABASE_OWNER_ID}, json={"finished_at": datetime.now(timezone.utc).isoformat(), "status": "failed", "error_summary": json.dumps({"phase": "failed", "error": str(error)[:1500]}, separators=(",", ":"))}, timeout=20)
+        if response.status_code not in (200, 204):
+            log.error("Could not mark scan run %s as failed (%s): %s", run_id, response.status_code, response.text[:300])
+    except Exception:
+        log.exception("Could not mark scan run %s as failed.", run_id)
+
+
+async def send_scan_report(http, stats, scan_run_id=None):
     """Send a compact per-run scan-usage report to the owner's Telegram chat."""
     if not BOT_TOKEN or not BOT_CHAT_IDS:
         log.info("Telegram scan reports are not configured; skipping scan report.")
@@ -1233,6 +1259,7 @@ async def send_scan_report(http, stats):
         f"Buyer signals: {stats.get('buyer_signals', 0):,}\n"
         f"New leads saved: {stats.get('leads_saved', 0)}\n"
         f"Duplicate leads: {stats.get('duplicates', 0)}\n"
+        f"Processing errors: {stats.get('scan_errors', 0)}\n"
         f"Post-scan audit status: {'SUCCESS' if stats.get('post_scan_audit_ok') else 'FAILED — alerts withheld'}\n"
         f"Post-scan audit: {stats.get('post_scan_audited', 0)} checked | {stats.get('post_scan_verified', 0)} verified | {stats.get('post_scan_review', 0)} held for review | {stats.get('post_scan_rejected', 0)} cancelled\n"
         f"Scan duration: {minutes}m {seconds}s\n\n"
@@ -1240,13 +1267,40 @@ async def send_scan_report(http, stats):
         "Only messages inside this two-hour window are checked. Expired windows are not replayed."
     )
     try:
-        delivered, errors = await send_telegram_to_all(http, report, timeout=30)
-        if not delivered:
-            log.error("Telegram scan report failed: %s", "; ".join(errors)[:500])
+        if not scan_run_id:
+            log.error("Cannot persist Telegram scan report delivery without a scan run ID.")
+            return False
+        headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
+        url = f"{SUPABASE_URL}/rest/v1/scan_runs"
+        delivery_state = {}
+        errors = []
+        for chat_id in BOT_CHAT_IDS:
+            key = recipient_key(chat_id)
+            delivered, error = await send_telegram_to_chat(http, chat_id, report, timeout=30)
+            if not delivered:
+                errors.append(f"{key}: {error}")
+                continue
+            delivery_state[key] = datetime.now(timezone.utc).isoformat()
+            saved = await http.patch(url, headers={**headers, "Prefer": "return=minimal"}, params={"id": "eq." + str(scan_run_id), "owner_id": "eq." + SUPABASE_OWNER_ID}, json={"report_deliveries": delivery_state}, timeout=30)
+            if saved.status_code not in (200, 204):
+                errors.append(f"{key}: delivered but database record failed ({saved.status_code})")
+                log.error("Telegram scan report reached one chat but its delivery record failed.")
+        all_sent = len(delivery_state) == len(BOT_CHAT_IDS) and not errors
+        final_payload = {"report_delivery_error": "; ".join(errors)[:1000] if errors else None}
+        if all_sent:
+            final_payload["report_delivered_at"] = datetime.now(timezone.utc).isoformat()
+        final = await http.patch(url, headers={**headers, "Prefer": "return=minimal"}, params={"id": "eq." + str(scan_run_id), "owner_id": "eq." + SUPABASE_OWNER_ID}, json=final_payload, timeout=30)
+        if final.status_code not in (200, 204):
+            log.error("Could not persist final scan report delivery status (%s).", final.status_code)
+            return False
+        if all_sent:
+            log.info("Telegram scan report delivered and recorded for %s chat(s).", len(BOT_CHAT_IDS))
         else:
-            log.info("Telegram scan report delivered to %s chat(s).", len(BOT_CHAT_IDS))
+            log.error("Telegram scan report partially delivered or failed: %s", "; ".join(errors)[:500])
+        return all_sent
     except Exception:
-        log.exception("Could not send Telegram scan report.")
+        log.exception("Could not send or record Telegram scan report.")
+        return False
 
 
 async def login(client):
@@ -1327,6 +1381,9 @@ async def run(once=False):
                 )
                 break
             scan_run_id = await start_scan_run(http, window_start, window_end)
+            if scan_run_id == "duplicate":
+                log.info("Two-hour window was claimed by a concurrent run; safely skipping.")
+                break
             if not scan_run_id:
                 raise RuntimeError(
                     "Could not create a durable Supabase scan_runs record; "
@@ -1342,6 +1399,7 @@ async def run(once=False):
             seller_posts = 0
             buyer_signals = 0
             duplicates = 0
+            scan_errors = 0
             run_seen_dedupe_keys = set()
             dialogs = []
             async for dialog in client.iter_dialogs():
@@ -1415,6 +1473,7 @@ async def run(once=False):
                     except Exception:
                         log.exception("Could not resolve message author in group %s, message %s.", group_id, msg.id)
                         group_write_failed = True
+                        scan_errors += 1
                         continue
                     if not is_human_sender(sender):
                         continue
@@ -1466,6 +1525,7 @@ async def run(once=False):
                         meta["qualified_leads"] = int(meta.get("qualified_leads", 0)) + 1
                     elif save_status == "error":
                         group_write_failed = True
+                        scan_errors += 1
 
                 if group_write_failed:
                     log.warning("Some messages in group %s failed during this window; expired windows will not be replayed.", group_id)
@@ -1511,9 +1571,10 @@ async def run(once=False):
                 "post_scan_review": audit_result.get("review", 0),
                 "post_scan_verified": audit_result["verified"],
                 "post_scan_audit_ok": audit_result["ok"],
+                "scan_errors": scan_errors,
             }
             await finish_scan_run(http, scan_run_id, stats)
-            await send_scan_report(http, stats)
+            await send_scan_report(http, stats, scan_run_id)
             log.info(
                 "Scan complete: %s/%s selected joined groups checked (%s joined groups available); %s joined-group messages processed with no message-count cap; %s text messages checked; %s new leads saved; %.1fs.",
                 checked, len(dialogs), joined_groups_available, joined_messages_processed, messages_checked, saved, duration_seconds
