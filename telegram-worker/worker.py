@@ -1060,7 +1060,7 @@ async def save_lead(client_http, payload):
         return "error"
 
 async def audit_current_scan_leads(client_http, scan_started_at):
-    """Re-check leads created in this scan before sending any new-lead alerts."""
+    """Conservatively audit this run: never reject a plausible buyer on classifier disagreement."""
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
     url = f"{SUPABASE_URL}/rest/v1/leads"
     params = {
@@ -1070,37 +1070,40 @@ async def audit_current_scan_leads(client_http, scan_started_at):
         "created_at": f"gte.{scan_started_at}",
         "order": "created_at.asc", "limit": "200",
     }
-    audited = rejected = 0
+    audited = rejected = review = 0
     try:
         response = await client_http.get(url, headers=headers, params=params, timeout=30)
         if response.status_code != 200:
             log.error("Post-scan audit could not load leads (%s): %s", response.status_code, response.text[:400])
-            return {"audited": 0, "rejected": 0, "ok": False}
+            return {"audited": 0, "rejected": 0, "review": 0, "ok": False}
         for lead in response.json():
             audited += 1
             evidence = str(lead.get("evidence_summary") or "").strip()
-            services = classify(evidence)
-            stored_need = str(lead.get("service_need") or "").strip()
+            # Only high-confidence seller advertisements are auto-rejected.
+            # A classifier miss, short excerpt, or service-label mismatch is NOT proof
+            # that a prospect is invalid; keep it for human review to protect buyers.
             seller = bool(SELLER_AD_CONTEXT.search(evidence) or SELLER_POST_CONTEXT.search(evidence) or SELLER_PITCH_CONTEXT.search(evidence))
-            reason = None
-            if len(evidence) < 25: reason = "post_scan_audit: missing_or_short_evidence"
-            elif seller: reason = "post_scan_audit: vendor_or_service_seller_pitch"
-            elif not services: reason = "post_scan_audit: no_valid_AENZO_buyer_intent"
-            elif not stored_need or not any(service in stored_need for service in services): reason = "post_scan_audit: stored_service_need_does_not_match_evidence"
-            if not reason: continue
+            if not seller:
+                if len(evidence) < 25 or not classify(evidence):
+                    review += 1
+                    log.info("Post-scan audit retained lead %s for human review; evidence/classifier uncertain.", lead["id"])
+                continue
+            reason = "post_scan_audit: high_confidence_vendor_or_service_seller_pitch"
             notes = (str(lead.get("notes") or "").strip() + " | " + reason).strip(" |")[:4000]
             patch = await client_http.patch(url, headers={**headers, "Prefer": "return=minimal"}, params={"id": "eq." + str(lead["id"]), "owner_id": "eq." + SUPABASE_OWNER_ID, "status": "eq.new"}, json={"status": "rejected", "notes": notes}, timeout=30)
             if patch.status_code in (200, 204):
                 rejected += 1
-                log.warning("Post-scan audit rejected lead %s: %s", lead["id"], reason)
+                log.warning("Post-scan audit rejected clear seller lead %s.", lead["id"])
             else:
                 log.error("Post-scan audit could not reject lead %s (%s): %s", lead["id"], patch.status_code, patch.text[:300])
-                return {"audited": audited, "rejected": rejected, "ok": False}
-        log.info("Post-scan audit complete: %s checked, %s rejected.", audited, rejected)
-        return {"audited": audited, "rejected": rejected, "ok": True}
+                return {"audited": audited, "rejected": rejected, "review": review, "ok": False}
+        log.info("Post-scan audit complete: %s checked, %s clear sellers rejected, %s retained for review.", audited, rejected, review)
+        return {"audited": audited, "rejected": rejected, "review": review, "ok": True}
     except Exception:
         log.exception("Post-scan lead audit failed.")
-        return {"audited": audited, "rejected": rejected, "ok": False}
+        return {"audited": audited, "rejected": rejected, "review": review, "ok": False}
+
+
 
 def format_telegram_lead(lead):
     contacts = lead.get('contacts') or []
@@ -1881,6 +1884,7 @@ async def run(once=False):
                 "duration_seconds": duration_seconds,
                 "post_scan_audited": audit_result["audited"],
                 "post_scan_rejected": audit_result["rejected"],
+                "post_scan_review": audit_result["review"],
                 "post_scan_audit_ok": audit_result["ok"],
             }
             await finish_scan_run(http, scan_run_id, stats)
