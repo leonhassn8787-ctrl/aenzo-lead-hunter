@@ -1171,6 +1171,7 @@ async def send_scan_report(http, stats):
         "📊 AENZO LABS SCAN REPORT\n\n"
         f"Joined groups available: {stats.get('joined_groups_available', 0)}\n"
         f"Groups selected this run (maximum {MAX_JOINED_GROUPS_PER_RUN}): {stats.get('joined_groups_selected', 0)}\n"
+        f"Two-hour window (UTC): {stats.get('window_start', 'n/a')} → {stats.get('window_end', 'n/a')}\n"
         f"Joined groups checked: {stats.get('joined_groups_scanned', 0)}\n"
         f"Joined-group messages processed: {stats.get('joined_messages_processed', 0):,}\n"
         f"Joined-group messages checked: {stats.get('joined_messages_checked', 0):,}\n"
@@ -1186,8 +1187,8 @@ async def send_scan_report(http, stats):
         f"Post-scan audit status: {'SUCCESS' if stats.get('post_scan_audit_ok') else 'FAILED — alerts withheld'}\n"
         f"Post-scan audit: {stats.get('post_scan_audited', 0)} checked | {stats.get('post_scan_verified', 0)} verified | {stats.get('post_scan_review', 0)} held for review | {stats.get('post_scan_rejected', 0)} cancelled\n"
         f"Scan duration: {minutes}m {seconds}s\n\n"
-        "Note: every unseen message in the selected joined groups is processed in order. "
-        "If a run is interrupted, saved per-group cursors let the next run resume the backlog."
+        f"Collection window (UTC): {stats.get('window_start', 'n/a')} to {stats.get('window_end', 'n/a')}\n"
+        "Only messages inside this two-hour window are checked. Expired windows are not replayed."
     )
     try:
         delivered, errors = await send_telegram_to_all(http, report, timeout=30)
@@ -1421,6 +1422,8 @@ async def run(once=False):
                 log.error("Post-scan audit failed; pending-lead notifications withheld for safety.")
             duration_seconds = asyncio.get_running_loop().time() - scan_started
             stats = {
+                "window_start": window_start.isoformat(),
+                "window_end": window_end.isoformat(),
                 "joined_groups_available": joined_groups_available,
                 "joined_groups_selected": len(dialogs),
                 "joined_groups_scanned": checked,
