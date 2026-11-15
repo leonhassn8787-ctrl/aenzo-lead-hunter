@@ -1582,7 +1582,7 @@ class LeadDisplayLabelTests(unittest.TestCase):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn('initial_start = os.getenv("INITIAL_SCAN_START_AT", "").strip()', source)
         self.assertIn('if state.get("initial_scan_since") != configured_anchor:', source)
-        render = WORKER.with_name("../render.yaml").resolve().read_text(encoding="utf-8")
+        render = (WORKER.parent.parent / "render.yaml").read_text(encoding="utf-8")
         self.assertIn('INITIAL_SCAN_START_AT', render)
         self.assertIn('2026-11-15T22:04:35+00:00', render)
 
