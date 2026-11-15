@@ -9,8 +9,8 @@ on:
         type: boolean
         default: false
   schedule:
-    # Scan every two hours (UTC); public-group search runs before joined groups.
-    - cron: "0 */2 * * *"
+    # Scan every two hours (UTC), away from the busy top of the hour.
+    - cron: "17 */2 * * *"
 
 permissions:
   contents: read
