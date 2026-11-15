@@ -1413,8 +1413,8 @@ async def run(once=False):
                 # Persist rotation progress after each completed group so a long
                 # run that reaches the Actions timeout cannot starve later groups.
                 state["joined_group_cursor"] = group_id
-                if checked % 10 == 0:
-                    write_state(state)
+                # Persist after every completed group so rotation survives a timeout.
+                write_state(state)
 
 
             if last_group_visited is not None:
