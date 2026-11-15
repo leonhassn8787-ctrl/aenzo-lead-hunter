@@ -9,8 +9,8 @@ on:
         type: boolean
         default: false
   schedule:
-    # Bangladesh time (UTC+6): 09:00 and 17:00 = 03:00 and 11:00 UTC.
-    - cron: "0 3,11 * * *"
+    # Scan every two hours (UTC); public-group search runs before joined groups.
+    - cron: "0 */2 * * *"
 
 permissions:
   contents: read
@@ -210,9 +210,9 @@ jobs:
           LOOKBACK_DAYS: "30"
           GLOBAL_SEARCH_MAX_PAGES: "3"
           SCAN_BUDGET_SECONDS: "1920"
-          MAX_MESSAGES_PER_RUN: "1300"
-          MAX_JOINED_MESSAGES_PER_RUN: "1000"
-          MAX_PUBLIC_MESSAGES_PER_RUN: "300"
+          MAX_MESSAGES_PER_RUN: "100"
+          MAX_JOINED_MESSAGES_PER_RUN: "70"
+          MAX_PUBLIC_MESSAGES_PER_RUN: "30"
           MAX_MESSAGES_PER_GROUP_PER_RUN: "10"
         run: python worker.py --once
 
