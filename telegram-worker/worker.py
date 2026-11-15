@@ -449,7 +449,9 @@ KOL_PROJECT_CONTEXT = re.compile(
     r"budget|hire (a |an )?(kol|kols|influencer)|"
     r"(bring|attract|acquire) (traders|users|creators|builders) to (our|the|its) (project|exchange|ecosystem|platform)|"
     r"(hiring|looking for|seeking) (growth )?(marketers?|kols?|influencers?) to (bring|attract|acquire)|"
-    r"(cex|exchange) kols? .{0,100}(traders|users|campaign|promot)"
+    r"(cex|exchange) kols?[, ]+.{0,100}(traders|users|campaign|promot)|"
+    r"bring .{0,80}(traders|users|creators|builders).{0,60}(project|exchange|ecosystem|platform)|"
+    r"hiring .{0,80}(growth )?(marketers?|kols?|influencers?).{0,100}(project|ecosystem|exchange|platform|ai agent)"
     r")\b",
     re.I,
 )
