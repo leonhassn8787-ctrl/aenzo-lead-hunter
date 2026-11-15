@@ -441,7 +441,16 @@ RECRUITMENT_BUYER_CONTEXT = re.compile(
 )
 
 KOL_PROJECT_CONTEXT = re.compile(
-    r"\b(our (project|token|launch|campaign|protocol|wallet|exchange|platform|community)|for our (web3|crypto|token|project|launch|campaign)|token launch|web3 launch|crypto launch|paid (kol|influencer) campaign|kol campaign|influencer campaign|budget|hire (a |an )?(kol|kols|influencer))\b",
+    r"\b("
+    r"(our|the) (web3 |crypto |ai |defi |cefi )?(project|token|launch|campaign|protocol|wallet|exchange|platform|community|ecosystem)|"
+    r"for our (web3|crypto|token|project|launch|campaign|exchange|platform|ecosystem)|"
+    r"(web3|crypto|ai agent|defi|cefi|cex) (launch|project|ecosystem|exchange|platform)|"
+    r"token launch|web3 launch|crypto launch|paid (kol|influencer) campaign|kol campaign|influencer campaign|"
+    r"budget|hire (a |an )?(kol|kols|influencer)|"
+    r"(bring|attract|acquire) (traders|users|creators|builders) to (our|the|its) (project|exchange|ecosystem|platform)|"
+    r"(hiring|looking for|seeking) (growth )?(marketers?|kols?|influencers?) to (bring|attract|acquire)|"
+    r"(cex|exchange) kols? .{0,100}(traders|users|campaign|promot)"
+    r")\b",
     re.I,
 )
 
