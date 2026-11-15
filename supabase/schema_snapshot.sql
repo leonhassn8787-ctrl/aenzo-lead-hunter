@@ -99,6 +99,9 @@ begin
 end
 $;
 
+create index if not exists leads_source_scan_run_id_idx
+  on public.leads (source_scan_run_id)
+  where source_scan_run_id is not null;
 create index if not exists leads_owner_scan_run_status_idx
   on public.leads (owner_id, source_scan_run_id, status)
   where source_scan_run_id is not null;
@@ -115,10 +118,6 @@ create table if not exists public.user_settings (
 );
 
 -- Supporting indexes and the database-level identity/evidence dedupe guards.
-create index if not exists discovery_candidates_owner_status_idx
-  on public.discovery_candidates (owner_id, review_status, signal_score desc);
-create index if not exists discovery_candidates_source_id_idx
-  on public.discovery_candidates (source_id);
 create index if not exists leads_created_at_idx
   on public.leads (created_at desc);
 create unique index if not exists leads_owner_dedupe_key_uidx
