@@ -41,7 +41,8 @@ create table if not exists public.leads (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   telegram_notified_at timestamptz,
-  telegram_notification_error text
+  telegram_notification_error text,
+  telegram_deliveries jsonb not null default '{}'::jsonb
 );
 
 create table if not exists public.discovery_candidates (
@@ -73,6 +74,11 @@ create table if not exists public.scan_runs (
   leads_found integer not null default 0,
   leads_saved integer not null default 0,
   error_summary text,
+  window_start timestamptz,
+  window_end timestamptz,
+  report_deliveries jsonb not null default '{}'::jsonb,
+  report_delivered_at timestamptz,
+  report_delivery_error text,
   created_at timestamptz not null default now()
 );
 
@@ -102,6 +108,9 @@ create index if not exists leads_owner_status_idx
   on public.leads (owner_id, status);
 create index if not exists scan_runs_owner_id_idx
   on public.scan_runs (owner_id);
+create unique index if not exists scan_runs_owner_window_start_uidx
+  on public.scan_runs (owner_id, window_start)
+  where window_start is not null;
 
 -- All browser-facing tables are owner-scoped by RLS.
 alter table public.lead_sources enable row level security;
