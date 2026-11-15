@@ -421,7 +421,9 @@ SELLER_POST_CONTEXT = re.compile(
 SELLER_PITCH_CONTEXT = re.compile(
     r"\b("
     r"(we|i) (offer|provide|deliver|sell|supply|run|manage) .{0,180}\b(kol|influencer|shilling|traffic|promotion|marketing|pr|ama|community management|social media|advertising|lead generation|campaign management|user acquisition)\b.{0,180}\b(services?|packages?|solutions?|campaigns?|clients?|projects?|registrations?|ftds?|depositors?)\b|"
-    r"(we|i) (provide|offer|deliver|sell|supply) .{0,260}\b(quality )?(targeted )?(traffic|registrations?|signups?|leads?|ftds?|first[- ]time depositors?)\b|"
+    r"(we|i) (provide|offer|deliver|sell|supply|drive) .{0,260}\b(quality |high[- ]velocity |high[- ]quality |premium |real |active |targeted )?(traffic|registrations?|signups?|leads?|ftds?|first[- ]time depositors?)\b|"
+    r"(traffic|lead generation) (stats|packages|services|solutions).{0,180}(price list|pricing|rates|book (your )?slot|dm|contact)|"
+    r"(price list|book (your )?slot).{0,180}(traffic|targeted growth|giveaways|api integration)|"
     r"(we|i) (are|am) (a|an) .{0,50}\b(marketing|promotion|influencer|kol|traffic|advertising|growth|media) (agency|provider|supplier|team|service|network)\b|"
     r"(we|i) (are )?(looking for|seeking) (new )?(clients|projects) (to promote|for promotion|for marketing)|"
     r"looking for clients.{0,100}(marketing|promotion|kol|influencer|pr|traffic)|"
