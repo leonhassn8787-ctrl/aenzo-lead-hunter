@@ -1529,5 +1529,16 @@ class LeadDisplayLabelTests(unittest.TestCase):
             self.classify("We need a paid influencer campaign for our Web3 project."),
         )
 
+
+    def test_telegram_scan_run_metrics_are_persisted_to_supabase(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn("async def start_scan_run(http):", source)
+        self.assertIn("async def finish_scan_run(http, run_id, stats):", source)
+        self.assertIn('"public_messages_processed"', source)
+        self.assertIn('"joined_messages_processed"', source)
+        self.assertIn('"public_leads_saved"', source)
+        self.assertIn('"joined_leads_saved"', source)
+        self.assertIn("await finish_scan_run(http, scan_run_id, stats)", source)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
