@@ -1405,6 +1405,9 @@ async def run(once=False):
                     log.warning("Keeping cursor unchanged for group %s so failed writes can be retried.", group_id)
 
                 checked += 1
+                # Persist rotation progress after each completed group so a long
+                # run that reaches the Actions timeout cannot starve later groups.
+                state["joined_group_cursor"] = group_id
                 if checked % 10 == 0:
                     write_state(state)
 
