@@ -323,7 +323,7 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_notification_alerts_fetch_all_pages_before_sending(self):
         source = WORKER.read_text(encoding="utf-8")
-        start = source.index("async def notify_pending_leads(http):")
+        start = source.index("async def notify_pending_leads(http, scan_started_at=None):")
         end = source.index("async def send_scan_report", start)
         notify = source[start:end]
         self.assertIn("'offset': str(offset)", notify)
@@ -1297,7 +1297,27 @@ class TelegramNotificationGateTests(unittest.TestCase):
             if isinstance(item, ast.FunctionDef)
             and item.name == "telegram_notification_block_reason"
         )
-        namespace = {"classify": lambda evidence: ["Project Promotion"] if "our crypto project needs a paid marketing campaign" in evidence.lower() else []}
+        namespace = {"re": re}
+        needed_constants = {
+            "BUYING_CONTEXT", "CRYPTO_CONTEXT", "NON_BUYER_CONTEXT",
+            "SELLER_AD_CONTEXT", "SELLER_POST_CONTEXT", "SELLER_PITCH_CONTEXT",
+        }
+        for assignment in tree.body:
+            if isinstance(assignment, ast.Assign) and any(
+                isinstance(target, ast.Name) and target.id in needed_constants
+                for target in assignment.targets
+            ):
+                names = {
+                    target.id for target in assignment.targets
+                    if isinstance(target, ast.Name)
+                }
+                if names & needed_constants:
+                    exec(compile(ast.Module(body=[assignment], type_ignores=[]), str(WORKER), "exec"), namespace)
+        verify_node = next(
+            item for item in tree.body
+            if isinstance(item, ast.FunctionDef) and item.name == "verify_buyer_evidence"
+        )
+        exec(compile(ast.Module(body=[verify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
         exec(compile(ast.Module(body=[node], type_ignores=[]), str(WORKER), "exec"), namespace)
         cls.check = staticmethod(namespace["telegram_notification_block_reason"])
 
