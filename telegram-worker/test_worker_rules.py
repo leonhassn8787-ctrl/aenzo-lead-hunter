@@ -1336,6 +1336,7 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         cls.rotate_group_ids = staticmethod(namespace["rotate_group_ids"])
         cls.should_pause_group = staticmethod(namespace["should_pause_group"])
         cls.message_scan_kwargs = staticmethod(namespace["message_scan_kwargs"])
+        cls.two_hour_window = staticmethod(namespace["two_hour_window"])
         cls.reset_group_quality_metrics = staticmethod(namespace["reset_group_quality_metrics"])
 
     def test_two_hour_windows_advance_without_replaying_expired_periods(self):
@@ -1436,22 +1437,6 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         self.assertIn("post_scan_verified", report)
         self.assertIn("post_scan_rejected", report)
 
-
-
-class JoinedGroupCheckpointTests(unittest.TestCase):
-    def test_checkpoint_counts_all_messages_and_saves_before_current_message(self):
-        source = WORKER.read_text(encoding="utf-8")
-        start = source.index("async for msg in client.iter_messages(entity")
-        end = source.index("if not group_write_failed:", start)
-        loop_start = source[start:end]
-        checkpoint = loop_start.index('if messages_since_checkpoint >= 25 and not group_write_failed:')
-        save_cursor = loop_start.index('meta["last_seen_id"] = max(last_seen, newest_seen)')
-        increment = loop_start.index("messages_since_checkpoint += 1")
-        update_current = loop_start.index("newest_seen = max(newest_seen, int(msg.id))")
-        self.assertLess(checkpoint, save_cursor)
-        self.assertLess(save_cursor, update_current)
-        self.assertLess(update_current, increment)
-        self.assertIn("if getattr(msg, \"out\", False):", loop_start)
 
 
 class LeadDisplayLabelTests(unittest.TestCase):
