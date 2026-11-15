@@ -1304,7 +1304,7 @@ class TelegramNotificationGateTests(unittest.TestCase):
         source = WORKER.read_text(encoding="utf-8")
         self.assertNotIn("async def notify_saved_lead(http, dedupe_key):", source)
         self.assertNotIn('await notify_saved_lead(http, payload["dedupe_key"])', source)
-        audit = source.index("audit_result = await audit_current_scan_leads(http, scan_started_at_utc)")
+        audit = source.index("audit_result = await audit_current_scan_leads(http, scan_run_id)")
         notify = source.index("await notify_pending_leads(http)", audit)
         self.assertLess(audit, notify)
 
