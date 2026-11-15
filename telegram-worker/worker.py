@@ -1325,13 +1325,15 @@ async def send_scan_report(http, stats, scan_run_id=None):
         if scan_run_id:
             try:
                 headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
-                await http.patch(
+                recorded = await http.patch(
                     f"{SUPABASE_URL}/rest/v1/scan_runs",
                     headers={**headers, "Prefer": "return=minimal"},
                     params={"id": "eq." + str(scan_run_id), "owner_id": "eq." + SUPABASE_OWNER_ID},
                     json={"report_delivery_error": "disabled: bot token or chat ID is not configured"},
                     timeout=20,
                 )
+                if recorded.status_code not in (200, 204):
+                    log.error("Could not record disabled Telegram scan report delivery (%s): %s", recorded.status_code, recorded.text[:300])
             except Exception:
                 log.exception("Could not record that Telegram scan report delivery is disabled.")
         return False
