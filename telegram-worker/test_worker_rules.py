@@ -149,6 +149,9 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("audit_result = await audit_current_scan_leads(http, scan_started_at_utc)", source)
         self.assertLess(source.index("audit_result = await audit_current_scan_leads"), source.index("await notify_pending_leads(http)", source.index("audit_result = await audit_current_scan_leads")))
         self.assertIn("pending-lead notifications withheld for safety", source)
+        self.assertIn("'offset': str(offset)", audit_code)
+        self.assertIn("pending.extend(page)", audit_code)
+        self.assertLess(audit_code.index("pending.extend(page)"), audit_code.index("for lead in pending"))
     def test_evidence_verifier_keeps_proven_project_buyers(self):
         posts = [
             "Our blockchain project is looking for a marketing agency for launch promotion.",
@@ -1472,11 +1475,20 @@ class LeadDisplayLabelTests(unittest.TestCase):
 
     def test_telegram_scan_run_metrics_are_persisted_to_supabase(self):
         source = WORKER.read_text(encoding="utf-8")
-        self.assertIn("async def start_scan_run(http):", source)
+        self.assertIn("async def start_scan_run(http, window_start, window_end):", source)
         self.assertIn("async def finish_scan_run(http, run_id, stats):", source)
+        self.assertIn('"window_start": stats.get("window_start")', source)
+        self.assertIn('"window_end": stats.get("window_end")', source)
         self.assertIn('"joined_messages_processed"', source)
         self.assertIn('"joined_leads_saved"', source)
         self.assertIn("await finish_scan_run(http, scan_run_id, stats)", source)
+
+    def test_same_two_hour_window_is_not_scanned_twice(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn("async def scan_window_already_recorded(http, window_start):", source)
+        self.assertIn('"error_summary": "like.*" + window_start.isoformat() + "*"', source)
+        self.assertIn("if await scan_window_already_recorded(http, window_start):", source)
+        self.assertIn("refusing to start an untracked Telegram scan", source)
 
 
 
