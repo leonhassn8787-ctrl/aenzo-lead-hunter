@@ -1424,7 +1424,7 @@ async def send_scan_report(http, stats):
         f"New leads saved: {stats.get('leads_saved', 0)}\n"
         f"Duplicate leads: {stats.get('duplicates', 0)}\n"
         f"Post-scan audit status: {'SUCCESS' if stats.get('post_scan_audit_ok') else 'FAILED — alerts withheld'}\n"
-        f"Post-scan audit: {stats.get('post_scan_audited', 0)} checked | {stats.get('post_scan_verified', 0)} verified | {stats.get('post_scan_rejected', 0)} rejected\n"
+        f"Post-scan audit: {stats.get('post_scan_audited', 0)} checked | {stats.get('post_scan_verified', 0)} verified | {stats.get('post_scan_review', 0)} held for review | {stats.get('post_scan_rejected', 0)} cancelled\n"
         f"Scan duration: {minutes}m {seconds}s\n\n"
         "Note: message count is the number actually processed in this run; "
         "older messages are not intentionally rescanned."
