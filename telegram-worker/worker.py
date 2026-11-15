@@ -904,8 +904,8 @@ async def save_lead(client_http, payload):
         log.exception("Supabase request failed; this message will be retried.")
         return "error"
 
-async def audit_current_scan_leads(client_http, scan_started_at):
-    """Audit only leads created during this completed message window."""
+async def audit_current_scan_leads(client_http, scan_run_id):
+    """Audit only the leads created by this exact scan run."""
 
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
     url = f"{SUPABASE_URL}/rest/v1/leads"
@@ -913,7 +913,7 @@ async def audit_current_scan_leads(client_http, scan_started_at):
         "select": "id,evidence_summary,service_need,notes,priority_score",
         "owner_id": f"eq.{SUPABASE_OWNER_ID}",
         "status": "eq.new",
-        "created_at": "gte." + str(scan_started_at),
+        "source_scan_run_id": "eq." + str(scan_run_id),
         "order": "created_at.asc,id.asc", "limit": "200",
     }
     audited = rejected = verified = review = 0
@@ -1428,7 +1428,6 @@ async def run(once=False):
                     "refusing to start an untracked Telegram scan."
                 )
             try:
-                scan_started_at_utc = window_start.isoformat()
                 log.info("Two-hour window UTC: %s to %s", window_start.isoformat(), window_end.isoformat())
                 checked = 0
                 saved = 0
@@ -1526,6 +1525,7 @@ async def run(once=False):
                         en, bn = make_outreach(services)
                         payload = {
                             "owner_id": SUPABASE_OWNER_ID,
+                            "source_scan_run_id": scan_run_id,
                             "company_name": "Potential project (verify)",
                             "website": None,
                             "industry": "Web3 / Crypto",
@@ -1581,7 +1581,7 @@ async def run(once=False):
                     state["joined_group_cursor"] = last_group_visited
 
                 write_state(state)
-                audit_result = await audit_current_scan_leads(http, scan_started_at_utc)
+                audit_result = await audit_current_scan_leads(http, scan_run_id)
                 if audit_result["ok"]:
                     await notify_pending_leads(http)
                 else:
