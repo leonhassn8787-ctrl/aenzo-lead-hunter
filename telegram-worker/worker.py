@@ -1271,6 +1271,12 @@ async def finish_scan_run(http, run_id, stats):
         "scan_errors": int(stats.get("scan_errors", 0)),
         "post_scan_audit_ok": bool(stats.get("post_scan_audit_ok")),
         "post_scan_review": int(stats.get("post_scan_review", 0)),
+        "alerts_configured": bool(stats.get("alerts_configured")),
+        "pending_alerts_loaded": int(stats.get("pending_alerts_loaded", 0)),
+        "alerts_delivered": int(stats.get("alerts_delivered", 0)),
+        "alerts_failed": int(stats.get("alerts_failed", 0)),
+        "leads_moved_to_review": int(stats.get("leads_moved_to_review", 0)),
+        "alert_load_error": bool(stats.get("alert_load_error")),
     }
     payload = {
         "finished_at": datetime.now(timezone.utc).isoformat(),
@@ -1351,6 +1357,8 @@ async def send_scan_report(http, stats, scan_run_id=None):
         f"Processing errors: {stats.get('scan_errors', 0)}\n"
         f"Post-scan audit status: {'SUCCESS' if stats.get('post_scan_audit_ok') else 'FAILED — alerts withheld'}\n"
         f"Post-scan audit: {stats.get('post_scan_audited', 0)} checked | {stats.get('post_scan_verified', 0)} verified | {stats.get('post_scan_review', 0)} held for review | {stats.get('post_scan_rejected', 0)} cancelled\n"
+        f"Telegram lead alerts: {'enabled' if stats.get('alerts_configured') else 'disabled'} | {stats.get('alerts_delivered', 0)} delivered | {stats.get('alerts_failed', 0)} failed | {stats.get('leads_moved_to_review', 0)} moved to review\n"
+        f"Pending alerts loaded: {stats.get('pending_alerts_loaded', 0)} | Alert queue read error: {stats.get('alert_load_error', False)}\n"
         f"Scan duration: {minutes}m {seconds}s\n\n"
         f"Collection window (UTC): {stats.get('window_start', 'n/a')} to {stats.get('window_end', 'n/a')}\n"
         "Only messages inside this two-hour window are checked. Expired windows are not replayed."
@@ -1633,8 +1641,16 @@ async def run(once=False):
 
                 write_state(state)
                 audit_result = await audit_current_scan_leads(http, scan_run_id)
+                alert_stats = {
+                    "alerts_configured": bool(BOT_TOKEN and BOT_CHAT_IDS),
+                    "pending_alerts_loaded": 0,
+                    "alerts_delivered": 0,
+                    "alerts_failed": 0,
+                    "leads_moved_to_review": 0,
+                    "alert_load_error": False,
+                }
                 if audit_result["ok"]:
-                    await notify_pending_leads(http)
+                    alert_stats = await notify_pending_leads(http)
                 else:
                     log.error("Post-scan audit failed; pending-lead notifications withheld for safety.")
                 duration_seconds = asyncio.get_running_loop().time() - scan_started
@@ -1662,6 +1678,7 @@ async def run(once=False):
                     "post_scan_verified": audit_result["verified"],
                     "post_scan_audit_ok": audit_result["ok"],
                     "scan_errors": scan_errors,
+                    **alert_stats,
                 }
                 finished = await finish_scan_run(http, scan_run_id, stats)
                 if not finished:
