@@ -142,7 +142,8 @@ class LeadSignalTests(unittest.TestCase):
         audit_end = source.index("\n\ndef format_telegram_lead", audit_start)
         audit_code = source[audit_start:audit_end]
         self.assertNotIn('"telegram_notified_at": "is.null"', audit_code)
-        self.assertNotIn('"created_at": f"gte.', audit_code)
+        self.assertIn('"created_at": "gte." + str(scan_started_at)', audit_code)
+        self.assertIn('"order": "created_at.asc,id.asc"', audit_code)
         self.assertNotIn("for human review to protect buyers", source)
         self.assertNotIn("await notify_saved_lead(", source)
         self.assertIn("await notify_pending_leads(http)", source)
@@ -1468,10 +1469,30 @@ class LeadDisplayLabelTests(unittest.TestCase):
     def test_pending_notifications_are_not_limited_to_current_scan_time(self):
         source = WORKER.read_text(encoding="utf-8")
         start = source.index("async def notify_pending_leads(http, scan_started_at=None):")
-        end = source.index("\n\nasync def start_scan_run", start)
+        end = source.index("\n\nasync def scan_window_already_recorded", start)
         block = source[start:end]
-        self.assertNotIn("base_params['created_at']", block)
+        self.assertNotIn("'created_at':", block)
         self.assertIn("'telegram_notified_at': 'is.null'", block)
+        self.assertIn("'order': 'created_at.asc,id.asc'", block)
+
+    def test_blocked_pending_leads_are_preserved_in_manual_review(self):
+        source = WORKER.read_text(encoding="utf-8")
+        start = source.index("async def notify_pending_leads")
+        end = source.index("\n\nasync def scan_window_already_recorded", start)
+        block = source[start:end]
+        self.assertIn('"status": "review"', block)
+        self.assertIn('"status": "eq.new"', block)
+        self.assertIn('"telegram_gate: " + block_reason', block)
+
+    def test_notification_gate_blocks_explicit_service_seller_posts(self):
+        source = WORKER.read_text(encoding="utf-8")
+        start = source.index("def telegram_notification_block_reason")
+        end = source.index("\n\nasync def send_telegram_to_chat", start)
+        block = source[start:end]
+        self.assertIn("SELLER_AD_CONTEXT", block)
+        self.assertIn("SELLER_POST_CONTEXT", block)
+        self.assertIn("SELLER_PITCH_CONTEXT", block)
+        self.assertIn('"seller_or_vendor_post"', block)
 
     def test_telegram_scan_run_metrics_are_persisted_to_supabase(self):
         source = WORKER.read_text(encoding="utf-8")
