@@ -10,7 +10,7 @@ Deno.serve((req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   return new Response(JSON.stringify({
     error: "The legacy RSS discovery scanner has been retired.",
-    message: "AENZO lead discovery now uses the Telegram group worker. It scans joined groups and targeted non-joined public groups through Telegram global group search. Private groups still require membership.",
+    message: "AENZO lead discovery now uses only the Telegram group worker. It scans groups already joined by the connected Telegram account. No external websites, directories, RSS feeds, or non-joined groups are searched.",
     workflow: "https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter/actions/workflows/telegram-scan.yml"
   }), {
     status: 410,
