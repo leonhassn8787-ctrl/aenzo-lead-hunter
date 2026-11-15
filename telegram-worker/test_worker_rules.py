@@ -1,4 +1,7 @@
 import ast
+import asyncio
+import hashlib
+import logging
 import re
 import unittest
 from pathlib import Path
@@ -1585,6 +1588,131 @@ class LeadDisplayLabelTests(unittest.TestCase):
         render = (WORKER.parent.parent / "render.yaml").read_text(encoding="utf-8")
         self.assertIn('INITIAL_SCAN_START_AT', render)
         self.assertIn('2026-11-15T22:04:35+00:00', render)
+
+
+class WorkerHttpBehaviorTests(unittest.IsolatedAsyncioTestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tree = ast.parse(WORKER.read_text(encoding="utf-8"))
+
+    @classmethod
+    def load_functions(cls, names, namespace):
+        nodes = [
+            node for node in cls.tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name in names
+        ]
+        exec(compile(ast.Module(body=nodes, type_ignores=[]), str(WORKER), "exec"), namespace)
+        return namespace
+
+    class Response:
+        def __init__(self, status_code, data=None, text=""):
+            self.status_code = status_code
+            self._data = data if data is not None else []
+            self.text = text
+
+        def json(self):
+            return self._data
+
+    class FakeHttp:
+        def __init__(self, lead):
+            self.lead = lead
+            self.patches = []
+            self.get_params = []
+
+        async def get(self, url, headers=None, params=None, timeout=None):
+            self.get_params.append(params or {})
+            return WorkerHttpBehaviorTests.Response(200, [self.lead])
+
+        async def patch(self, url, headers=None, params=None, json=None, timeout=None):
+            payload = json or {}
+            self.patches.append(payload)
+            self.lead.update(payload)
+            return WorkerHttpBehaviorTests.Response(204)
+
+    async def test_partial_alert_delivery_retries_only_the_failed_chat(self):
+        lead = {
+            "id": "lead-1",
+            "company_name": "Potential project",
+            "service_need": "Project Promotion",
+            "priority_score": 70,
+            "evidence_summary": "Our crypto project needs a paid marketing campaign before launch. We need an agency.",
+            "evidence_date": "2026-11-16",
+            "evidence_url": "https://t.me/example/10",
+            "telegram_group_url": "https://t.me/example",
+            "contacts": [],
+            "outreach_english": "Hello",
+            "outreach_bengali": "হ্যালো",
+            "telegram_deliveries": {},
+            "notes": "",
+        }
+        calls = []
+        outcomes = {"chat-a": (True, None), "chat-b": (False, "temporary failure")}
+
+        async def send(http, chat_id, message, timeout=30):
+            calls.append(chat_id)
+            return outcomes[chat_id]
+
+        namespace = {
+            "BOT_TOKEN": "test-token",
+            "BOT_CHAT_IDS": ["chat-a", "chat-b"],
+            "SUPABASE_URL": "https://example.supabase.co",
+            "SUPABASE_OWNER_ID": "owner-1",
+            "SUPABASE_SERVICE_ROLE_KEY": "server-key",
+            "supabase_headers": lambda key: {"apikey": key},
+            "telegram_notification_block_reason": lambda item: None,
+            "recipient_key": lambda value: hashlib.sha256(str(value).encode()).hexdigest()[:20],
+            "format_telegram_lead": lambda item: "test lead",
+            "send_telegram_to_chat": send,
+            "datetime": __import__("datetime").datetime,
+            "timezone": __import__("datetime").timezone,
+            "log": logging.getLogger("test-aenzo-worker"),
+        }
+        self.load_functions({"notify_pending_leads"}, namespace)
+        first_http = self.FakeHttp(lead)
+        first = await namespace["notify_pending_leads"](first_http)
+        self.assertEqual(first["alerts_delivered"], 0)
+        self.assertEqual(first["alerts_failed"], 1)
+        self.assertEqual(first_http.lead["telegram_deliveries"], {
+            namespace["recipient_key"]("chat-a"): first_http.lead["telegram_deliveries"][namespace["recipient_key"]("chat-a")]
+        })
+        self.assertNotIn("telegram_notified_at", first_http.lead)
+
+        calls.clear()
+        outcomes["chat-b"] = (True, None)
+        second_http = self.FakeHttp(first_http.lead)
+        second = await namespace["notify_pending_leads"](second_http)
+        self.assertEqual(calls, ["chat-b"])
+        self.assertEqual(second["alerts_delivered"], 1)
+        self.assertEqual(second["alerts_failed"], 0)
+        self.assertIn("telegram_notified_at", second_http.lead)
+        self.assertEqual(len(second_http.lead["telegram_deliveries"]), 2)
+
+    async def test_audit_queries_only_candidates_from_its_scan_run(self):
+        namespace = {
+            "SUPABASE_URL": "https://example.supabase.co",
+            "SUPABASE_OWNER_ID": "owner-1",
+            "SUPABASE_SERVICE_ROLE_KEY": "server-key",
+            "supabase_headers": lambda key: {"apikey": key},
+            "SELLER_AD_CONTEXT": re.compile(r"(?!)"),
+            "SELLER_POST_CONTEXT": re.compile(r"(?!)"),
+            "SELLER_PITCH_CONTEXT": re.compile(r"(?!)"),
+            "verify_buyer_evidence": lambda text: False,
+            "classify": lambda text: [],
+            "log": logging.getLogger("test-aenzo-worker"),
+        }
+        self.load_functions({"audit_current_scan_leads"}, namespace)
+        http = self.FakeHttp({"id": "unused"})
+        async def get_empty(url, headers=None, params=None, timeout=None):
+            http.get_params.append(params or {})
+            return self.Response(200, [])
+        http.get = get_empty
+        result = await namespace["audit_current_scan_leads"](http, "scan-run-123")
+        self.assertTrue(result["ok"])
+        self.assertEqual(http.get_params[0]["source_scan_run_id"], "eq.scan-run-123")
+        self.assertEqual(http.get_params[0]["status"], "eq.new")
+        self.assertNotIn("created_at", http.get_params[0])
+        self.assertEqual(http.patches, [])
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
