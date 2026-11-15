@@ -138,12 +138,17 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("buyer_intent_verified; service_label_repaired", source)
         self.assertIn("source_evidence_does_not_prove_buyer_intent", source)
         self.assertIn("post_scan_verified", source)
+        audit_start = source.index("async def audit_current_scan_leads")
+        audit_end = source.index("\\n\\ndef format_telegram_lead", audit_start)
+        audit_code = source[audit_start:audit_end]
+        self.assertIn('"telegram_notified_at": "is.null"', audit_code)
+        self.assertNotIn('"created_at": f"gte.', audit_code)
         self.assertNotIn("for human review to protect buyers", source)
         self.assertNotIn("post_scan_review", source)
         self.assertNotIn("await notify_saved_lead(", source)
-        self.assertIn("await notify_pending_leads(http, scan_started_at_utc)", source)
+        self.assertIn("await notify_pending_leads(http)", source)
         self.assertIn("audit_result = await audit_current_scan_leads(http, scan_started_at_utc)", source)
-        self.assertLess(source.index("audit_result = await audit_current_scan_leads"), source.index("await notify_pending_leads(http, scan_started_at_utc)", source.index("audit_result = await audit_current_scan_leads")))
+        self.assertLess(source.index("audit_result = await audit_current_scan_leads"), source.index("await notify_pending_leads(http)", source.index("audit_result = await audit_current_scan_leads")))
         self.assertIn("pending-lead notifications withheld for safety", source)
     def test_evidence_verifier_keeps_proven_project_buyers(self):
         posts = [
@@ -1365,7 +1370,7 @@ class TelegramNotificationGateTests(unittest.TestCase):
         self.assertNotIn("async def notify_saved_lead(http, dedupe_key):", source)
         self.assertNotIn('await notify_saved_lead(http, payload["dedupe_key"])', source)
         audit = source.index("audit_result = await audit_current_scan_leads(http, scan_started_at_utc)")
-        notify = source.index("await notify_pending_leads(http, scan_started_at_utc)", audit)
+        notify = source.index("await notify_pending_leads(http)", audit)
         self.assertLess(audit, notify)
 
     def test_non_buyer_evidence_is_blocked(self):
