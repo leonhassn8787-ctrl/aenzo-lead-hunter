@@ -58,7 +58,7 @@ MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 1300, 1, 2000)
 MAX_PUBLIC_MESSAGES_PER_RUN = min(bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500), MAX_MESSAGES_PER_RUN)
 MAX_JOINED_MESSAGES_PER_RUN = bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 1000, 1, 1500)
 MAX_MESSAGES_PER_GROUP_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_GROUP_PER_RUN", 10, 1, 50)
-CLASSIFIER_RULES_VERSION = 24
+CLASSIFIER_RULES_VERSION = 25
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for beta testers",
@@ -245,9 +245,6 @@ SIGNALS = {
         r"need (more )?(project visibility|brand awareness|user acquisition)",
         r"(looking for|need) (a |an )?user acquisition (agency|partner|team|service)",
         r"need project promotion", r"promote our project",
-        r"cross[- ]marketing", r"co[- ]marketing", r"joint campaign",
-        r"pr collaboration", r"x partnership", r"twitter partnership",
-        r"(open to|looking for|seeking|interested in) .{0,80}(collaboration|collaborations|partnership|partnerships)",
         r"looking for a marketing partner", r"project marketing campaign",
         r"upcoming launch (promotion|marketing)",
     ],
@@ -470,6 +467,9 @@ NON_BUYER_CONTEXT = re.compile(
     r"anyone hiring|is anyone hiring|who is hiring|job opportunities|employment opportunities|"
     r"looking to join (a |your |any )?team|"
     r"you need (marketing|promotion|kols?|influencers?) (in|for)|you should (hire|look for|find) a? ?(marketing|growth) (agency|team)|"
+    r"looking for (cross[- ]promotion|co[- ]marketing|mutual promotion) (partners?|partnerships?)|"
+    r"(cross[- ]promotion|co[- ]marketing|mutual promotion).{0,100}(exchange of exposure|promote each other|in return|barter|free promotion)|"
+    r"(promote each other|exchange of exposure|in return for exposure|barter promotion)|"
     r"will anyone ever need (a )?(moderator|community manager|developer)( here)?|"
     r"does anyone need (a )?(moderator|community manager|developer) here|"
     r"looking for traders? in kol(s)?|"
