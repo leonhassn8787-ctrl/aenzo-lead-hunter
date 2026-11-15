@@ -1059,6 +1059,49 @@ async def save_lead(client_http, payload):
         log.exception("Supabase request failed; this message will be retried.")
         return "error"
 
+async def audit_current_scan_leads(client_http, scan_started_at):
+    """Re-check leads created in this scan before sending any new-lead alerts."""
+    headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
+    url = f"{SUPABASE_URL}/rest/v1/leads"
+    params = {
+        "select": "id,evidence_summary,service_need,notes",
+        "owner_id": f"eq.{SUPABASE_OWNER_ID}",
+        "status": "eq.new",
+        "created_at": f"gte.{scan_started_at}",
+        "order": "created_at.asc", "limit": "200",
+    }
+    audited = rejected = 0
+    try:
+        response = await client_http.get(url, headers=headers, params=params, timeout=30)
+        if response.status_code != 200:
+            log.error("Post-scan audit could not load leads (%s): %s", response.status_code, response.text[:400])
+            return {"audited": 0, "rejected": 0, "ok": False}
+        for lead in response.json():
+            audited += 1
+            evidence = str(lead.get("evidence_summary") or "").strip()
+            services = classify(evidence)
+            stored_need = str(lead.get("service_need") or "").strip()
+            seller = bool(SELLER_AD_CONTEXT.search(evidence) or SELLER_POST_CONTEXT.search(evidence) or SELLER_PITCH_CONTEXT.search(evidence))
+            reason = None
+            if len(evidence) < 25: reason = "post_scan_audit: missing_or_short_evidence"
+            elif seller: reason = "post_scan_audit: vendor_or_service_seller_pitch"
+            elif not services: reason = "post_scan_audit: no_valid_AENZO_buyer_intent"
+            elif not stored_need or not any(service in stored_need for service in services): reason = "post_scan_audit: stored_service_need_does_not_match_evidence"
+            if not reason: continue
+            notes = (str(lead.get("notes") or "").strip() + " | " + reason).strip(" |")[:4000]
+            patch = await client_http.patch(url, headers={**headers, "Prefer": "return=minimal"}, params={"id": "eq." + str(lead["id"]), "owner_id": "eq." + SUPABASE_OWNER_ID, "status": "eq.new"}, json={"status": "rejected", "notes": notes}, timeout=30)
+            if patch.status_code in (200, 204):
+                rejected += 1
+                log.warning("Post-scan audit rejected lead %s: %s", lead["id"], reason)
+            else:
+                log.error("Post-scan audit could not reject lead %s (%s): %s", lead["id"], patch.status_code, patch.text[:300])
+                return {"audited": audited, "rejected": rejected, "ok": False}
+        log.info("Post-scan audit complete: %s checked, %s rejected.", audited, rejected)
+        return {"audited": audited, "rejected": rejected, "ok": True}
+    except Exception:
+        log.exception("Post-scan lead audit failed.")
+        return {"audited": audited, "rejected": rejected, "ok": False}
+
 def format_telegram_lead(lead):
     contacts = lead.get('contacts') or []
     contact_lines = []
@@ -1395,6 +1438,7 @@ async def run(once=False):
         while True:
             scan_started = asyncio.get_running_loop().time()
             scan_run_id = await start_scan_run(http)
+            scan_started_at_utc = datetime.now(timezone.utc).isoformat()
             checked = 0
             saved = 0
             paused = 0
@@ -1804,7 +1848,11 @@ async def run(once=False):
             )
 
             write_state(state)
-            await notify_pending_leads(http)
+            audit_result = await audit_current_scan_leads(http, scan_started_at_utc)
+            if audit_result["ok"]:
+                await notify_pending_leads(http)
+            else:
+                log.error("Post-scan audit failed; pending-lead notifications withheld for safety.")
             duration_seconds = asyncio.get_running_loop().time() - scan_started
             stats = {
                 "joined_groups_available": len(dialogs),
@@ -1831,6 +1879,9 @@ async def run(once=False):
                 "leads_saved": saved,
                 "duplicates": duplicates,
                 "duration_seconds": duration_seconds,
+                "post_scan_audited": audit_result["audited"],
+                "post_scan_rejected": audit_result["rejected"],
+                "post_scan_audit_ok": audit_result["ok"],
             }
             await finish_scan_run(http, scan_run_id, stats)
             await send_scan_report(http, stats)
