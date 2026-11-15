@@ -1612,9 +1612,6 @@ async def run(once=False):
                         if messages_processed % 25 == 0:
                             write_state(state)
                         continue
-                    buyer_signals += 1
-                    public_buyer_signals += 1
-
                     try:
                         entity = await client.get_entity(msg.peer_id)
                         sender = await msg.get_sender()
@@ -1630,6 +1627,9 @@ async def run(once=False):
                         store_public_cursor(query_meta, msg)
                         continue
 
+                    # Count only actual human-authored group buyer candidates.
+                    buyer_signals += 1
+                    public_buyer_signals += 1
                     group_id = str(entity.id)
                     global_group_ids.add(group_id)
                     username = getattr(sender, "username", None)
@@ -1803,8 +1803,6 @@ async def run(once=False):
                     services = classify(text_body)
                     if not services:
                         continue
-                    buyer_signals += 1
-                    meta["buyer_signals"] = int(meta.get("buyer_signals", 0)) + 1
                     try:
                         sender = await msg.get_sender()
                     except Exception:
@@ -1813,6 +1811,9 @@ async def run(once=False):
                         continue
                     if not is_human_sender(sender):
                         continue
+                    # Count only actual human-authored group buyer candidates.
+                    buyer_signals += 1
+                    meta["buyer_signals"] = int(meta.get("buyer_signals", 0)) + 1
                     username = getattr(sender, "username", None) if sender else None
                     group_name = (getattr(entity, "title", None) or "Telegram group").strip()
                     public_name = getattr(entity, "username", None)
