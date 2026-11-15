@@ -1731,6 +1731,14 @@ class LeadDisplayLabelTests(unittest.TestCase):
             with self.subTest(unsupported=unsupported):
                 self.assertNotIn('"' + unsupported + '":', block.split('payload = {', 1)[1].split('}', 1)[0])
 
+    def test_pending_notifications_are_not_limited_to_current_scan_time(self):
+        source = WORKER.read_text(encoding="utf-8")
+        start = source.index("async def notify_pending_leads(http, scan_started_at=None):")
+        end = source.index("\n\nasync def start_scan_run", start)
+        block = source[start:end]
+        self.assertNotIn("base_params['created_at']", block)
+        self.assertIn("'telegram_notified_at': 'is.null'", block)
+
     def test_telegram_scan_run_metrics_are_persisted_to_supabase(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("async def start_scan_run(http):", source)
