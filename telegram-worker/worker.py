@@ -1923,6 +1923,7 @@ async def run(once=False):
                 "duration_seconds": duration_seconds,
                 "post_scan_audited": audit_result["audited"],
                 "post_scan_rejected": audit_result["rejected"],
+                "post_scan_review": audit_result.get("review", 0),
                 "post_scan_verified": audit_result["verified"],
                 "post_scan_audit_ok": audit_result["ok"],
             }
