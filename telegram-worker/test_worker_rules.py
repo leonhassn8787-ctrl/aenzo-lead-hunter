@@ -1420,7 +1420,8 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
         self.assertIn('bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)', source)
         self.assertIn('bounded_int_env("MAX_JOINED_GROUPS_PER_RUN", 200, 1, 200)', source)
-        self.assertIn('bounded_int_env("INITIAL_SCAN_START_AT"', source)
+        self.assertIn('os.getenv("INITIAL_SCAN_START_AT"', source)
+        self.assertIn('state["initial_scan_since"]', source)
 
     def test_scan_report_is_joined_group_only(self):
         source = WORKER.read_text(encoding="utf-8")
