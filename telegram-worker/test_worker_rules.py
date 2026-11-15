@@ -738,18 +738,21 @@ class LeadSignalTests(unittest.TestCase):
             [],
         )
 
-    def test_joined_group_only_scan_budget_and_two_hour_schedule(self):
+    def test_joined_group_scan_has_200_group_limit_and_no_message_count_limit(self):
         source = WORKER.read_text(encoding="utf-8")
-        self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 2000)', source)
-        self.assertIn('bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 100, 1, 2000)', source)
+        self.assertIn('bounded_int_env("MAX_JOINED_GROUPS_PER_RUN", 200, 1, 200)', source)
         self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
-        self.assertIn("messages_processed >= MAX_MESSAGES_PER_RUN", source)
-        self.assertIn("joined_messages_processed >= MAX_JOINED_MESSAGES_PER_RUN", source)
         self.assertIn("async for dialog in client.iter_dialogs()", source)
         self.assertIn('if not bool(getattr(dialog, "is_group", False))', source)
+        self.assertIn("dialogs = dialogs[:MAX_JOINED_GROUPS_PER_RUN]", source)
         run_code = source[source.index("async def run("):]
         self.assertNotIn("SearchGlobalRequest", run_code)
         self.assertNotIn("fetch_global_group_messages", run_code)
+        self.assertNotIn("MAX_MESSAGES_PER_RUN", source)
+        self.assertNotIn("MAX_JOINED_MESSAGES_PER_RUN", source)
+        self.assertNotIn("MAX_MESSAGES_PER_GROUP_PER_RUN", source)
+        self.assertNotIn("SCAN_BUDGET_SECONDS", source)
+        self.assertNotIn("should_pause_group(meta)", run_code)
 
     def test_verdict_testing_service_buyer_request(self):
         self.assert_signal(
@@ -1416,13 +1419,14 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
         self.assertIn('bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)', source)
-        self.assertIn('bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1920)', source)
-        self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 2000)', source)
-        self.assertIn('bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 100, 1, 2000)', source)
+        self.assertIn('bounded_int_env("MAX_JOINED_GROUPS_PER_RUN", 200, 1, 200)', source)
+        self.assertIn('bounded_int_env("INITIAL_SCAN_START_AT"', source)
 
     def test_scan_report_is_joined_group_only(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("Joined groups available:", source)
+        self.assertIn("Groups selected this run (maximum", source)
+        self.assertIn("no fixed message-count cap", source)
         self.assertIn("Joined groups checked:", source)
         self.assertIn("Joined-group messages processed:", source)
         self.assertNotIn("Public groups with qualified buyer signals:", source)
