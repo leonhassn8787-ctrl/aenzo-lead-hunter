@@ -1256,8 +1256,7 @@ async def notify_pending_leads(http, scan_started_at=None):
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
     url = SUPABASE_URL + '/rest/v1/leads'
     base_params = {'select': 'id,company_name,service_need,priority_score,evidence_date,evidence_summary,evidence_url,telegram_group_url,contacts,outreach_english,outreach_bengali', 'owner_id': 'eq.' + SUPABASE_OWNER_ID, 'status': 'eq.new', 'telegram_notified_at': 'is.null', 'order': 'created_at.asc', 'limit': '100'}
-    if scan_started_at:
-        base_params['created_at'] = 'gte.' + scan_started_at
+    # Do not restrict by scan start time: older unsent leads must survive retries.
     # Load every pending row before sending or updating any row. This keeps
     # offset pagination stable while successful notifications leave the query.
     pending = []
