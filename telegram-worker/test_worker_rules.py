@@ -133,7 +133,7 @@ class LeadSignalTests(unittest.TestCase):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("async def audit_current_scan_leads", source)
         self.assertIn("post_scan_audit: buyer_intent_uncertain_manual_review_required", source)
-        self.assertIn("Re-audit every active candidate; retain uncertain evidence for manual review", source)
+        self.assertIn("Keep ambiguous candidates in a review queue instead of discarding them", source)
         self.assertIn("def verify_buyer_evidence(text):", source)
         self.assertIn("buyer_intent_verified; service_label_repaired", source)
         self.assertIn("source_evidence_does_not_prove_buyer_intent", source)
