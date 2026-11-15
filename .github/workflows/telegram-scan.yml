@@ -11,6 +11,11 @@ on:
   schedule:
     # Saudi Arabia local time: every two hours at :10 (UTC even hours).
     - cron: "10 0,2,4,6,8,10,12,14,16,18,20,22 * * *"
+  push:
+    # Run once when this workflow is updated, so the new scan configuration is
+    # exercised immediately instead of waiting for the next scheduled window.
+    paths:
+      - ".github/workflows/telegram-scan.yml"
 
 permissions:
   contents: read
