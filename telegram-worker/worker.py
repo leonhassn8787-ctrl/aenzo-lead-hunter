@@ -435,7 +435,7 @@ SELLER_PITCH_CONTEXT = re.compile(
 # A recruitment signal is buyer intent only when the post clearly speaks for a
 # project/team, not when a member is advertising their own availability.
 RECRUITMENT_BUYER_CONTEXT = re.compile(
-    r"\\b(our project|our team|our company|our platform|our protocol|we are hiring|we're hiring|hiring for our|need (a |an )?(moderator|community manager|developer) for|looking for (a |an )?(moderator|community manager|developer) for)\\b",
+    r"\\b(our project|our team|our company|our platform|our protocol|we are hiring|we're hiring|hiring for our|for our (web3 |crypto )?(project|wallet|platform|protocol|token|community)|need (a |an )?(moderator|community manager|developer) for|looking for (a |an )?(moderator|community manager|developer) for)\\b",
     re.I,
 )
 
