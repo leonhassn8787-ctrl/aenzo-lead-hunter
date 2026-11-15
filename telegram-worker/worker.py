@@ -58,7 +58,7 @@ MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 1300, 1, 2000)
 MAX_PUBLIC_MESSAGES_PER_RUN = min(bounded_int_env("MAX_PUBLIC_MESSAGES_PER_RUN", 300, 1, 500), MAX_MESSAGES_PER_RUN)
 MAX_JOINED_MESSAGES_PER_RUN = bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 1000, 1, 1500)
 MAX_MESSAGES_PER_GROUP_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_GROUP_PER_RUN", 10, 1, 50)
-CLASSIFIER_RULES_VERSION = 21
+CLASSIFIER_RULES_VERSION = 22
 GLOBAL_GROUP_SEARCH_QUERIES = [
     "looking for crypto marketing",
     "looking for beta testers",
@@ -419,28 +419,29 @@ SELLER_POST_CONTEXT = re.compile(
 
 # Clear first-person service pitches are vendor posts, even when they mention client demand.
 SELLER_PITCH_CONTEXT = re.compile(
-    r"\\b("
-    r"(we|i) (offer|provide|deliver|sell|supply|run|manage) .{0,120}\\b(kol|influencer|shilling|traffic|promotion|marketing|pr|ama|community management|social media|advertising|lead generation|campaign management)\\b.{0,100}\\b(services?|packages?|solutions?|campaigns?|clients?|projects?)\\b|"
-    r"(we|i) (are|am) (a|an) .{0,50}\\b(marketing|promotion|influencer|kol|traffic|advertising|growth) (agency|provider|team|service)\\b|"
+    r"\b("
+    r"(we|i) (offer|provide|deliver|sell|supply|run|manage) .{0,180}\b(kol|influencer|shilling|traffic|promotion|marketing|pr|ama|community management|social media|advertising|lead generation|campaign management|user acquisition)\b.{0,180}\b(services?|packages?|solutions?|campaigns?|clients?|projects?|registrations?|ftds?|depositors?)\b|"
+    r"(we|i) (provide|offer|deliver|sell|supply) .{0,260}\b(quality )?(targeted )?(traffic|registrations?|signups?|leads?|ftds?|first[- ]time depositors?)\b|"
+    r"(we|i) (are|am) (a|an) .{0,50}\b(marketing|promotion|influencer|kol|traffic|advertising|growth|media) (agency|provider|supplier|team|service|network)\b|"
     r"(we|i) (are )?(looking for|seeking) (new )?(clients|projects) (to promote|for promotion|for marketing)|"
     r"looking for clients.{0,100}(marketing|promotion|kol|influencer|pr|traffic)|"
     r"(dm|contact|message) (me|us) (for )?(rates|pricing|packages|to book|for services)|"
     r"available for (paid )?(promotions?|campaigns?|marketing services)|"
     r"(marketing|kol|influencer|traffic|promotion) packages available|"
-    r"we work with .{0,100}\\b(projects|brands|clients)\\b.{0,100}\\b(promote|promotion|campaigns|traffic|leads)\\b"
-    r")\\b",
+    r"we work with .{0,100}\b(projects|brands|clients)\b.{0,100}\b(promote|promotion|campaigns|traffic|leads)\b|"
+    r"\b(google ppc|meta ads|facebook ads|instagram ads|telegram ads)\b.{0,180}\b(traffic|registrations?|ftds?|depositors?)\b.{0,180}\b(we provide|we offer|we deliver|our service|our traffic)\b|"
+    r"\b(igaming|casino|sportsbook)\b.{0,180}\b(traffic|ftds?|first[- ]time depositors?|registrations?)\b.{0,180}\b(we provide|we offer|we deliver|across [0-9]+ geos|geo[s]?)\b"
+    r")",
     re.I,
 )
 
-# A recruitment signal is buyer intent only when the post clearly speaks for a
-# project/team, not when a member is advertising their own availability.
 RECRUITMENT_BUYER_CONTEXT = re.compile(
-    r"\\b(our project|our team|our company|our platform|our protocol|we are hiring|we're hiring|hiring for our|for our (web3 |crypto )?(project|wallet|platform|protocol|token|community)|need (a |an )?(moderator|community manager|developer) for|looking for (a |an )?(moderator|community manager|developer) for)\\b",
+    r"\b(our project|our team|our company|our platform|our protocol|we are hiring|we're hiring|hiring for our|for our (web3 |crypto )?(project|wallet|platform|protocol|token|community)|need (a |an )?(moderator|community manager|developer) for|looking for (a |an )?(moderator|community manager|developer) for)\b",
     re.I,
 )
 
 KOL_PROJECT_CONTEXT = re.compile(
-    r"\\b(our (project|token|launch|campaign|protocol|wallet|exchange|platform|community)|for our (web3|crypto|token|project|launch|campaign)|token launch|web3 launch|crypto launch|paid (kol|influencer) campaign|kol campaign|influencer campaign|budget|hire (a |an )?(kol|kols|influencer))\\b",
+    r"\b(our (project|token|launch|campaign|protocol|wallet|exchange|platform|community)|for our (web3|crypto|token|project|launch|campaign)|token launch|web3 launch|crypto launch|paid (kol|influencer) campaign|kol campaign|influencer campaign|budget|hire (a |an )?(kol|kols|influencer))\b",
     re.I,
 )
 
