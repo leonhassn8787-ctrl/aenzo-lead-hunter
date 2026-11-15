@@ -210,9 +210,21 @@ jobs:
           import os
           import httpx
           token = os.getenv("AENZO_BOT_TOKEN", "").strip()
-          chat_id = os.getenv("AENZO_BOT_CHAT_ID", "").strip()
-          if not token or not chat_id:
-              raise SystemExit("Missing AENZO_BOT_TOKEN or AENZO_BOT_CHAT_ID repository secret.")
+          chat_ids = [
+              value.strip()
+              for value in (
+                  os.getenv("AENZO_BOT_CHAT_ID", "") + "," +
+                  os.getenv("AENZO_BOT_CHAT_IDS", "")
+              ).split(",")
+              if value.strip()
+          ]
+          if not token or not chat_ids:
+              raise SystemExit(
+                  "Missing AENZO_BOT_TOKEN or both AENZO_BOT_CHAT_ID/AENZO_BOT_CHAT_IDS repository secrets."
+              )
+          # Send one opt-in test message to one destination only; never spam
+          # every configured chat during a manual connection check.
+          chat_id = chat_ids[0]
           response = httpx.post(
               f"https://api.telegram.org/bot{token}/sendMessage",
               json={"chat_id": chat_id, "text": "AENZO LABS Lead Hunter bot connection test: SUCCESS. New saved leads will be sent here automatically."},
