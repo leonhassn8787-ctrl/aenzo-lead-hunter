@@ -1220,6 +1220,73 @@ async def notify_pending_leads(http):
 
 
 
+async def start_scan_run(http):
+    """Create a durable Supabase scan_runs record for each Telegram scan cycle."""
+    url = f"{SUPABASE_URL}/rest/v1/scan_runs"
+    headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
+    headers["Prefer"] = "return=representation"
+    try:
+        response = await http.post(
+            url,
+            headers=headers,
+            json={"owner_id": SUPABASE_OWNER_ID, "status": "running"},
+            timeout=20,
+        )
+        if response.status_code not in (200, 201):
+            log.warning("Could not create Supabase scan_runs row (%s): %s", response.status_code, response.text[:300])
+            return None
+        rows = response.json()
+        return rows[0].get("id") if rows else None
+    except Exception:
+        log.exception("Could not create Supabase scan_runs row.")
+        return None
+
+
+async def finish_scan_run(http, run_id, stats):
+    """Persist source-separated Telegram scan telemetry using existing scan_runs columns."""
+    if not run_id:
+        return
+    url = f"{SUPABASE_URL}/rest/v1/scan_runs"
+    headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
+    headers["Prefer"] = "return=minimal"
+    telemetry = {
+        "public_messages_processed": stats.get("public_messages_processed", 0),
+        "joined_messages_processed": stats.get("joined_messages_processed", 0),
+        "public_messages_checked": stats.get("public_messages_checked", 0),
+        "joined_messages_checked": stats.get("joined_messages_checked", 0),
+        "public_buyer_signals": stats.get("public_buyer_signals", 0),
+        "joined_buyer_signals": stats.get("joined_buyer_signals", 0),
+        "public_leads_saved": stats.get("public_leads_saved", 0),
+        "joined_leads_saved": stats.get("joined_leads_saved", 0),
+        "public_duplicates": stats.get("public_duplicates", 0),
+        "joined_duplicates": stats.get("joined_duplicates", 0),
+        "seller_posts": stats.get("seller_posts", 0),
+        "global_queries_completed": stats.get("global_queries_completed", 0),
+        "global_queries_incomplete": stats.get("global_queries_incomplete", 0),
+        "duration_seconds": round(stats.get("duration_seconds", 0), 1),
+    }
+    payload = {
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "status": "completed",
+        "sources_checked": int(stats.get("joined_groups_scanned", 0)) + int(stats.get("global_queries_completed", 0)),
+        "leads_found": int(stats.get("buyer_signals", 0)),
+        "leads_saved": int(stats.get("leads_saved", 0)),
+        "error_summary": json.dumps(telemetry, separators=(",", ":"))[:3000],
+    }
+    try:
+        response = await http.patch(
+            url,
+            headers=headers,
+            params={"id": "eq." + str(run_id), "owner_id": "eq." + SUPABASE_OWNER_ID},
+            json=payload,
+            timeout=20,
+        )
+        if response.status_code not in (200, 204):
+            log.warning("Could not update Supabase scan_runs row (%s): %s", response.status_code, response.text[:300])
+    except Exception:
+        log.exception("Could not update Supabase scan_runs row.")
+
+
 async def send_scan_report(http, stats):
     """Send a compact per-run scan-usage report to the owner's Telegram chat."""
     if not BOT_TOKEN or not BOT_CHAT_IDS:
@@ -1306,6 +1373,7 @@ async def run(once=False):
     async with httpx.AsyncClient() as http:
         while True:
             scan_started = asyncio.get_running_loop().time()
+            scan_run_id = await start_scan_run(http)
             checked = 0
             saved = 0
             paused = 0
@@ -1717,7 +1785,7 @@ async def run(once=False):
             write_state(state)
             await notify_pending_leads(http)
             duration_seconds = asyncio.get_running_loop().time() - scan_started
-            await send_scan_report(http, {
+            stats = {
                 "joined_groups_available": len(dialogs),
                 "joined_groups_scanned": checked,
                 "groups_paused": paused,
@@ -1742,7 +1810,9 @@ async def run(once=False):
                 "leads_saved": saved,
                 "duplicates": duplicates,
                 "duration_seconds": duration_seconds,
-            })
+            }
+            await finish_scan_run(http, scan_run_id, stats)
+            await send_scan_report(http, stats)
             log.info(
                 "Scan complete: %s/%s joined groups checked; %s total messages processed (%s cap, %s public budget); %s public messages; %s text messages checked; %s new leads saved; %.1fs.",
                 checked, len(dialogs), messages_processed, MAX_MESSAGES_PER_RUN, MAX_PUBLIC_MESSAGES_PER_RUN, public_messages_processed, messages_checked, saved, duration_seconds
