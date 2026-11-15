@@ -1042,44 +1042,60 @@ def recipient_key(chat_id):
     return hashlib.sha256(str(chat_id).encode("utf-8")).hexdigest()[:20]
 
 
-async def notify_pending_leads(http, scan_started_at=None):
-    if not BOT_TOKEN or not BOT_CHAT_IDS:
-        log.info('Telegram bot alerts not configured; scanning continues.')
-        return
+async def notify_pending_leads(http):
+    summary = {
+        "alerts_configured": bool(BOT_TOKEN and BOT_CHAT_IDS),
+        "pending_alerts_loaded": 0,
+        "alerts_delivered": 0,
+        "alerts_failed": 0,
+        "leads_moved_to_review": 0,
+        "alert_load_error": False,
+    }
+    if not summary["alerts_configured"]:
+        log.info("Telegram bot alerts not configured; scanning continues.")
+        return summary
+
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
-    url = SUPABASE_URL + '/rest/v1/leads'
-    base_params = {'select': 'id,company_name,service_need,priority_score,evidence_date,evidence_summary,evidence_url,telegram_group_url,contacts,outreach_english,outreach_bengali,telegram_deliveries,notes', 'owner_id': 'eq.' + SUPABASE_OWNER_ID, 'status': 'eq.new', 'telegram_notified_at': 'is.null', 'order': 'created_at.asc,id.asc', 'limit': '100'}
-    # Do not restrict by scan start time: older unsent leads must survive retries.
-    # Load every pending row before sending or updating any row. This keeps
-    # offset pagination stable while successful notifications leave the query.
+    url = SUPABASE_URL + "/rest/v1/leads"
+    base_params = {
+        "select": "id,company_name,service_need,priority_score,evidence_date,evidence_summary,evidence_url,telegram_group_url,contacts,outreach_english,outreach_bengali,telegram_deliveries,notes",
+        "owner_id": "eq." + SUPABASE_OWNER_ID,
+        "status": "eq.new",
+        "telegram_notified_at": "is.null",
+        "order": "created_at.asc,id.asc",
+        "limit": "100",
+    }
+
+    # Load every page before changing any status; the deterministic tie-breaker
+    # keeps offset pagination stable when several leads share created_at.
     pending = []
     offset = 0
     try:
         while True:
-            params = {**base_params, 'offset': str(offset)}
+            params = {**base_params, "offset": str(offset)}
             response = await http.get(url, headers=headers, params=params, timeout=30)
             if response.status_code != 200:
-                log.error('Could not load pending Telegram alerts: %s', response.text[:300])
-                return
+                log.error("Could not load pending Telegram alerts (%s): %s", response.status_code, response.text[:300])
+                summary["alert_load_error"] = True
+                return summary
             page = response.json()
             pending.extend(page)
             if len(page) < 100:
                 break
             offset += len(page)
     except Exception:
-        log.exception('Could not load pending Telegram alerts.')
-        return
-    log.info('Loaded %s pending Telegram alerts for strict review.', len(pending))
+        log.exception("Could not load pending Telegram alerts.")
+        summary["alert_load_error"] = True
+        return summary
+
+    summary["pending_alerts_loaded"] = len(pending)
+    log.info("Loaded %s pending Telegram alerts for strict review.", len(pending))
+
     for lead in pending:
-        lead_id = lead.get('id')
+        lead_id = lead.get("id")
         block_reason = telegram_notification_block_reason(lead)
         if block_reason:
-            log.warning(
-                "Telegram alert blocked for lead %s by strict buyer-evidence gate: %s",
-                lead_id, block_reason,
-            )
-            # Keep uncertain or seller-like records visible for manual review;
-            # do not let a blocked record clog the pending-alert queue forever.
+            log.warning("Telegram alert blocked for lead %s by strict buyer-evidence gate: %s", lead_id, block_reason)
             try:
                 old_notes = str(lead.get("notes") or "").strip()
                 review_note = "telegram_gate: " + block_reason
@@ -1088,21 +1104,21 @@ async def notify_pending_leads(http, scan_started_at=None):
                 reviewed = await http.patch(
                     url,
                     headers={**headers, "Prefer": "return=minimal"},
-                    params={
-                        "id": "eq." + str(lead_id),
-                        "owner_id": "eq." + SUPABASE_OWNER_ID,
-                        "status": "eq.new",
-                    },
+                    params={"id": "eq." + str(lead_id), "owner_id": "eq." + SUPABASE_OWNER_ID, "status": "eq.new"},
                     json={"status": "review", "notes": old_notes},
                     timeout=30,
                 )
                 if reviewed.status_code not in (200, 204):
+                    summary["alerts_failed"] += 1
                     log.error("Could not move blocked lead %s to manual review (%s): %s", lead_id, reviewed.status_code, reviewed.text[:300])
                 else:
+                    summary["leads_moved_to_review"] += 1
                     log.info("Blocked lead %s safely retained in manual review: %s", lead_id, block_reason)
             except Exception:
+                summary["alerts_failed"] += 1
                 log.exception("Could not move blocked lead %s to manual review.", lead_id)
             continue
+
         try:
             delivery_state = lead.get("telegram_deliveries") or {}
             if not isinstance(delivery_state, dict):
@@ -1112,27 +1128,62 @@ async def notify_pending_leads(http, scan_started_at=None):
                 key = recipient_key(chat_id)
                 if delivery_state.get(key):
                     continue
-                delivered, error = await send_telegram_to_chat(http, chat_id, format_telegram_lead(lead), timeout=30)
+                delivered, error = await send_telegram_to_chat(
+                    http, chat_id, format_telegram_lead(lead), timeout=30
+                )
                 if not delivered:
                     all_delivered = False
                     detail = f"{key}: {error}"[:500]
                     log.error("Telegram alert failed for lead %s: %s", lead_id, detail)
-                    await http.patch(url, headers=headers, params={"id": "eq." + str(lead_id), "owner_id": "eq." + SUPABASE_OWNER_ID}, json={"telegram_notification_error": detail}, timeout=30)
+                    try:
+                        await http.patch(
+                            url,
+                            headers={**headers, "Prefer": "return=minimal"},
+                            params={"id": "eq." + str(lead_id), "owner_id": "eq." + SUPABASE_OWNER_ID},
+                            json={"telegram_notification_error": detail},
+                            timeout=30,
+                        )
+                    except Exception:
+                        log.exception("Could not record Telegram alert error for lead %s.", lead_id)
                     continue
+
                 delivery_state[key] = datetime.now(timezone.utc).isoformat()
-                recorded = await http.patch(url, headers={**headers, "Prefer": "return=minimal"}, params={"id": "eq." + str(lead_id), "owner_id": "eq." + SUPABASE_OWNER_ID}, json={"telegram_deliveries": delivery_state}, timeout=30)
+                recorded = await http.patch(
+                    url,
+                    headers={**headers, "Prefer": "return=minimal"},
+                    params={"id": "eq." + str(lead_id), "owner_id": "eq." + SUPABASE_OWNER_ID},
+                    json={"telegram_deliveries": delivery_state},
+                    timeout=30,
+                )
                 if recorded.status_code not in (200, 204):
                     all_delivered = False
-                    log.error("Telegram delivered lead %s to one chat, but per-chat delivery state could not be recorded (%s).", lead_id, recorded.status_code)
+                    log.error(
+                        "Telegram delivered lead %s to one chat, but per-chat delivery state could not be recorded (%s).",
+                        lead_id, recorded.status_code,
+                    )
                     break
+
             if all_delivered and all(delivery_state.get(recipient_key(chat_id)) for chat_id in BOT_CHAT_IDS):
-                marked = await http.patch(url, headers={**headers, "Prefer": "return=minimal"}, params={"id": "eq." + str(lead_id), "owner_id": "eq." + SUPABASE_OWNER_ID}, json={"telegram_notified_at": datetime.now(timezone.utc).isoformat(), "telegram_notification_error": None}, timeout=30)
+                marked = await http.patch(
+                    url,
+                    headers={**headers, "Prefer": "return=minimal"},
+                    params={"id": "eq." + str(lead_id), "owner_id": "eq." + SUPABASE_OWNER_ID},
+                    json={"telegram_notified_at": datetime.now(timezone.utc).isoformat(), "telegram_notification_error": None},
+                    timeout=30,
+                )
                 if marked.status_code not in (200, 204):
+                    summary["alerts_failed"] += 1
                     log.error("All recipients received lead %s, but final notification timestamp could not be recorded (%s).", lead_id, marked.status_code)
                 else:
+                    summary["alerts_delivered"] += 1
                     log.info("Telegram alert delivered and recorded for lead %s.", lead_id)
+            else:
+                summary["alerts_failed"] += 1
         except Exception:
+            summary["alerts_failed"] += 1
             log.exception("Telegram notification attempt failed for lead %s; it will be retried.", lead_id)
+
+    return summary
 
 
 
