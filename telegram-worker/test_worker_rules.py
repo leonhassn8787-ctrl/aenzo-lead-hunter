@@ -1577,5 +1577,14 @@ class LeadDisplayLabelTests(unittest.TestCase):
         self.assertIn('"source_scan_run_id": "eq." + str(scan_run_id)', source)
         self.assertIn("audit_current_scan_leads(http, scan_run_id)", source)
 
+
+    def test_configured_scan_anchor_overrides_stale_host_state(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn('initial_start = os.getenv("INITIAL_SCAN_START_AT", "").strip()', source)
+        self.assertIn('if state.get("initial_scan_since") != configured_anchor:', source)
+        render = WORKER.with_name("../render.yaml").resolve().read_text(encoding="utf-8")
+        self.assertIn('INITIAL_SCAN_START_AT', render)
+        self.assertIn('2026-11-15T22:04:35+00:00', render)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
