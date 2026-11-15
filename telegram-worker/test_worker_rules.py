@@ -150,6 +150,11 @@ class LeadSignalTests(unittest.TestCase):
             "Our blockchain project is looking for a marketing agency for launch promotion.",
             "We need paid KOL marketing for our crypto wallet project.",
             "We are seeking beta testers for our Web3 wallet and product feedback.",
+            "Our Web3 startup is looking for a growth agency to increase users.",
+            "We need community engagement and Telegram member acquisition for our DeFi project.",
+            "Our crypto exchange is hiring brand ambassadors for a paid campaign.",
+            "We need content creators and sponsored posts for our blockchain game.",
+            "We are looking for an AMA host for our token project.",
         ]
         for post in posts:
             with self.subTest(post=post):
