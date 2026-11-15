@@ -297,7 +297,7 @@ class LeadSignalTests(unittest.TestCase):
         start = source.index("async def notify_pending_leads(http):")
         end = source.index("async def send_scan_report", start)
         notify = source[start:end]
-        self.assertIn("'offset': str(offset)", notify)
+        self.assertIn('"offset": str(offset)', notify)
         self.assertIn("pending.extend(page)", notify)
         self.assertLess(notify.index("pending.extend(page)"), notify.index("for lead in pending"))
 
