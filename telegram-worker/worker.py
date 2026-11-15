@@ -51,10 +51,7 @@ BOT_CHAT_IDS = list(dict.fromkeys(
 ))
 POLL_SECONDS = bounded_int_env("POLL_SECONDS", 7200, 60, 86400)
 LOOKBACK_DAYS = bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)
-SCAN_BUDGET_SECONDS = bounded_int_env("SCAN_BUDGET_SECONDS", 1320, 60, 1920)
-MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 2000)
-MAX_JOINED_MESSAGES_PER_RUN = bounded_int_env("MAX_JOINED_MESSAGES_PER_RUN", 100, 1, 2000)
-MAX_MESSAGES_PER_GROUP_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_GROUP_PER_RUN", 10, 1, 50)
+MAX_JOINED_GROUPS_PER_RUN = bounded_int_env("MAX_JOINED_GROUPS_PER_RUN", 200, 1, 200)
 CLASSIFIER_RULES_VERSION = 25
 
 
@@ -1169,14 +1166,14 @@ async def send_scan_report(http, stats):
     report = (
         "📊 AENZO LABS SCAN REPORT\n\n"
         f"Joined groups available: {stats.get('joined_groups_available', 0)}\n"
+        f"Groups selected this run (maximum {MAX_JOINED_GROUPS_PER_RUN}): {stats.get('joined_groups_selected', 0)}\n"
         f"Joined groups checked: {stats.get('joined_groups_scanned', 0)}\n"
-        f"Joined groups paused: {stats.get('groups_paused', 0)}\n"
         f"Joined-group messages processed: {stats.get('joined_messages_processed', 0):,}\n"
         f"Joined-group messages checked: {stats.get('joined_messages_checked', 0):,}\n"
         f"Joined-group buyer signals: {stats.get('joined_buyer_signals', 0):,}\n"
         f"Joined-group leads saved: {stats.get('joined_leads_saved', 0)}\n"
         f"Joined-group duplicate leads: {stats.get('joined_duplicates', 0)}\n"
-        f"Messages processed this run: {stats.get('messages_processed', 0):,} / {MAX_MESSAGES_PER_RUN:,}\n"
+        f"Messages processed this run: {stats.get('messages_processed', 0):,} (no fixed message-count cap)\n"
         f"Text messages checked: {stats.get('messages_checked', 0):,}\n"
         f"Seller/vendor posts: {stats.get('seller_posts', 0):,}\n"
         f"Buyer signals: {stats.get('buyer_signals', 0):,}\n"
@@ -1185,8 +1182,8 @@ async def send_scan_report(http, stats):
         f"Post-scan audit status: {'SUCCESS' if stats.get('post_scan_audit_ok') else 'FAILED — alerts withheld'}\n"
         f"Post-scan audit: {stats.get('post_scan_audited', 0)} checked | {stats.get('post_scan_verified', 0)} verified | {stats.get('post_scan_review', 0)} held for review | {stats.get('post_scan_rejected', 0)} cancelled\n"
         f"Scan duration: {minutes}m {seconds}s\n\n"
-        "Note: message count is the number actually processed in this run; "
-        "older messages are not intentionally rescanned."
+        "Note: every unseen message in the selected joined groups is processed in order. "
+        "If a run is interrupted, saved per-group cursors let the next run resume the backlog."
     )
     try:
         delivered, errors = await send_telegram_to_all(http, report, timeout=30)
@@ -1236,6 +1233,28 @@ async def run(once=False):
     if reset_group_quality_metrics(state):
         write_state(state)
     groups_state = state.setdefault("groups", {})
+    # Start a clean two-hour collection window once. Existing message cursors
+    # are reset so no messages from before the user's requested start are replayed.
+    if not state.get("initial_scan_since"):
+        initial_start = os.getenv("INITIAL_SCAN_START_AT", "").strip()
+        if initial_start:
+            try:
+                initial_dt = datetime.fromisoformat(initial_start.replace("Z", "+00:00"))
+                if initial_dt.tzinfo is None:
+                    initial_dt = initial_dt.replace(tzinfo=timezone.utc)
+            except ValueError as exc:
+                raise RuntimeError("INITIAL_SCAN_START_AT must be an ISO-8601 timestamp.") from exc
+        else:
+            initial_dt = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
+        state["initial_scan_since"] = initial_dt.astimezone(timezone.utc).isoformat()
+        for group_meta in groups_state.values():
+            group_meta["last_seen_id"] = 0
+            group_meta["paused_until"] = None
+        write_state(state)
+    initial_scan_since = datetime.fromisoformat(state["initial_scan_since"])
+    if initial_scan_since.tzinfo is None:
+        initial_scan_since = initial_scan_since.replace(tzinfo=timezone.utc)
+    initial_scan_cutoff = initial_scan_since.astimezone(timezone.utc)
     async with httpx.AsyncClient() as http:
         while True:
             scan_started = asyncio.get_running_loop().time()
@@ -1243,15 +1262,12 @@ async def run(once=False):
             scan_started_at_utc = datetime.now(timezone.utc).isoformat()
             checked = 0
             saved = 0
-            paused = 0
             messages_checked = 0
             messages_processed = 0
             seller_posts = 0
             buyer_signals = 0
             duplicates = 0
-            public_duplicates = 0
             run_seen_dedupe_keys = set()
-            cutoff = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
             now = datetime.now(timezone.utc)
             dialogs = []
             async for dialog in client.iter_dialogs():
@@ -1261,15 +1277,8 @@ async def run(once=False):
                     continue
                 dialogs.append(dialog)
 
-            joined_messages_processed = 0
-
-            joined_messages_processed = 0
-            public_messages_checked = 0
-            public_buyer_signals = 0
-            public_leads_saved = 0
-
-            # Prioritize proven groups, then rotate after the last visited group.
-            # A busy group is capped per run so it cannot monopolize the budget.
+            # Prioritize groups with proven leads, then rotate so every joined group
+            # gets a turn. At most 200 joined groups are selected per run.
             dialogs.sort(
                 key=lambda dialog: group_priority(
                     groups_state.get(str(dialog.entity.id), {})
@@ -1281,15 +1290,11 @@ async def run(once=False):
                 dialog_by_id.keys(), state.get("joined_group_cursor")
             )
             dialogs = [dialog_by_id[group_id] for group_id in ordered_group_ids]
+            joined_groups_available = len(dialogs)
+            dialogs = dialogs[:MAX_JOINED_GROUPS_PER_RUN]
             last_group_visited = None
 
             for dialog in dialogs:
-                if messages_processed >= MAX_MESSAGES_PER_RUN or joined_messages_processed >= MAX_JOINED_MESSAGES_PER_RUN:
-                    log.info("Per-run message limit reached; remaining joined groups resume next run.")
-                    break
-                if asyncio.get_running_loop().time() - scan_started >= SCAN_BUDGET_SECONDS:
-                    log.info("Scan time budget reached; remaining joined groups resume next run.")
-                    break
                 entity = dialog.entity
                 group_id = str(entity.id)
                 last_group_visited = group_id
@@ -1302,37 +1307,10 @@ async def run(once=False):
                     "paused_until": None,
                 })
                 last_seen = int(meta.get("last_seen_id", 0))
-                pause_value = meta.get("paused_until")
-                if pause_value:
-                    try:
-                        pause_until = datetime.fromisoformat(pause_value)
-                        if pause_until.tzinfo is None:
-                            pause_until = pause_until.replace(tzinfo=timezone.utc)
-                    except (TypeError, ValueError):
-                        pause_until = now
-                    if pause_until > now:
-                        paused += 1
-                        continue
-                    # Re-sample a previously snoozed group instead of excluding it forever.
-                    meta.update({
-                        "messages_seen": 0,
-                        "seller_ads": 0,
-                        "buyer_signals": 0,
-                        "qualified_leads": 0,
-                        "paused_until": None,
-                    })
-
                 newest_seen = last_seen
                 group_write_failed = False
                 messages_since_checkpoint = 0
-                group_messages_processed = 0
-                async for msg in client.iter_messages(entity, **message_scan_kwargs(last_seen, cutoff)):
-                    if group_messages_processed >= MAX_MESSAGES_PER_GROUP_PER_RUN:
-                        break
-                    if messages_processed >= MAX_MESSAGES_PER_RUN or joined_messages_processed >= MAX_JOINED_MESSAGES_PER_RUN:
-                        break
-                    if asyncio.get_running_loop().time() - scan_started >= SCAN_BUDGET_SECONDS:
-                        break
+                async for msg in client.iter_messages(entity, **message_scan_kwargs(last_seen, initial_scan_cutoff)):
                     if not msg:
                         continue
 
@@ -1347,7 +1325,6 @@ async def run(once=False):
                     messages_since_checkpoint += 1
                     messages_processed += 1
                     joined_messages_processed += 1
-                    group_messages_processed += 1
                     if getattr(msg, "out", False):
                         continue
                     if not msg.message or not msg.date:
@@ -1427,11 +1404,6 @@ async def run(once=False):
                 else:
                     log.warning("Keeping cursor unchanged for group %s so failed writes can be retried.", group_id)
 
-                # Vendor-heavy groups are snoozed for seven days, then sampled again.
-                if should_pause_group(meta):
-                    meta["paused_until"] = (now + timedelta(days=7)).isoformat()
-                    log.info("Temporarily snoozing low-quality vendor-heavy group %s for 7 days.", group_id)
-
                 checked += 1
                 if checked % 10 == 0:
                     write_state(state)
@@ -1448,9 +1420,9 @@ async def run(once=False):
                 log.error("Post-scan audit failed; pending-lead notifications withheld for safety.")
             duration_seconds = asyncio.get_running_loop().time() - scan_started
             stats = {
-                "joined_groups_available": len(dialogs),
+                "joined_groups_available": joined_groups_available,
+                "joined_groups_selected": len(dialogs),
                 "joined_groups_scanned": checked,
-                "groups_paused": paused,
                 "joined_messages_processed": joined_messages_processed,
                 "joined_messages_checked": messages_checked,
                 "joined_buyer_signals": buyer_signals,
@@ -1472,8 +1444,8 @@ async def run(once=False):
             await finish_scan_run(http, scan_run_id, stats)
             await send_scan_report(http, stats)
             log.info(
-                "Scan complete: %s/%s joined groups checked; %s joined-group messages processed (%s cap); %s text messages checked; %s new leads saved; %.1fs.",
-                checked, len(dialogs), joined_messages_processed, MAX_JOINED_MESSAGES_PER_RUN, messages_checked, saved, duration_seconds
+                "Scan complete: %s/%s selected joined groups checked (%s joined groups available); %s joined-group messages processed with no message-count cap; %s text messages checked; %s new leads saved; %.1fs.",
+                checked, len(dialogs), joined_groups_available, joined_messages_processed, messages_checked, saved, duration_seconds
             )
             if once:
                 break
