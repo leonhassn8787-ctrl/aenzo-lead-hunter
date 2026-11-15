@@ -60,6 +60,13 @@ class LeadSignalTests(unittest.TestCase):
             if isinstance(node, ast.Assign)
             and any(target.id == "SELLER_POST_CONTEXT" for target in node.targets if isinstance(target, ast.Name))
         )
+        for name in ("SELLER_PITCH_CONTEXT", "RECRUITMENT_BUYER_CONTEXT", "KOL_PROJECT_CONTEXT"):
+            namespace[name] = next(
+                eval(compile(ast.Expression(body=node.value), str(WORKER), "eval"), {"re": re})
+                for node in tree.body
+                if isinstance(node, ast.Assign)
+                and any(target.id == name for target in node.targets if isinstance(target, ast.Name))
+            )
         exec(compile(ast.Module(body=[classify_node], type_ignores=[]), str(WORKER), "exec"), namespace)
         cls.classify = staticmethod(namespace["classify"])
         priority_node = next(
@@ -1539,6 +1546,43 @@ class LeadDisplayLabelTests(unittest.TestCase):
         self.assertIn('"public_leads_saved"', source)
         self.assertIn('"joined_leads_saved"', source)
         self.assertIn("await finish_scan_run(http, scan_run_id, stats)", source)
+
+
+    def test_latest_igaming_traffic_provider_pitch_is_rejected(self):
+        message = (
+            "We provide quality iGaming, casino & sportsbook traffic across 32+ GEOs "
+            "through Google PPC, Meta Ads (Facebook & Instagram), TG Ads & Influencers. "
+            "Our focus is on quality registrations and First-Time Depositors (FTDs) "
+            "to help brands grow. Looking for quality traffic or interested in a "
+            "partnership? Let's connect! DM @SalesDiplomat0"
+        )
+        self.assertEqual(self.classify(message), [])
+
+    def test_traffic_and_ftd_vendor_variants_are_rejected(self):
+        for message in (
+            "We provide targeted traffic and qualified registrations for casino brands. DM us.",
+            "We deliver sportsbook FTDs across multiple GEOs through paid ads and influencers.",
+            "Our agency offers iGaming traffic packages. Contact us for pricing.",
+        ):
+            with self.subTest(message=message):
+                self.assertEqual(self.classify(message), [])
+
+    def test_vendor_pitch_filters_use_real_word_boundaries(self):
+        source = WORKER.read_text(encoding="utf-8")
+        for name in ("SELLER_PITCH_CONTEXT", "RECRUITMENT_BUYER_CONTEXT", "KOL_PROJECT_CONTEXT"):
+            with self.subTest(name=name):
+                start = source.index(name + " = re.compile(")
+                end = source.index("\n)", start)
+                block = source[start:end]
+                self.assertIn(r"\b", block)
+                self.assertNotIn(r"\\b", block)
+
+    def test_job_seeker_moderator_post_is_rejected(self):
+        self.assertEqual(
+            self.classify("Will anyone ever need a moderator here? Since when did this job become so low-demand"),
+            [],
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
