@@ -1477,5 +1477,57 @@ class LeadDisplayLabelTests(unittest.TestCase):
         self.assertEqual(worker_source.count('"company_name": "Potential project (verify)"'), 2)
 
 
+
+    def test_recent_service_seller_false_positives_are_rejected(self):
+        provider_posts = [
+            "We provide targeted traffic, giveaways, targeting and API services. DM for rates and booking.",
+            "We offer iGaming traffic, Google Ads, Meta Ads, Telegram Ads and influencer services. Contact us for pricing.",
+            "We deliver KOL and influencer marketing services for Web3 projects. DM us for rates.",
+        ]
+        for message in provider_posts:
+            with self.subTest(message=message):
+                self.assertEqual(self.classify(message), [])
+
+    def test_freelancer_open_to_new_projects_is_not_a_buyer(self):
+        self.assertEqual(
+            self.classify("I am a full-stack developer, open to new projects and collaborations."),
+            [],
+        )
+
+    def test_ambiguous_moderator_question_is_not_a_recruitment_lead(self):
+        self.assertEqual(
+            self.classify("Will anyone ever need a moderator here?"),
+            [],
+        )
+
+    def test_employer_side_recruitment_request_is_preserved(self):
+        self.assertIn(
+            "Recruitment",
+            self.classify("Hiring a community manager and moderators for our crypto project."),
+        )
+        self.assertIn(
+            "Recruitment",
+            self.classify("We are looking for a developer for our Web3 wallet project."),
+        )
+
+    def test_ambiguous_kol_demand_is_not_promoted_to_buyer(self):
+        for message in [
+            "Anyone looking for KOLs?",
+            "Need KOLs.",
+            "Will anyone need influencers?",
+        ]:
+            with self.subTest(message=message):
+                self.assertEqual(self.classify(message), [])
+
+    def test_project_specific_kol_buying_intent_is_preserved(self):
+        self.assertIn(
+            "KOL & Influencer Marketing",
+            self.classify("Looking for KOLs for our crypto launch."),
+        )
+        self.assertIn(
+            "KOL & Influencer Marketing",
+            self.classify("We need a paid influencer campaign for our Web3 project."),
+        )
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
