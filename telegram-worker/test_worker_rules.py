@@ -1531,25 +1531,6 @@ class GlobalSearchPaginationTests(unittest.TestCase):
 
 
 
-class LeadDisplayLabelTests(unittest.TestCase):
-    def test_group_title_is_not_misrepresented_as_project_name(self):
-        worker_source = open(__file__.replace("test_worker_rules.py", "worker.py"), encoding="utf-8").read()
-        self.assertNotIn('f"Potential project (verify) — {group_name}"', worker_source)
-        self.assertEqual(worker_source.count('"company_name": "Potential project (verify)"'), 2)
-
-
-
-    def test_telegram_scan_run_metrics_are_persisted_to_supabase(self):
-        source = WORKER.read_text(encoding="utf-8")
-        self.assertIn("async def start_scan_run(http):", source)
-        self.assertIn("async def finish_scan_run(http, run_id, stats):", source)
-        self.assertIn('"public_messages_processed"', source)
-        self.assertIn('"joined_messages_processed"', source)
-        self.assertIn('"public_leads_saved"', source)
-        self.assertIn('"joined_leads_saved"', source)
-        self.assertIn("await finish_scan_run(http, scan_run_id, stats)", source)
-
-
     def test_latest_igaming_traffic_provider_pitch_is_rejected(self):
         message = (
             "We provide quality iGaming, casino & sportsbook traffic across 32+ GEOs "
@@ -1584,6 +1565,27 @@ class LeadDisplayLabelTests(unittest.TestCase):
             self.classify("Will anyone ever need a moderator here? Since when did this job become so low-demand"),
             [],
         )
+
+
+
+class LeadDisplayLabelTests(unittest.TestCase):
+    def test_group_title_is_not_misrepresented_as_project_name(self):
+        worker_source = open(__file__.replace("test_worker_rules.py", "worker.py"), encoding="utf-8").read()
+        self.assertNotIn('f"Potential project (verify) — {group_name}"', worker_source)
+        self.assertEqual(worker_source.count('"company_name": "Potential project (verify)"'), 2)
+
+
+
+    def test_telegram_scan_run_metrics_are_persisted_to_supabase(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn("async def start_scan_run(http):", source)
+        self.assertIn("async def finish_scan_run(http, run_id, stats):", source)
+        self.assertIn('"public_messages_processed"', source)
+        self.assertIn('"joined_messages_processed"', source)
+        self.assertIn('"public_leads_saved"', source)
+        self.assertIn('"joined_leads_saved"', source)
+        self.assertIn("await finish_scan_run(http, scan_run_id, stats)", source)
+
 
 
 if __name__ == "__main__":
