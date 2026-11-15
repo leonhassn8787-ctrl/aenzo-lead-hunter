@@ -1820,7 +1820,6 @@ async def run(once=False):
                     if save_status == "saved":
                         saved += 1
                         meta["qualified_leads"] = int(meta.get("qualified_leads", 0)) + 1
-                        await notify_saved_lead(http, payload["dedupe_key"])
                     elif save_status == "duplicate":
                         duplicates += 1
                         meta["qualified_leads"] = int(meta.get("qualified_leads", 0)) + 1
