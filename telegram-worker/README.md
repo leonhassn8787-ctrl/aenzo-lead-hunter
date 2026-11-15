@@ -20,6 +20,8 @@ A group title is not treated as a verified company name. Unverified identities a
 - There is no fixed message-count cap per run and no per-group message cap. Each run checks messages whose Telegram timestamps fall strictly inside one two-hour window: window start inclusive, window end exclusive. The worker reads oldest-first and stops at the window end; it does not use old message-ID cursors to replay history.
 - The two-hour windows are anchored at 2026-11-16 01:04:35 Saudi Arabia time. The first complete window is 01:04:35–03:04:35; the scheduled run at about 03:10 reports that window. The next run checks only 03:04:35–05:04:35, then 05:04:35–07:04:35, continuously.
 - If a scheduled run is delayed or missed, expired windows are skipped and the worker checks only the latest completed two-hour window. If a run is interrupted or a message cannot be saved, that expired window is not replayed later; the scan report/log must be checked for failures. This deliberately follows the owner's no-old-backlog rule.
+- Before scanning, the worker checks Supabase `scan_runs` for the exact window. A window is recorded as `running` before Telegram history is read, and the window timestamps remain in `error_summary` after completion. If another run already started that window—even if it was interrupted—the second run skips it. If Supabase cannot verify or record the window, scanning stops rather than risk an untracked duplicate.
+- The post-scan buyer-evidence audit fetches every page of `new` leads before changing any status. This avoids skipping rows when more than 200 leads are waiting for audit; only after the complete audit succeeds are pending Telegram alerts considered.
 - Up to 200 joined groups are selected per run, rotating the selected group set across runs when more than 200 groups are joined. Groups not selected in a particular run are not scanned in that window.
 - The worker ignores messages sent by the account owner, bot accounts, and anonymous group/channel identities that cannot be verified as a human user.
 - No public username, project identity, or link is invented.
@@ -35,6 +37,7 @@ The scheduled GitHub Actions workflow needs these six repository secrets for sca
 - `SUPABASE_OWNER_ID`
 - `AENZO_BOT_TOKEN` — BotFather token for your private AENZO notification bot
 - `AENZO_BOT_CHAT_ID` — your private chat ID with that bot
+- At least one chat ID is required for automatic Telegram alerts. If the bot token is present but no chat ID is configured, scanning continues but alerts are disabled; the workflow now prints a warning.
 
 The Supabase secret key is sent only in the `apikey` header. It is not a JWT and must not be sent as `Authorization: Bearer`.
 
