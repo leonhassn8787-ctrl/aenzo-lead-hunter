@@ -22,4 +22,4 @@ jobs:
 
       - name: Run lead qualification and scan-rule tests
         working-directory: telegram-worker
-        run: python -m unittest -v test_worker_rules.py
+        run: python -m unittest discover -s . -p 'test_*.py' -v
