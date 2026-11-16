@@ -214,6 +214,25 @@ class LeadSignalTests(unittest.TestCase):
         self.assertEqual(self.classify(message), [])
         self.assertFalse(self.verify_buyer_evidence(message))
 
+    def test_generic_partnership_discussion_is_not_a_service_buyer(self):
+        message = (
+            "I always worry about onboarding users. This is when we need a big partnership "
+            "to bring volume. The network rewards people for powering infrastructure; "
+            "I also lean on advertising partners as a general growth idea."
+        )
+        self.assertFalse(self.verify_buyer_evidence(message))
+
+    def test_clear_project_side_promotion_requests_still_pass(self):
+        posts = [
+            "Looking for a promoter who can get users for our AI agent launchpad platform.",
+            "Our crypto project is looking for paid project promotion.",
+            "We need content creators and sponsored posts for our blockchain game.",
+            "Our DeFi app is looking for moderators for our community.",
+        ]
+        for post in posts:
+            with self.subTest(post=post):
+                self.assertTrue(self.verify_buyer_evidence(post))
+
     def test_direct_gamefi_marketing_agency_request_is_preserved(self):
         message = "Our GameFi project is looking for a marketing agency for its launch campaign."
         self.assertIn("Project Promotion", self.classify(message))
