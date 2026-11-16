@@ -370,7 +370,7 @@ CAPITAL_RAISE_CONTEXT = re.compile(
     re.I,
 )
 DIRECT_SERVICE_BUY_REQUEST_CONTEXT = re.compile(
-    r"\b(looking for|need|seeking|want to hire|hiring|we need|we are looking for)\b"
+    r"\b(looking for|needs?|seeking|want to hire|hiring|we need|we are looking for)\b"
     r".{0,120}\b(marketing (agency|team|partner|service|services|campaign)|"
     r"growth (agency|team|partner)|kol(s)?|influencers?|community (promotion|growth|management)|"
     r"member acquisition|pr (agency|partner|service|services)|ama (host|hosting)|content (marketing|distribution)|"
