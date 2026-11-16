@@ -1782,6 +1782,45 @@ class WorkerHttpBehaviorTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("telegram_notified_at", second_http.lead)
         self.assertEqual(len(second_http.lead["telegram_deliveries"]), 2)
 
+    async def test_reconcile_rewinds_ahead_cursor_to_missing_window(self):
+        from datetime import datetime, timezone, timedelta
+        rows = [
+            {"window_start": "2026-11-15T22:04:35+00:00", "status": "completed"},
+            {"window_start": "2026-11-16T00:04:35+00:00", "status": "completed"},
+            {"window_start": "2026-11-16T02:04:35+00:00", "status": "completed"},
+            # The 04:04–06:04 window is deliberately missing.
+            {"window_start": "2026-11-16T06:04:35+00:00", "status": "completed"},
+            {"window_start": "2026-11-16T08:04:35+00:00", "status": "completed"},
+        ]
+
+        class WindowHttp:
+            async def get(self, url, headers=None, params=None, timeout=None):
+                return WorkerHttpBehaviorTests.Response(200, rows)
+
+        state = {"next_window_start": "2026-11-16T10:04:35+00:00"}
+        writes = []
+        namespace = {
+            "SUPABASE_URL": "https://example.supabase.co",
+            "SUPABASE_OWNER_ID": "owner-1",
+            "SUPABASE_SERVICE_ROLE_KEY": "server-key",
+            "supabase_headers": lambda key: {"apikey": key},
+            "datetime": datetime,
+            "timezone": timezone,
+            "timedelta": timedelta,
+            "write_state": lambda value: writes.append(dict(value)),
+            "log": logging.getLogger("test-aenzo-worker"),
+        }
+        self.load_functions({"reconcile_next_window_start"}, namespace)
+        result = await namespace["reconcile_next_window_start"](
+            WindowHttp(),
+            datetime(2026, 11, 15, 22, 4, 35, tzinfo=timezone.utc),
+            state,
+            datetime(2026, 11, 16, 12, 30, tzinfo=timezone.utc),
+        )
+        self.assertEqual(result, datetime(2026, 11, 16, 4, 4, 35, tzinfo=timezone.utc))
+        self.assertEqual(state["next_window_start"], "2026-11-16T04:04:35+00:00")
+        self.assertEqual(len(writes), 1)
+
     async def test_audit_queries_only_candidates_from_its_scan_run(self):
         namespace = {
             "SUPABASE_URL": "https://example.supabase.co",
