@@ -1281,6 +1281,71 @@ async def scan_window_already_recorded(http, window_start):
     return any(row.get("status") == "completed" for row in response.json())
 
 
+async def reconcile_next_window_start(http, anchor, state, now=None):
+    """Rewind a stale local cursor to the earliest two-hour window not completed in Supabase."""
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    else:
+        now = now.astimezone(timezone.utc)
+    anchor = anchor.astimezone(timezone.utc)
+    url = f"{SUPABASE_URL}/rest/v1/scan_runs"
+    headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
+    rows = []
+    offset = 0
+    page_size = 1000
+    while True:
+        response = await http.get(
+            url,
+            headers=headers,
+            params={
+                "select": "window_start,status",
+                "owner_id": "eq." + SUPABASE_OWNER_ID,
+                "window_start": "gte." + anchor.isoformat(),
+                "order": "window_start.asc,started_at.asc",
+                "limit": str(page_size),
+                "offset": str(offset),
+            },
+            timeout=30,
+        )
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"Could not reconcile completed scan windows ({response.status_code}): {response.text[:300]}"
+            )
+        page = response.json()
+        rows.extend(page)
+        if len(page) < page_size:
+            break
+        offset += len(page)
+
+    completed = set()
+    for row in rows:
+        if row.get("status") != "completed" or not row.get("window_start"):
+            continue
+        try:
+            recorded = datetime.fromisoformat(str(row["window_start"]).replace("Z", "+00:00"))
+            if recorded.tzinfo is None:
+                recorded = recorded.replace(tzinfo=timezone.utc)
+            completed.add(recorded.astimezone(timezone.utc))
+        except (TypeError, ValueError):
+            log.warning("Ignoring invalid scan window timestamp in Supabase: %r", row.get("window_start"))
+
+    candidate = anchor
+    while candidate + timedelta(hours=2) <= now and candidate in completed:
+        candidate += timedelta(hours=2)
+
+    next_start = candidate.isoformat()
+    if state.get("next_window_start") != next_start:
+        previous = state.get("next_window_start")
+        state["next_window_start"] = next_start
+        write_state(state)
+        log.warning(
+            "Reconciled scan cursor from %s to earliest uncompleted window %s.",
+            previous, next_start,
+        )
+    return candidate
+
+
 async def start_scan_run(http, window_start, window_end):
     """Reuse a prior unfinished run instead of treating it as a completed window."""
     url = f"{SUPABASE_URL}/rest/v1/scan_runs"
@@ -1520,6 +1585,7 @@ async def run(once=False):
 
     async with httpx.AsyncClient() as http:
         while True:
+            await reconcile_next_window_start(http, anchor, state)
             window_start = datetime.fromisoformat(state["next_window_start"])
             if window_start.tzinfo is None:
                 window_start = window_start.replace(tzinfo=timezone.utc)
