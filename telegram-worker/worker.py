@@ -1635,8 +1635,8 @@ async def run(once=False):
                                 dt = dt.astimezone(timezone.utc)
                             if dt >= window_end:
                                 break
-                            if dt < window_start:
-                                continue
+                        # Older boundary messages are harmlessly filtered by process_message,
+                        # then checkpointed too so a boundary item cannot block resume forever.
                         # Persist after every successfully processed message; a failure leaves its ID untouched.
                         await process_message(msg, entity, group_id, meta)
                         gp["last_message_id"] = int(msg.id)
