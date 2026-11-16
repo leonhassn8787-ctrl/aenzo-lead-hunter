@@ -315,11 +315,12 @@ class LeadSignalTests(unittest.TestCase):
         self.assertNotEqual(self.dedupe("group-a", 100), self.dedupe("group-a", 101))
         self.assertNotEqual(self.dedupe("group-a", 100), self.dedupe("group-b", 100))
 
-    def test_worker_enforces_the_requested_100_message_run_cap(self):
+    def test_worker_has_no_message_count_cap(self):
         source = WORKER.read_text(encoding="utf-8")
-        self.assertIn('MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)', source)
-        self.assertIn("if messages_processed >= MAX_MESSAGES_PER_RUN:", source)
-        self.assertIn('"max_messages_per_run": MAX_MESSAGES_PER_RUN', source)
+        self.assertNotIn("MAX_MESSAGES_PER_RUN", source)
+        self.assertNotIn("message_limit_reached", source)
+        self.assertIn('"message_count_limit": "unlimited"', source)
+        self.assertIn("if message_date >= window_end:", source)
 
     def test_message_scan_is_date_windowed_and_old_backlog_is_not_requested(self):
         from datetime import datetime, timezone
@@ -791,12 +792,9 @@ class LeadSignalTests(unittest.TestCase):
         run_code = source[source.index("async def run("):]
         self.assertNotIn("SearchGlobalRequest", run_code)
         self.assertNotIn("fetch_global_group_messages", run_code)
-        self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)', source)
-        self.assertIn("if messages_processed >= MAX_MESSAGES_PER_RUN:", run_code)
-        group_loop = run_code.index("for dialog in dialogs:")
-        cap_guard = run_code.index("if messages_processed >= MAX_MESSAGES_PER_RUN:", group_loop)
-        group_entity = run_code.index("entity = dialog.entity", group_loop)
-        self.assertLess(cap_guard, group_entity)
+        self.assertNotIn("MAX_MESSAGES_PER_RUN", source)
+        self.assertNotIn("message_limit_reached", run_code)
+        self.assertIn('"message_count_limit": "unlimited"', source)
         self.assertNotIn("MAX_JOINED_MESSAGES_PER_RUN", source)
         self.assertNotIn("MAX_MESSAGES_PER_GROUP_PER_RUN", source)
         self.assertNotIn("SCAN_BUDGET_SECONDS", source)
@@ -1489,7 +1487,7 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("Joined groups available:", source)
         self.assertIn("Groups selected this run (maximum", source)
-        self.assertIn("MAX_MESSAGES_PER_RUN", source)
+        self.assertIn("no message-count limit", source)
         self.assertIn("Joined groups checked:", source)
         self.assertIn("Joined-group messages processed:", source)
         self.assertNotIn("Public groups with qualified buyer signals:", source)
