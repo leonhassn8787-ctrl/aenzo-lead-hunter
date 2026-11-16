@@ -772,7 +772,7 @@ class LeadSignalTests(unittest.TestCase):
             [],
         )
 
-    def test_joined_group_scan_has_200_group_limit_and_no_message_count_limit(self):
+    def test_joined_group_scan_has_200_group_limit_and_100_message_run_cap(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn('bounded_int_env("MAX_JOINED_GROUPS_PER_RUN", 200, 1, 200)', source)
         self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
@@ -782,7 +782,8 @@ class LeadSignalTests(unittest.TestCase):
         run_code = source[source.index("async def run("):]
         self.assertNotIn("SearchGlobalRequest", run_code)
         self.assertNotIn("fetch_global_group_messages", run_code)
-        self.assertNotIn("MAX_MESSAGES_PER_RUN", source)
+        self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)', source)
+        self.assertIn("if messages_processed >= MAX_MESSAGES_PER_RUN:", run_code)
         self.assertNotIn("MAX_JOINED_MESSAGES_PER_RUN", source)
         self.assertNotIn("MAX_MESSAGES_PER_GROUP_PER_RUN", source)
         self.assertNotIn("SCAN_BUDGET_SECONDS", source)
@@ -1291,6 +1292,8 @@ class TelegramNotificationGateTests(unittest.TestCase):
         needed_constants = {
             "BUYING_CONTEXT", "CRYPTO_CONTEXT", "NON_BUYER_CONTEXT",
             "SELLER_AD_CONTEXT", "SELLER_POST_CONTEXT", "SELLER_PITCH_CONTEXT",
+            "INDIVIDUAL_CREATIVE_ROLE_CONTEXT", "CAPITAL_RAISE_CONTEXT",
+            "DIRECT_SERVICE_BUY_REQUEST_CONTEXT",
         }
         for assignment in tree.body:
             if isinstance(assignment, ast.Assign) and any(
@@ -1316,8 +1319,16 @@ class TelegramNotificationGateTests(unittest.TestCase):
             "evidence_summary": "Our crypto project needs a paid marketing campaign before launch. We need an agency.",
             "service_need": "Project Promotion",
             "priority_score": 75,
+            "notes": "post_scan_audit: buyer_intent_verified",
         }
         self.assertIsNone(self.check(lead))
+
+    def test_missing_post_scan_audit_marker_is_blocked(self):
+        lead = {
+            "evidence_summary": "Our crypto project needs a paid marketing campaign before launch. We need an agency.",
+            "service_need": "Project Promotion",
+        }
+        self.assertEqual(self.check(lead), "missing_post_scan_buyer_audit")
 
     def test_missing_evidence_is_blocked(self):
         self.assertEqual(
@@ -1327,7 +1338,7 @@ class TelegramNotificationGateTests(unittest.TestCase):
 
     def test_low_priority_does_not_block_evidence_proven_buyer(self):
         self.assertIsNone(
-            self.check({"evidence_summary": "Our crypto project needs a paid marketing campaign before launch.", "service_need": "Project Promotion", "priority_score": 1}),
+            self.check({"evidence_summary": "Our crypto project needs a paid marketing campaign before launch.", "service_need": "Project Promotion", "priority_score": 1, "notes": "post_scan_audit: buyer_intent_verified"}),
         )
 
     def test_direct_buyer_at_minimum_qualified_score_can_be_notified(self):
@@ -1335,6 +1346,7 @@ class TelegramNotificationGateTests(unittest.TestCase):
             "evidence_summary": "Our crypto project needs a paid marketing campaign before launch. We need an agency.",
             "service_need": "Project Promotion",
             "priority_score": 55,
+            "notes": "post_scan_audit: buyer_intent_verified",
         }
         self.assertIsNone(self.check(lead))
 
@@ -1531,6 +1543,8 @@ class LeadDisplayLabelTests(unittest.TestCase):
         self.assertIn("SELLER_POST_CONTEXT", block)
         self.assertIn("SELLER_PITCH_CONTEXT", block)
         self.assertIn('"seller_or_vendor_post"', block)
+        self.assertIn("post_scan_audit: buyer_intent_verified", block)
+        self.assertNotIn("or classify(evidence)", block)
 
     def test_telegram_scan_run_metrics_are_persisted_to_supabase(self):
         source = WORKER.read_text(encoding="utf-8")
