@@ -1414,7 +1414,7 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         self.assertIn('kwargs["min_id"]', run_code)
         self.assertIn('gp["last_message_id"] = int(msg.id)', run_code)
         self.assertIn("write_state(state)", run_code)
-        self.assertIn("retry_after = max(30, min(int(getattr(exc, \"seconds\", 60) or 60), 900))", run_code)
+        self.assertIn("retry_after = retry_delay_seconds(exc)", run_code)
         self.assertIn("await asyncio.sleep(retry_after)", run_code)
         self.assertIn("next_window_start", run_code)
         self.assertIn('return any(row.get("status") == "completed" for row in response.json())', source)
