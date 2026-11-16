@@ -320,7 +320,7 @@ class LeadSignalTests(unittest.TestCase):
         self.assertNotIn("MAX_MESSAGES_PER_RUN", source)
         self.assertNotIn("message_limit_reached", source)
         self.assertIn('"message_count_limit": "unlimited"', source)
-        self.assertIn("if message_date >= window_end:", source)
+        self.assertIn("if dt >= window_end:", source)
 
     def test_message_scan_is_date_windowed_and_old_backlog_is_not_requested(self):
         from datetime import datetime, timezone
@@ -1478,10 +1478,10 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
         self.assertIn('bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)', source)
-        self.assertIn('bounded_int_env("MAX_JOINED_GROUPS_PER_RUN", 200, 1, 200)', source)
         self.assertIn('os.getenv("INITIAL_SCAN_START_AT"', source)
         self.assertIn('state["initial_scan_since"]', source)
-        self.assertIn("two_hour_window(initial_scan_anchor, scan_now_utc)", source)
+        self.assertIn('state["next_window_start"]', source)
+        self.assertIn('kwargs["min_id"]', source)
         self.assertIn("message_date >= window_end", source)
         self.assertNotIn("message_scan_kwargs(last_seen", source)
 
@@ -1575,9 +1575,9 @@ class LeadDisplayLabelTests(unittest.TestCase):
         self.assertIn("async def scan_window_already_recorded(http, window_start):", source)
         self.assertIn('"window_start": "eq." + window_start.isoformat()', source)
         self.assertIn('"window_start": window_start.isoformat()', source)
-        self.assertIn('if response.status_code == 409:', source)
+        self.assertIn('return any(row.get("status") == "completed" for row in response.json())', source)
         self.assertIn("if await scan_window_already_recorded(http, window_start):", source)
-        self.assertIn("refusing to start an untracked Telegram scan", source)
+        self.assertIn('"status": "running", "finished_at": None', source)
 
 
     def test_per_chat_lead_alert_delivery_is_persisted_without_raw_chat_ids(self):
@@ -1611,8 +1611,7 @@ class LeadDisplayLabelTests(unittest.TestCase):
 
     def test_scan_metrics_persistence_failure_fails_the_worker(self):
         source = WORKER.read_text(encoding="utf-8")
-        self.assertIn('finished = await finish_scan_run(http, scan_run_id, stats)', source)
-        self.assertIn('if not finished:', source)
+        self.assertIn('if not await finish_scan_run(http, scan_run_id, stats):', source)
         self.assertIn('mark_scan_run_failed(http, scan_run_id, exc)', source)
 
     def test_disabled_scan_report_is_recorded(self):
