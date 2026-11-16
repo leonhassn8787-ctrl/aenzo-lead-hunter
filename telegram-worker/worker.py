@@ -1756,7 +1756,7 @@ async def run(once=False):
                     raise RuntimeError("Supabase could not persist the completed scan metrics.")
                 await send_scan_report(http, stats, scan_run_id)
                 log.info(
-                    "Scan complete: %s/%s selected joined groups checked (%s joined groups available); %s joined-group messages processed (per-run cap applied); %s text messages checked; %s new leads saved; %.1fs.",
+                    "Scan complete: %s/%s selected joined groups checked (%s joined groups available); %s joined-group messages processed (no message-count cap); %s text messages checked; %s new leads saved; %.1fs.",
                     checked, len(dialogs), joined_groups_available, joined_messages_processed, messages_checked, saved, duration_seconds
                 )
 
