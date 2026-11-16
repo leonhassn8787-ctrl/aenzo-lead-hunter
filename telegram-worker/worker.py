@@ -1465,7 +1465,7 @@ async def retry_pending_scan_reports(http):
         response = await http.get(
             url, headers=headers,
             params={"select": "id,error_summary", "owner_id": "eq." + SUPABASE_OWNER_ID,
-                    "status": "eq.completed", "report_delivered_at": "is.null",
+                    "status": "eq.completed", "report_delivered_at": "is.null", "window_start": "not.is.null",
                     "order": "started_at.asc", "limit": "50"},
             timeout=30,
         )
