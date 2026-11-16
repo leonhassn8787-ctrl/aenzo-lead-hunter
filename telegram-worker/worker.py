@@ -376,7 +376,9 @@ DIRECT_SERVICE_BUY_REQUEST_CONTEXT = re.compile(
     r"member acquisition|pr (agency|partner|service|services)|ama (host|hosting)|content (marketing|distribution)|"
     r"video production|promotional video|giveaway campaign|airdrop campaign|"
     r"social media marketing|user acquisition|website (design|development)|"
-    r"brand ambassadors?|paid campaign)\b",
+    r"brand ambassadors?|paid campaign|paid promotions?|project promotion|promoters?|"
+    r"content creators?|sponsored posts?|early users?|beta testers?|product feedback|product testing|"
+    r"community managers?|moderators?|developers?)\b",
     re.I,
 )
 
@@ -716,6 +718,17 @@ def verify_buyer_evidence(text):
         text, re.I,
     )
     if not project_context or not service_need:
+        return False
+
+    # A generic request for a "partnership" is not proof that the author is
+    # buying an AENZO service. Require a service-specific request, or a clear
+    # project-side recruitment request. This blocks discussion/comments that
+    # mention advertising elsewhere but do not ask for an AENZO service.
+    direct_service_request = bool(
+        DIRECT_SERVICE_BUY_REQUEST_CONTEXT.search(text)
+        or RECRUITMENT_BUYER_CONTEXT.search(text)
+    )
+    if not direct_service_request:
         return False
     if not buyer_request and not (indirect_growth and service_need):
         return False
