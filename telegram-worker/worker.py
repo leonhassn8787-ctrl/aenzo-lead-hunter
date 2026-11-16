@@ -52,7 +52,8 @@ BOT_CHAT_IDS = list(dict.fromkeys(
 POLL_SECONDS = bounded_int_env("POLL_SECONDS", 7200, 60, 86400)
 LOOKBACK_DAYS = bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)
 MAX_JOINED_GROUPS_PER_RUN = bounded_int_env("MAX_JOINED_GROUPS_PER_RUN", 200, 1, 200)
-CLASSIFIER_RULES_VERSION = 25
+MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)
+CLASSIFIER_RULES_VERSION = 26
 
 
 # Signals that indicate a project may need one or more AENZO services.
@@ -193,7 +194,7 @@ SIGNALS = {
 }
 COMPILED = {name: [re.compile(p, re.I) for p in patterns] for name, patterns in SIGNALS.items()}
 BUYING_CONTEXT = re.compile(r"\b(struggling to (get|attract|reach|grow|increase)|having trouble (getting|attracting|reaching|growing)|not getting (enough|many) (users|registrations|signups|members|engagement|traction)|could use more|how can we (get|attract|reach|grow|increase)|what.s the best way to (get|attract|reach|grow|increase)|looking for|looking to work with|looking to grow|looking to increase|looking to boost|looking to attract|looking to reach|looking to get|in search of|trying to find|trying to grow|trying to increase|trying to reach|want to grow|want to increase|want to boost|want to attract|want to reach|need|needs|need more|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|need a hand|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|can anyone help|anyone able to|someone who can|anyone experienced in|could use|need help with|help us|partner with|any agency|suggest a)\b", re.I)
-CRYPTO_CONTEXT = re.compile(r"\b(web3|crypto|blockchain|solana|memecoins?|defi|cefi|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet|layer[- ]?[12])\b", re.I)
+CRYPTO_CONTEXT = re.compile(r"\b(web3|crypto|blockchain|solana|memecoins?|defi|cefi|cex|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet|layer[- ]?[12])\b", re.I)
 # Posts selling tools, accounts, traffic, or services are vendors—not buyers.
 # This catches ads that contain phrases such as "looking for an account" while
 # the author is actually offering rentals or inventory.
@@ -346,6 +347,30 @@ KOL_PROJECT_CONTEXT = re.compile(
     re.I,
 )
 
+# Individual creative-role hiring is not a marketing agency/service purchase.
+INDIVIDUAL_CREATIVE_ROLE_CONTEXT = re.compile(
+    r"\b(looking for|seeking|hiring|need|want to hire)\s+(?:an?\s+)?"
+    r"(content specialists?|video editors?|copywriters?|graphic designers?|motion designers?)\b",
+    re.I,
+)
+CAPITAL_RAISE_CONTEXT = re.compile(
+    r"\b(looking for|seeking|need|raising|raise|want to raise)\b.{0,80}\b"
+    r"(additional funds?|funding|investment|investors?|capital|liquidity)\b|"
+    r"\b(sell|selling)\s+(the\s+)?(project|company)\b|"
+    r"\bproject for sale\b|\blisting contract\b",
+    re.I,
+)
+DIRECT_SERVICE_BUY_REQUEST_CONTEXT = re.compile(
+    r"\b(looking for|need|seeking|want to hire|hiring|we need|we are looking for)\b"
+    r".{0,120}\b(marketing (agency|team|partner|service|services|campaign)|"
+    r"growth (agency|team|partner)|kol(s)?|influencers?|community (promotion|growth|management)|"
+    r"member acquisition|pr (agency|partner|service|services)|ama (host|hosting)|content (marketing|distribution)|"
+    r"video production|promotional video|giveaway campaign|airdrop campaign|"
+    r"social media marketing|user acquisition|website (design|development)|"
+    r"brand ambassadors?|paid campaign)\b",
+    re.I,
+)
+
 NON_BUYER_CONTEXT = re.compile(
     r"\b(looking for a job|need a job|seeking (a )?job|looking for work|available for work|"
     r"open to (the )?(next|new) (opportunity|role|position)|open to opportunities|open to new projects|open to projects|"
@@ -475,6 +500,8 @@ def classify(text):
     """Return direct and plausible AENZO prospects; seller and job-seeker posts remain excluded."""
     if (
         not text
+        or INDIVIDUAL_CREATIVE_ROLE_CONTEXT.search(text)
+        or (CAPITAL_RAISE_CONTEXT.search(text) and not DIRECT_SERVICE_BUY_REQUEST_CONTEXT.search(text))
         or (
             NON_BUYER_CONTEXT.search(text)
             and not (
@@ -527,6 +554,15 @@ def classify(text):
         r"interested in hiring a (web3 |crypto )?marketing team)\b",
         re.I,
     )
+
+    identified_project_context = CRYPTO_CONTEXT.search(text) or re.search(
+        r"\b(project|product|app|platform|website|software|saas|digital product|"
+        r"startup|brand|launch|game|exchange|wallet|protocol)\b",
+        text,
+        re.I,
+    )
+    if not identified_project_context:
+        return []
 
     hits = [
         name for name, patterns in COMPILED.items()
@@ -610,6 +646,10 @@ def verify_buyer_evidence(text):
     """Independent evidence gate: prove project context, a buyer request, and an AENZO service need."""
     if not text:
         return False
+    if INDIVIDUAL_CREATIVE_ROLE_CONTEXT.search(text):
+        return False
+    if CAPITAL_RAISE_CONTEXT.search(text) and not DIRECT_SERVICE_BUY_REQUEST_CONTEXT.search(text):
+        return False
     if SELLER_AD_CONTEXT.search(text) or SELLER_POST_CONTEXT.search(text) or SELLER_PITCH_CONTEXT.search(text):
         return False
     if NON_BUYER_CONTEXT.search(text) and not (
@@ -644,7 +684,7 @@ def verify_buyer_evidence(text):
         r"growth (agency|team|partner|service|marketing)|growth|"
         r"community (growth|promotion|management|engagement)|community growth|"
         r"telegram (promotion|member acquisition|community growth)|member acquisition|"
-        r"pr agency|media coverage|press release|ama hosting|ama|"
+        r"pr (agency|partner|service|services)|media coverage|press release|ama hosting|ama|"
         r"giveaway campaign|airdrop campaign|social media management|"
         r"content marketing|content distribution|content creators?|brand ambassadors?|"
         r"influencer outreach|sponsored posts?|brand awareness|"
@@ -938,14 +978,21 @@ async def audit_current_scan_leads(client_http, scan_run_id):
             evidence = str(lead.get("evidence_summary") or "").strip()
             stored_need = str(lead.get("service_need") or "").strip()
             seller = bool(SELLER_AD_CONTEXT.search(evidence) or SELLER_POST_CONTEXT.search(evidence) or SELLER_PITCH_CONTEXT.search(evidence))
-            proven = len(evidence) >= 25 and not seller and (
-                verify_buyer_evidence(evidence) or bool(classify(evidence))
+            # Classification is discovery-only and cannot override the final evidence gate.
+            proven = (
+                len(evidence) >= 25
+                and not seller
+                and verify_buyer_evidence(evidence)
             )
             if not proven:
-                # A clear seller pitch is cancelled; ambiguous or incomplete evidence
-                # is retained for the owner's manual review instead of being lost.
-                target_status = "rejected" if seller else "review"
-                reason = "post_scan_audit: clear_service_seller_or_nonbuyer" if seller else "post_scan_audit: buyer_intent_uncertain_manual_review_required"
+                # Clear sellers are held; ambiguous or incomplete evidence remains in manual review.
+                # Preserve records: failed candidates go to manual review, never auto-reject.
+                target_status = "review"
+                reason = (
+                    "post_scan_audit: clear_service_seller_held_for_manual_review"
+                    if seller
+                    else "post_scan_audit: buyer_intent_uncertain_manual_review_required"
+                )
                 notes = (str(lead.get("notes") or "").strip() + " | " + reason).strip(" |")[:4000]
                 patch = await client_http.patch(
                     url, headers={**headers, "Prefer": "return=minimal"},
@@ -955,24 +1002,36 @@ async def audit_current_scan_leads(client_http, scan_run_id):
                 if patch.status_code not in (200, 204):
                     log.error("Post-scan audit could not update lead %s (%s): %s", lead["id"], patch.status_code, patch.text[:300])
                     return {"audited": audited, "rejected": rejected, "verified": verified, "review": review, "ok": False}
-                if seller:
-                    rejected += 1
-                    log.info("Post-scan audit cancelled clear seller/non-buyer candidate %s.", lead["id"])
-                else:
-                    review += 1
-                    log.info("Post-scan audit retained uncertain candidate %s for manual review.", lead["id"])
+                review += 1
+                log.info("Post-scan audit held unverified candidate %s for manual review (%s).", lead["id"], reason)
                 continue
 
             inferred = classify(evidence)
             repaired_need = "; ".join(inferred) if inferred else (stored_need or "Project Promotion")
+            notes = str(lead.get("notes") or "").strip()
+            marker = "post_scan_audit: buyer_intent_verified"
+            if marker not in notes:
+                notes = (notes + " | " + marker).strip(" |")
+            patch_payload = {"notes": notes[:4000]}
             if repaired_need != stored_need:
-                notes = (str(lead.get("notes") or "").strip() + " | post_scan_audit: buyer_intent_verified; service_label_repaired").strip(" |")[:4000]
-                patch = await client_http.patch(url, headers={**headers, "Prefer": "return=minimal"}, params={"id": "eq." + str(lead["id"]), "owner_id": "eq." + SUPABASE_OWNER_ID, "status": "eq.new"}, json={"service_need": repaired_need, "notes": notes}, timeout=30)
+                patch_payload["service_need"] = repaired_need
+                repair_marker = "post_scan_audit: service_label_repaired"
+                if repair_marker not in notes:
+                    notes = (notes + " | " + repair_marker).strip(" |")
+                patch_payload["notes"] = notes[:4000]
+            if patch_payload["notes"] != str(lead.get("notes") or "").strip() or repaired_need != stored_need:
+                patch = await client_http.patch(
+                    url,
+                    headers={**headers, "Prefer": "return=minimal"},
+                    params={"id": "eq." + str(lead["id"]), "owner_id": "eq." + SUPABASE_OWNER_ID, "status": "eq.new"},
+                    json=patch_payload,
+                    timeout=30,
+                )
                 if patch.status_code not in (200, 204):
-                    log.error("Could not repair service label for verified lead %s (%s): %s", lead["id"], patch.status_code, patch.text[:300])
+                    log.error("Could not record verified buyer audit for lead %s (%s): %s", lead["id"], patch.status_code, patch.text[:300])
                     return {"audited": audited, "rejected": rejected, "verified": verified, "review": review, "ok": False}
             verified += 1
-        log.info("Post-scan evidence audit complete: %s checked, %s verified buyers kept, %s held for review, %s clear sellers/non-buyers cancelled.", audited, verified, review, rejected)
+        log.info("Post-scan evidence audit complete: %s checked, %s verified buyers kept, %s held for review; no candidates were auto-rejected.", audited, verified, review)
         return {"audited": audited, "rejected": rejected, "verified": verified, "review": review, "ok": True}
     except Exception:
         log.exception("Post-scan lead audit failed.")
@@ -1014,8 +1073,11 @@ def telegram_notification_block_reason(lead):
         return "missing_service_need"
     if SELLER_AD_CONTEXT.search(evidence) or SELLER_POST_CONTEXT.search(evidence) or SELLER_PITCH_CONTEXT.search(evidence):
         return "seller_or_vendor_post"
-    # Priority ranks verified leads; it must not veto evidence-proven buyers.
-    if not (verify_buyer_evidence(evidence) or classify(evidence)):
+    notes = str(lead.get("notes") or "")
+    if "post_scan_audit: buyer_intent_verified" not in notes:
+        return "missing_post_scan_buyer_audit"
+    # Discovery classification cannot substitute for the independent audit.
+    if not verify_buyer_evidence(evidence):
         return "source_evidence_does_not_prove_buyer_intent"
     return None
 
@@ -1262,6 +1324,8 @@ async def finish_scan_run(http, run_id, stats):
         "window_end": stats.get("window_end"),
         "joined_groups_scanned": stats.get("joined_groups_scanned", 0),
         "joined_messages_processed": stats.get("joined_messages_processed", 0),
+        "max_messages_per_run": stats.get("max_messages_per_run", MAX_MESSAGES_PER_RUN),
+        "message_limit_reached": bool(stats.get("message_limit_reached", False)),
         "joined_messages_checked": stats.get("joined_messages_checked", 0),
         "joined_buyer_signals": stats.get("joined_buyer_signals", 0),
         "joined_leads_saved": stats.get("joined_leads_saved", 0),
@@ -1350,7 +1414,7 @@ async def send_scan_report(http, stats, scan_run_id=None):
         f"Joined-group buyer signals: {stats.get('joined_buyer_signals', 0):,}\n"
         f"Joined-group leads saved: {stats.get('joined_leads_saved', 0)}\n"
         f"Joined-group duplicate leads: {stats.get('joined_duplicates', 0)}\n"
-        f"Messages processed this run: {stats.get('messages_processed', 0):,} (no fixed message-count cap)\n"
+        f"Messages processed this run: {stats.get('messages_processed', 0):,} / {MAX_MESSAGES_PER_RUN:,} maximum\n"
         f"Text messages checked: {stats.get('messages_checked', 0):,}\n"
         f"Seller/vendor posts: {stats.get('seller_posts', 0):,}\n"
         f"Buyer signals: {stats.get('buyer_signals', 0):,}\n"
@@ -1358,7 +1422,7 @@ async def send_scan_report(http, stats, scan_run_id=None):
         f"Duplicate leads: {stats.get('duplicates', 0)}\n"
         f"Processing errors: {stats.get('scan_errors', 0)}\n"
         f"Post-scan audit status: {'SUCCESS' if stats.get('post_scan_audit_ok') else 'FAILED — alerts withheld'}\n"
-        f"Post-scan audit: {stats.get('post_scan_audited', 0)} checked | {stats.get('post_scan_verified', 0)} verified | {stats.get('post_scan_review', 0)} held for review | {stats.get('post_scan_rejected', 0)} cancelled\n"
+        f"Post-scan audit: {stats.get('post_scan_audited', 0)} checked | {stats.get('post_scan_verified', 0)} verified | {stats.get('post_scan_review', 0)} held for review | {stats.get('post_scan_rejected', 0)} auto-rejected\n"
         f"Telegram lead alerts: {'enabled' if stats.get('alerts_configured') else 'disabled'} | {stats.get('alerts_delivered', 0)} delivered | {stats.get('alerts_failed', 0)} failed | {stats.get('leads_moved_to_review', 0)} moved to review\n"
         f"Pending alerts loaded: {stats.get('pending_alerts_loaded', 0)} | Alert queue read error: {stats.get('alert_load_error', False)}\n"
         f"Scan duration: {minutes}m {seconds}s\n\n"
@@ -1529,6 +1593,7 @@ async def run(once=False):
                 joined_groups_available = len(dialogs)
                 dialogs = dialogs[:MAX_JOINED_GROUPS_PER_RUN]
                 last_group_visited = None
+                message_limit_reached = False
 
                 for dialog in dialogs:
                     entity = dialog.entity
@@ -1544,6 +1609,9 @@ async def run(once=False):
                     })
                     group_write_failed = False
                     async for msg in client.iter_messages(entity, **message_scan_kwargs(window_start)):
+                        if messages_processed >= MAX_MESSAGES_PER_RUN:
+                            message_limit_reached = True
+                            break
                         if not msg or not msg.date:
                             continue
                         message_date = msg.date
@@ -1641,6 +1709,9 @@ async def run(once=False):
                     state["joined_group_cursor"] = group_id
                     # Persist after every completed group so rotation survives a timeout.
                     write_state(state)
+                    if message_limit_reached:
+                        log.info("Reached the per-run Telegram message cap (%s); remaining groups rotate into later windows.", MAX_MESSAGES_PER_RUN)
+                        break
 
 
                 if last_group_visited is not None:
@@ -1674,6 +1745,8 @@ async def run(once=False):
                     "joined_duplicates": duplicates,
                     "messages_checked": messages_checked,
                     "messages_processed": messages_processed,
+                    "message_limit_reached": message_limit_reached,
+                    "max_messages_per_run": MAX_MESSAGES_PER_RUN,
                     "seller_posts": seller_posts,
                     "buyer_signals": buyer_signals,
                     "leads_saved": saved,
@@ -1692,7 +1765,7 @@ async def run(once=False):
                     raise RuntimeError("Supabase could not persist the completed scan metrics.")
                 await send_scan_report(http, stats, scan_run_id)
                 log.info(
-                    "Scan complete: %s/%s selected joined groups checked (%s joined groups available); %s joined-group messages processed with no message-count cap; %s text messages checked; %s new leads saved; %.1fs.",
+                    "Scan complete: %s/%s selected joined groups checked (%s joined groups available); %s joined-group messages processed (per-run cap applied); %s text messages checked; %s new leads saved; %.1fs.",
                     checked, len(dialogs), joined_groups_available, joined_messages_processed, messages_checked, saved, duration_seconds
                 )
 

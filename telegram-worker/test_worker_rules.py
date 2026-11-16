@@ -63,7 +63,11 @@ class LeadSignalTests(unittest.TestCase):
             if isinstance(node, ast.Assign)
             and any(target.id == "SELLER_POST_CONTEXT" for target in node.targets if isinstance(target, ast.Name))
         )
-        for name in ("SELLER_PITCH_CONTEXT", "RECRUITMENT_BUYER_CONTEXT", "KOL_PROJECT_CONTEXT"):
+        for name in (
+            "SELLER_PITCH_CONTEXT", "RECRUITMENT_BUYER_CONTEXT", "KOL_PROJECT_CONTEXT",
+            "INDIVIDUAL_CREATIVE_ROLE_CONTEXT", "CAPITAL_RAISE_CONTEXT",
+            "DIRECT_SERVICE_BUY_REQUEST_CONTEXT",
+        ):
             namespace[name] = next(
                 eval(compile(ast.Expression(body=node.value), str(WORKER), "eval"), {"re": re})
                 for node in tree.body
@@ -138,7 +142,10 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("post_scan_audit: buyer_intent_uncertain_manual_review_required", source)
         self.assertIn("ambiguous or incomplete evidence", source)
         self.assertIn("def verify_buyer_evidence(text):", source)
-        self.assertIn("buyer_intent_verified; service_label_repaired", source)
+        self.assertIn("post_scan_audit: buyer_intent_verified", source)
+        self.assertIn("post_scan_audit: service_label_repaired", source)
+        self.assertNotIn("verify_buyer_evidence(evidence) or bool(classify(evidence))", source)
+        self.assertIn("missing_post_scan_buyer_audit", source)
         self.assertIn("source_evidence_does_not_prove_buyer_intent", source)
         self.assertIn("post_scan_verified", source)
         audit_start = source.index("async def audit_current_scan_leads")
@@ -183,6 +190,24 @@ class LeadSignalTests(unittest.TestCase):
         for post in posts:
             with self.subTest(post=post):
                 self.assertFalse(self.verify_buyer_evidence(post))
+
+    def test_content_specialist_and_video_editor_job_post_is_not_a_client_lead(self):
+        message = "Looking for a content specialist?, video editor for marketing? DM me please. Thank you."
+        self.assertEqual(self.classify(message), [])
+        self.assertFalse(self.verify_buyer_evidence(message))
+
+    def test_fundraising_and_liquidity_request_is_not_a_marketing_service_buyer(self):
+        message = (
+            "We are developing a GameFi project and are looking for additional fund "
+            "investment for liquidity and marketing, or we can sell the project and listing contract."
+        )
+        self.assertEqual(self.classify(message), [])
+        self.assertFalse(self.verify_buyer_evidence(message))
+
+    def test_direct_gamefi_marketing_agency_request_is_preserved(self):
+        message = "Our GameFi project is looking for a marketing agency for its launch campaign."
+        self.assertIn("Project Promotion", self.classify(message))
+        self.assertTrue(self.verify_buyer_evidence(message))
 
     def test_new_web3_marketing_partner_request_is_detected(self):
         # A general marketing-partner request is classified under the broad
@@ -280,6 +305,12 @@ class LeadSignalTests(unittest.TestCase):
         self.assertEqual(self.dedupe("group-a", 100), self.dedupe("group-a", 100))
         self.assertNotEqual(self.dedupe("group-a", 100), self.dedupe("group-a", 101))
         self.assertNotEqual(self.dedupe("group-a", 100), self.dedupe("group-b", 100))
+
+    def test_worker_enforces_the_requested_100_message_run_cap(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn('MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)', source)
+        self.assertIn("if messages_processed >= MAX_MESSAGES_PER_RUN:", source)
+        self.assertIn('"max_messages_per_run": MAX_MESSAGES_PER_RUN', source)
 
     def test_message_scan_is_date_windowed_and_old_backlog_is_not_requested(self):
         from datetime import datetime, timezone
@@ -741,7 +772,7 @@ class LeadSignalTests(unittest.TestCase):
             [],
         )
 
-    def test_joined_group_scan_has_200_group_limit_and_no_message_count_limit(self):
+    def test_joined_group_scan_has_200_group_limit_and_100_message_run_cap(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn('bounded_int_env("MAX_JOINED_GROUPS_PER_RUN", 200, 1, 200)', source)
         self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
@@ -751,7 +782,8 @@ class LeadSignalTests(unittest.TestCase):
         run_code = source[source.index("async def run("):]
         self.assertNotIn("SearchGlobalRequest", run_code)
         self.assertNotIn("fetch_global_group_messages", run_code)
-        self.assertNotIn("MAX_MESSAGES_PER_RUN", source)
+        self.assertIn('bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)', source)
+        self.assertIn("if messages_processed >= MAX_MESSAGES_PER_RUN:", run_code)
         self.assertNotIn("MAX_JOINED_MESSAGES_PER_RUN", source)
         self.assertNotIn("MAX_MESSAGES_PER_GROUP_PER_RUN", source)
         self.assertNotIn("SCAN_BUDGET_SECONDS", source)
@@ -1227,7 +1259,11 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_vendor_pitch_filters_use_real_word_boundaries(self):
         source = WORKER.read_text(encoding="utf-8")
-        for name in ("SELLER_PITCH_CONTEXT", "RECRUITMENT_BUYER_CONTEXT", "KOL_PROJECT_CONTEXT"):
+        for name in (
+            "SELLER_PITCH_CONTEXT", "RECRUITMENT_BUYER_CONTEXT", "KOL_PROJECT_CONTEXT",
+            "INDIVIDUAL_CREATIVE_ROLE_CONTEXT", "CAPITAL_RAISE_CONTEXT",
+            "DIRECT_SERVICE_BUY_REQUEST_CONTEXT",
+        ):
             with self.subTest(name=name):
                 start = source.index(name + " = re.compile(")
                 end = source.index("\n)", start)
@@ -1256,6 +1292,8 @@ class TelegramNotificationGateTests(unittest.TestCase):
         needed_constants = {
             "BUYING_CONTEXT", "CRYPTO_CONTEXT", "NON_BUYER_CONTEXT",
             "SELLER_AD_CONTEXT", "SELLER_POST_CONTEXT", "SELLER_PITCH_CONTEXT",
+            "INDIVIDUAL_CREATIVE_ROLE_CONTEXT", "CAPITAL_RAISE_CONTEXT",
+            "DIRECT_SERVICE_BUY_REQUEST_CONTEXT",
         }
         for assignment in tree.body:
             if isinstance(assignment, ast.Assign) and any(
@@ -1281,8 +1319,16 @@ class TelegramNotificationGateTests(unittest.TestCase):
             "evidence_summary": "Our crypto project needs a paid marketing campaign before launch. We need an agency.",
             "service_need": "Project Promotion",
             "priority_score": 75,
+            "notes": "post_scan_audit: buyer_intent_verified",
         }
         self.assertIsNone(self.check(lead))
+
+    def test_missing_post_scan_audit_marker_is_blocked(self):
+        lead = {
+            "evidence_summary": "Our crypto project needs a paid marketing campaign before launch. We need an agency.",
+            "service_need": "Project Promotion",
+        }
+        self.assertEqual(self.check(lead), "missing_post_scan_buyer_audit")
 
     def test_missing_evidence_is_blocked(self):
         self.assertEqual(
@@ -1292,7 +1338,7 @@ class TelegramNotificationGateTests(unittest.TestCase):
 
     def test_low_priority_does_not_block_evidence_proven_buyer(self):
         self.assertIsNone(
-            self.check({"evidence_summary": "Our crypto project needs a paid marketing campaign before launch.", "service_need": "Project Promotion", "priority_score": 1}),
+            self.check({"evidence_summary": "Our crypto project needs a paid marketing campaign before launch.", "service_need": "Project Promotion", "priority_score": 1, "notes": "post_scan_audit: buyer_intent_verified"}),
         )
 
     def test_direct_buyer_at_minimum_qualified_score_can_be_notified(self):
@@ -1300,6 +1346,7 @@ class TelegramNotificationGateTests(unittest.TestCase):
             "evidence_summary": "Our crypto project needs a paid marketing campaign before launch. We need an agency.",
             "service_need": "Project Promotion",
             "priority_score": 55,
+            "notes": "post_scan_audit: buyer_intent_verified",
         }
         self.assertIsNone(self.check(lead))
 
@@ -1429,7 +1476,7 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("Joined groups available:", source)
         self.assertIn("Groups selected this run (maximum", source)
-        self.assertIn("no fixed message-count cap", source)
+        self.assertIn("MAX_MESSAGES_PER_RUN", source)
         self.assertIn("Joined groups checked:", source)
         self.assertIn("Joined-group messages processed:", source)
         self.assertNotIn("Public groups with qualified buyer signals:", source)
@@ -1496,6 +1543,8 @@ class LeadDisplayLabelTests(unittest.TestCase):
         self.assertIn("SELLER_POST_CONTEXT", block)
         self.assertIn("SELLER_PITCH_CONTEXT", block)
         self.assertIn('"seller_or_vendor_post"', block)
+        self.assertIn("post_scan_audit: buyer_intent_verified", block)
+        self.assertNotIn("or classify(evidence)", block)
 
     def test_telegram_scan_run_metrics_are_persisted_to_supabase(self):
         source = WORKER.read_text(encoding="utf-8")
