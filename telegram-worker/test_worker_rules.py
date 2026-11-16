@@ -191,6 +191,15 @@ class LeadSignalTests(unittest.TestCase):
             with self.subTest(post=post):
                 self.assertFalse(self.verify_buyer_evidence(post))
 
+    def test_workoff_early_access_feedback_post_is_not_a_marketing_service_buyer(self):
+        message = (
+            "I’m working on WorkOff, an AI-native workplace where humans and AI agents can work together. "
+            "The product covers sales, marketing, engineering, QA, DevOps and operations. "
+            "We’re currently opening Early Access and looking for feedback from founders, builders, "
+            "and teams already experimenting with AI."
+        )
+        self.assertFalse(self.verify_buyer_evidence(message))
+
     def test_content_specialist_and_video_editor_job_post_is_not_a_client_lead(self):
         message = "Looking for a content specialist?, video editor for marketing? DM me please. Thank you."
         self.assertEqual(self.classify(message), [])
