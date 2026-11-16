@@ -1409,7 +1409,7 @@ async def send_scan_report(http, stats, scan_run_id=None):
         f"Pending alerts loaded: {stats.get('pending_alerts_loaded', 0)} | Alert queue read error: {stats.get('alert_load_error', False)}\n"
         f"Scan duration: {minutes}m {seconds}s\n\n"
         f"Collection window (UTC): {stats.get('window_start', 'n/a')} to {stats.get('window_end', 'n/a')}\n"
-        "Only messages inside this two-hour window are checked. Expired windows are not replayed."
+        "Only joined Telegram groups are scanned. Incomplete windows resume from the last successfully processed message; windows advance only after all groups and the audit finish."
     )
     try:
         if not scan_run_id:
@@ -1687,8 +1687,12 @@ async def run(once=False):
                          checked, joined_messages_processed, saved)
             except Exception as exc:
                 await mark_scan_run_failed(http, scan_run_id, exc)
-                log.exception("Window remains incomplete; next run resumes from the last saved message.")
-                raise
+                log.exception("Window remains incomplete; retrying from the last saved message.")
+                if once:
+                    raise
+                retry_after = max(30, min(int(getattr(exc, "seconds", 60) or 60), 900))
+                await asyncio.sleep(retry_after)
+                continue
             if once:
                 break
         if not once:
