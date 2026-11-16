@@ -36,7 +36,7 @@ The scan report records joined groups and messages processed, buyer signals, sav
 
 ## Deployment and configuration
 
-The active scanner is the **Render Background Worker** defined in the root `render.yaml`. It uses a persistent disk mounted at `/data` and `POLL_SECONDS: "7200"`. GitHub Actions is intentionally test-only; do not add a second scheduled live scanner, because two independent workers would not share the same checkpoint file.
+The intended production scanner is the **Render Background Worker** defined in the root `render.yaml`. **It is not currently deployed or running.** Render requested payment information during Blueprint planning, so the paid service was deliberately left unapproved. No payment or deployment has been made. GitHub Actions is intentionally test-only: it runs syntax, dependency, and regression checks, but it does not scan Telegram or send lead alerts. Do not add a second scheduled live scanner, because two independent workers would not share the same checkpoint file.
 
 Required Render environment variables:
 
