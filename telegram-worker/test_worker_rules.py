@@ -1476,7 +1476,7 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("Joined groups available:", source)
         self.assertIn("Groups selected this run (maximum", source)
-        self.assertIn("no fixed message-count cap", source)
+        self.assertIn("MAX_MESSAGES_PER_RUN", source)
         self.assertIn("Joined groups checked:", source)
         self.assertIn("Joined-group messages processed:", source)
         self.assertNotIn("Public groups with qualified buyer signals:", source)
