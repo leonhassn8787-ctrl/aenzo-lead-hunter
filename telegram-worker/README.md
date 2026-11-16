@@ -39,20 +39,22 @@ The scan report records joined groups and messages processed, buyer signals, sav
 
 The intended production scanner is the **Render Background Worker** defined in the root `render.yaml`. **It is not currently deployed or running.** Render requested payment information during Blueprint planning, so the paid service was deliberately left unapproved. No payment or deployment has been made. GitHub Actions is intentionally test-only: it runs syntax, dependency, and regression checks, but it does not scan Telegram or send lead alerts. Do not add a second scheduled live scanner, because two independent workers would not share the same checkpoint file.
 
-Required Render environment variables:
+**Use the existing Telegram account and existing AENZO alert bot from the previous setup. Do not create a new Telegram account, bot, login session, or chat destination.** When the worker is deployed later, transfer/reuse the already-created account's existing session and the same bot credentials privately in Render's environment settings. The values are intentionally not stored in this repository or exposed in chat.
 
-- `TELEGRAM_API_ID`
-- `TELEGRAM_API_HASH`
-- `TELEGRAM_SESSION_STRING` (or a valid persistent session file)
+Required Render environment variables (populate with the existing values):
+
+- `TELEGRAM_API_ID` — same Telegram app/API ID already used.
+- `TELEGRAM_API_HASH` — same Telegram app/API hash already used.
+- `TELEGRAM_SESSION_STRING` — the existing account's session string; alternatively, mount/copy its already-authenticated session file to the persistent disk. Do not run a new login unless the existing session is confirmed unavailable and the user explicitly approves.
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY` (server-side secret key only)
 - `SUPABASE_OWNER_ID`
 
-Optional Telegram bot notifications:
+Existing AENZO bot notifications (reuse the already connected bot and same private chat):
 
-- `AENZO_BOT_TOKEN`
-- `AENZO_BOT_CHAT_ID` (primary private chat)
-- `AENZO_BOT_CHAT_IDS` (optional comma-separated additional destinations)
+- `AENZO_BOT_TOKEN` — existing bot token.
+- `AENZO_BOT_CHAT_ID` — existing primary private chat ID.
+- `AENZO_BOT_CHAT_IDS` — only if additional destinations were already configured; do not add new chats.
 
 Other settings:
 
@@ -65,18 +67,7 @@ Never share Telegram API credentials, login codes, two-step passwords, bot token
 
 ## Android / Termux session setup
 
-If a Telegram StringSession needs to be created, use the user's own trusted Termux installation. Run these commands in Termux:
-
-```sh
-pkg update -y
-pkg install python git -y
-git clone https://github.com/leonhassn8787-ctrl/aenzo-lead-hunter.git
-cd aenzo-lead-hunter/telegram-worker
-python -m pip install -r requirements.txt
-python session_login.py
-```
-
-Enter API credentials, login code, and any two-step password only inside the private Termux prompt. Copy the resulting StringSession directly into the Render environment variable. Never paste it into ChatGPT or Telegram messages.
+The previous Telegram account/session must be reused. Do not run `session_login.py` or request a new login code as part of the normal deployment. If the already-authenticated session is only present as a Termux `.session` file, securely transfer that existing file to the Render persistent disk; if its existing StringSession is already available, use that same value in Render's private environment settings. If neither existing form can be located, stop and ask the user before attempting any new Telegram login.
 
 ## Tests and verification
 
