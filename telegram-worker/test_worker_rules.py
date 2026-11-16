@@ -784,11 +784,10 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_joined_group_scan_has_200_group_limit_and_100_message_run_cap(self):
         source = WORKER.read_text(encoding="utf-8")
-        self.assertIn('bounded_int_env("MAX_JOINED_GROUPS_PER_RUN", 200, 1, 200)', source)
+        self.assertNotIn("MAX_JOINED_GROUPS_PER_RUN", source)
         self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
         self.assertIn("async for dialog in client.iter_dialogs()", source)
         self.assertIn('if not bool(getattr(dialog, "is_group", False))', source)
-        self.assertIn("dialogs = dialogs[:MAX_JOINED_GROUPS_PER_RUN]", source)
         run_code = source[source.index("async def run("):]
         self.assertNotIn("SearchGlobalRequest", run_code)
         self.assertNotIn("fetch_global_group_messages", run_code)
@@ -1486,7 +1485,7 @@ class GroupScanningOptimizationTests(unittest.TestCase):
     def test_scan_report_is_joined_group_only(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertIn("Joined groups available:", source)
-        self.assertIn("Groups selected this run (maximum", source)
+        self.assertIn("Joined groups selected this run:", source)
         self.assertIn("no message-count limit", source)
         self.assertIn("Joined groups checked:", source)
         self.assertIn("Joined-group messages processed:", source)
