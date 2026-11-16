@@ -33,6 +33,17 @@ def bounded_int_env(name, default, minimum, maximum):
     return value
 
 
+def retry_delay_seconds(error):
+    """Respect Telegram FloodWait exactly (plus a safety margin); back off other errors."""
+    wait_seconds = getattr(error, "seconds", None)
+    if wait_seconds is None:
+        return 60
+    try:
+        return max(30, int(wait_seconds) + 5)
+    except (TypeError, ValueError, OverflowError):
+        return 60
+
+
 API_ID = int(os.environ["TELEGRAM_API_ID"])
 API_HASH = os.environ["TELEGRAM_API_HASH"]
 PHONE = os.getenv("TELEGRAM_PHONE", "").strip()
@@ -1690,7 +1701,7 @@ async def run(once=False):
                 log.exception("Window remains incomplete; retrying from the last saved message.")
                 if once:
                     raise
-                retry_after = max(30, min(int(getattr(exc, "seconds", 60) or 60), 900))
+                retry_after = retry_delay_seconds(exc)
                 await asyncio.sleep(retry_after)
                 continue
             if once:

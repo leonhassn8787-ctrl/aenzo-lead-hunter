@@ -22,4 +22,4 @@ jobs:
           python-version: "3.12"
       - name: Run worker regression tests
         working-directory: telegram-worker
-        run: python -m unittest -v test_worker_rules.py
+        run: python -m unittest discover -s . -p 'test_*.py' -v
