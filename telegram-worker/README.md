@@ -33,7 +33,7 @@ Deduplication uses the sender's numeric Telegram user ID when available, so one 
 
 Only leads that pass the post-scan buyer-evidence audit can be sent as lead alerts. The notification gate checks the original evidence again and blocks seller/vendor posts. Each configured recipient has separate delivery tracking so a successful delivery is not repeated just because another recipient failed. Failed recipients are retried later.
 
-The scan report records joined groups and messages processed, buyer signals, saved leads, duplicates, audit results, alert delivery, errors, and scan duration. Scan-report delivery is tracked separately from lead alerts.
+The scan report records joined groups and messages processed, buyer signals, saved leads, duplicates, audit results, alert delivery, errors, and scan duration. Scan-report delivery is tracked separately from lead alerts. If a report is only partially delivered or fails, the worker retries outstanding recipients on its next loop and skips recipients already recorded as delivered.
 
 ## Deployment and configuration
 
