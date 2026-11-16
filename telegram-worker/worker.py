@@ -115,7 +115,6 @@ SIGNALS = {
         r"need (content distribution|content marketing)",
         r"content distribution (partner|service|agency)",
         r"looking for (marketing|content) agency",
-        r"looking for (a |an )?(web3 |crypto )?marketing (agency|partner|team)",
         r"(need|seeking) (a |an )?(web3 |crypto )?marketing (agency|partner|team)",
         r"looking for (a |an )?(web3 |crypto )?growth (agency|partner|team)",
         r"need (a |an )?growth (agency|partner|team)",
