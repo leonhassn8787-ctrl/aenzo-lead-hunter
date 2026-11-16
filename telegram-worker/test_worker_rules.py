@@ -1482,7 +1482,7 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         self.assertIn('state["initial_scan_since"]', source)
         self.assertIn('state["next_window_start"]', source)
         self.assertIn('kwargs["min_id"]', source)
-        self.assertIn("message_date >= window_end", source)
+        self.assertIn("dt >= window_end", source)
         self.assertNotIn("message_scan_kwargs(last_seen", source)
 
     def test_scan_report_is_joined_group_only(self):
