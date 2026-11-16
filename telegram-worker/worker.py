@@ -724,10 +724,7 @@ def verify_buyer_evidence(text):
     # buying an AENZO service. Require a service-specific request, or a clear
     # project-side recruitment request. This blocks discussion/comments that
     # mention advertising elsewhere but do not ask for an AENZO service.
-    direct_service_request = bool(
-        DIRECT_SERVICE_BUY_REQUEST_CONTEXT.search(text)
-        or RECRUITMENT_BUYER_CONTEXT.search(text)
-    )
+    direct_service_request = bool(DIRECT_SERVICE_BUY_REQUEST_CONTEXT.search(text))
     if not direct_service_request:
         return False
     if not buyer_request and not (indirect_growth and service_need):
