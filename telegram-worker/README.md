@@ -13,6 +13,7 @@ It scans every available joined group in each two-hour message window. There is 
 - The worker writes its checkpoint after each message is successfully processed. If saving a lead or resolving a required sender fails, the cursor does not advance past that message.
 - Interrupted or failed windows are resumed from their last saved group/message checkpoint. A window is not marked complete or advanced until every currently accessible joined group is processed and the post-scan evidence audit succeeds.
 - Completed windows are skipped safely. Running or failed windows are reused rather than treated as complete.
+- Before each window, the worker reconciles its local next-window cursor against the Supabase completed-window ledger. If an earlier two-hour window is missing, it rewinds to the earliest uncompleted window and backfills it instead of silently jumping ahead.
 - Telegram FloodWait errors are respected for the full server-requested wait plus a small safety margin. Other transient errors retry with a delay.
 - The Render disk mounted at `/data` is required to preserve the Telegram session and scan checkpoints across restarts.
 
