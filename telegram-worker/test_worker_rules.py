@@ -782,21 +782,24 @@ class LeadSignalTests(unittest.TestCase):
             [],
         )
 
-    def test_joined_group_scan_has_200_group_limit_and_100_message_run_cap(self):
+    def test_joined_group_scan_has_no_count_caps_and_resumes_per_message(self):
         source = WORKER.read_text(encoding="utf-8")
         self.assertNotIn("MAX_JOINED_GROUPS_PER_RUN", source)
-        self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
-        self.assertIn("async for dialog in client.iter_dialogs()", source)
-        self.assertIn('if not bool(getattr(dialog, "is_group", False))', source)
-        run_code = source[source.index("async def run("):]
-        self.assertNotIn("SearchGlobalRequest", run_code)
-        self.assertNotIn("fetch_global_group_messages", run_code)
         self.assertNotIn("MAX_MESSAGES_PER_RUN", source)
-        self.assertNotIn("message_limit_reached", run_code)
-        self.assertIn('"message_count_limit": "unlimited"', source)
         self.assertNotIn("MAX_JOINED_MESSAGES_PER_RUN", source)
         self.assertNotIn("MAX_MESSAGES_PER_GROUP_PER_RUN", source)
         self.assertNotIn("SCAN_BUDGET_SECONDS", source)
+        self.assertIn('bounded_int_env("POLL_SECONDS", 7200, 60, 86400)', source)
+        self.assertIn("async for dialog in client.iter_dialogs()", source)
+        self.assertIn('"window_progress"', source)
+        self.assertIn('"last_message_id"', source)
+        self.assertIn('kwargs["min_id"]', source)
+        self.assertIn('state["next_window_start"]', source)
+        self.assertIn("Only completed windows are skipped", source)
+        self.assertIn("message_count_limit", source)
+        run_code = source[source.index("async def run("):]
+        self.assertNotIn("SearchGlobalRequest", run_code)
+        self.assertNotIn("fetch_global_group_messages", run_code)
         self.assertNotIn("should_pause_group(meta)", run_code)
 
     def test_verdict_testing_service_buyer_request(self):
