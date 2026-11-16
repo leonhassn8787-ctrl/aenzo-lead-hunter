@@ -1407,6 +1407,19 @@ class GroupScanningOptimizationTests(unittest.TestCase):
         cls.two_hour_window = staticmethod(namespace["two_hour_window"])
         cls.reset_group_quality_metrics = staticmethod(namespace["reset_group_quality_metrics"])
 
+
+    def test_failed_message_and_window_resume_from_last_checkpoint(self):
+        source = WORKER.read_text(encoding="utf-8")
+        run_code = source[source.index("async def run("):]
+        self.assertIn('kwargs["min_id"]', run_code)
+        self.assertIn('gp["last_message_id"] = int(msg.id)', run_code)
+        self.assertIn("write_state(state)", run_code)
+        self.assertIn("retry_after = max(30, min(int(getattr(exc, \"seconds\", 60) or 60), 900))", run_code)
+        self.assertIn("await asyncio.sleep(retry_after)", run_code)
+        self.assertIn("next_window_start", run_code)
+        self.assertIn('return any(row.get("status") == "completed" for row in response.json())', source)
+        self.assertIn('json={"status": "running", "finished_at": None}', source)
+
     def test_two_hour_windows_advance_without_replaying_expired_periods(self):
         from datetime import datetime, timedelta, timezone
         anchor = datetime(2026, 11, 16, 0, 0, tzinfo=timezone.utc)
