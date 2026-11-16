@@ -1847,5 +1847,19 @@ class WorkerHttpBehaviorTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("created_at", http.get_params[0])
         self.assertEqual(http.patches, [])
 
+class ScanReportRecoveryTests(unittest.TestCase):
+    def test_completed_scan_reports_are_retried_on_worker_loop(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn("async def retry_pending_scan_reports(http):", source)
+        self.assertIn("await retry_pending_scan_reports(http)", source)
+        self.assertIn('"report_delivered_at": "is.null"', source)
+
+    def test_scan_report_skips_already_delivered_recipients(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn('"select": "report_deliveries,report_delivered_at"', source)
+        self.assertIn("if delivery_state.get(key):", source)
+        self.assertIn("if current.json()[0].get(\"report_delivered_at\"):", source)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
