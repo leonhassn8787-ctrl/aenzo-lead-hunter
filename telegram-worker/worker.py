@@ -1391,8 +1391,12 @@ async def finish_scan_run(http, run_id, stats):
     telemetry = {
         "window_start": stats.get("window_start"),
         "window_end": stats.get("window_end"),
+        "joined_groups_available": stats.get("joined_groups_available", 0),
+        "joined_groups_selected": stats.get("joined_groups_selected", 0),
         "joined_groups_scanned": stats.get("joined_groups_scanned", 0),
         "joined_messages_processed": stats.get("joined_messages_processed", 0),
+        "messages_processed": stats.get("messages_processed", 0),
+        "messages_checked": stats.get("messages_checked", 0),
         "message_count_limit": "unlimited",
         "joined_messages_checked": stats.get("joined_messages_checked", 0),
         "joined_buyer_signals": stats.get("joined_buyer_signals", 0),
@@ -1402,6 +1406,9 @@ async def finish_scan_run(http, run_id, stats):
         "duration_seconds": round(stats.get("duration_seconds", 0), 1),
         "scan_errors": int(stats.get("scan_errors", 0)),
         "post_scan_audit_ok": bool(stats.get("post_scan_audit_ok")),
+        "post_scan_audited": int(stats.get("post_scan_audited", 0)),
+        "post_scan_verified": int(stats.get("post_scan_verified", 0)),
+        "post_scan_rejected": int(stats.get("post_scan_rejected", 0)),
         "post_scan_review": int(stats.get("post_scan_review", 0)),
         "alerts_configured": bool(stats.get("alerts_configured")),
         "pending_alerts_loaded": int(stats.get("pending_alerts_loaded", 0)),
@@ -1557,7 +1564,7 @@ async def send_scan_report(http, stats, scan_run_id=None):
             if saved.status_code not in (200, 204):
                 errors.append(f"{key}: delivered but database record failed ({saved.status_code})")
                 log.error("Telegram scan report reached one chat but its delivery record failed.")
-        all_sent = len(delivery_state) == len(BOT_CHAT_IDS) and not errors
+        all_sent = all(delivery_state.get(recipient_key(chat_id)) for chat_id in BOT_CHAT_IDS) and not errors
         final_payload = {"report_delivery_error": "; ".join(errors)[:1000] if errors else None}
         if all_sent:
             final_payload["report_delivered_at"] = datetime.now(timezone.utc).isoformat()
