@@ -1,3 +1,4 @@
+# Regression tests for joined-group scan resume and lead-quality gates.
 import ast
 import asyncio
 import hashlib
