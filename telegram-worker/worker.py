@@ -349,25 +349,25 @@ KOL_PROJECT_CONTEXT = re.compile(
 
 # Individual creative-role hiring is not a marketing agency/service purchase.
 INDIVIDUAL_CREATIVE_ROLE_CONTEXT = re.compile(
-    r"\\b(looking for|seeking|hiring|need|want to hire)\\s+(?:an?\\s+)?"
-    r"(content specialists?|video editors?|copywriters?|graphic designers?|motion designers?)\\b",
+    r"\b(looking for|seeking|hiring|need|want to hire)\s+(?:an?\s+)?"
+    r"(content specialists?|video editors?|copywriters?|graphic designers?|motion designers?)\b",
     re.I,
 )
 CAPITAL_RAISE_CONTEXT = re.compile(
-    r"\\b(looking for|seeking|need|raising|raise|want)\\b.{0,100}\\b"
-    r"(additional )?(funds?|funding|investment|investors?|capital|liquidity)\\b|"
-    r"\\b(sell|selling)\\s+(the\\s+)?(project|company)\\b|"
-    r"\\bproject for sale\\b|\\blisting contract\\b",
+    r"\b(looking for|seeking|need|raising|raise|want)\b.{0,100}\b"
+    r"(additional )?(funds?|funding|investment|investors?|capital|liquidity)\b|"
+    r"\b(sell|selling)\s+(the\s+)?(project|company)\b|"
+    r"\bproject for sale\b|\blisting contract\b",
     re.I,
 )
 DIRECT_SERVICE_BUY_REQUEST_CONTEXT = re.compile(
-    r"\\b(looking for|need|seeking|want to hire|hiring|we need|we are looking for)\\b"
-    r".{0,120}\\b(marketing (agency|team|partner|service|services|campaign)|"
+    r"\b(looking for|need|seeking|want to hire|hiring|we need|we are looking for)\b"
+    r".{0,120}\b(marketing (agency|team|partner|service|services|campaign)|"
     r"growth (agency|team|partner)|kol(s)?|influencers?|community (promotion|growth|management)|"
     r"member acquisition|pr (agency|services)|ama (host|hosting)|content (marketing|distribution)|"
     r"video production|promotional video|giveaway campaign|airdrop campaign|"
     r"social media marketing|user acquisition|website (design|development)|"
-    r"brand ambassadors?|paid campaign)\\b",
+    r"brand ambassadors?|paid campaign)\b",
     re.I,
 )
 
