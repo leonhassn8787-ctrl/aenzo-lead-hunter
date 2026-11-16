@@ -1691,7 +1691,12 @@ async def run(once=False):
             if once:
                 break
         if not once:
-            await asyncio.sleep(POLL_SECONDS)
+            next_start = datetime.fromisoformat(state["next_window_start"])
+            if next_start.tzinfo is None:
+                next_start = next_start.replace(tzinfo=timezone.utc)
+            next_end = next_start.astimezone(timezone.utc) + timedelta(hours=2)
+            seconds_until_next_window = max(1, (next_end - datetime.now(timezone.utc)).total_seconds())
+            await asyncio.sleep(min(POLL_SECONDS, seconds_until_next_window))
 
 if __name__ == "__main__":
     if "--login" in sys.argv:
