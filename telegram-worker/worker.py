@@ -52,7 +52,6 @@ BOT_CHAT_IDS = list(dict.fromkeys(
 POLL_SECONDS = bounded_int_env("POLL_SECONDS", 7200, 60, 86400)
 LOOKBACK_DAYS = bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)
 MAX_JOINED_GROUPS_PER_RUN = bounded_int_env("MAX_JOINED_GROUPS_PER_RUN", 200, 1, 200)
-MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)
 CLASSIFIER_RULES_VERSION = 26
 
 
@@ -1325,8 +1324,7 @@ async def finish_scan_run(http, run_id, stats):
         "window_end": stats.get("window_end"),
         "joined_groups_scanned": stats.get("joined_groups_scanned", 0),
         "joined_messages_processed": stats.get("joined_messages_processed", 0),
-        "max_messages_per_run": stats.get("max_messages_per_run", MAX_MESSAGES_PER_RUN),
-        "message_limit_reached": bool(stats.get("message_limit_reached", False)),
+        "message_count_limit": "unlimited",
         "joined_messages_checked": stats.get("joined_messages_checked", 0),
         "joined_buyer_signals": stats.get("joined_buyer_signals", 0),
         "joined_leads_saved": stats.get("joined_leads_saved", 0),
@@ -1415,7 +1413,7 @@ async def send_scan_report(http, stats, scan_run_id=None):
         f"Joined-group buyer signals: {stats.get('joined_buyer_signals', 0):,}\n"
         f"Joined-group leads saved: {stats.get('joined_leads_saved', 0)}\n"
         f"Joined-group duplicate leads: {stats.get('joined_duplicates', 0)}\n"
-        f"Messages processed this run: {stats.get('messages_processed', 0):,} / {MAX_MESSAGES_PER_RUN:,} maximum\n"
+        f"Messages processed this run: {stats.get('messages_processed', 0):,} (no message-count limit)\n"
         f"Text messages checked: {stats.get('messages_checked', 0):,}\n"
         f"Seller/vendor posts: {stats.get('seller_posts', 0):,}\n"
         f"Buyer signals: {stats.get('buyer_signals', 0):,}\n"
@@ -1594,15 +1592,8 @@ async def run(once=False):
                 joined_groups_available = len(dialogs)
                 dialogs = dialogs[:MAX_JOINED_GROUPS_PER_RUN]
                 last_group_visited = None
-                message_limit_reached = False
 
                 for dialog in dialogs:
-                    # Check the run-wide cap before marking a group as visited.
-                    # If the cap was reached at the end of the previous group, do
-                    # not advance the cursor past this untouched group.
-                    if messages_processed >= MAX_MESSAGES_PER_RUN:
-                        message_limit_reached = True
-                        break
                     entity = dialog.entity
                     group_id = str(entity.id)
                     last_group_visited = group_id
@@ -1616,9 +1607,6 @@ async def run(once=False):
                     })
                     group_write_failed = False
                     async for msg in client.iter_messages(entity, **message_scan_kwargs(window_start)):
-                        if messages_processed >= MAX_MESSAGES_PER_RUN:
-                            message_limit_reached = True
-                            break
                         if not msg or not msg.date:
                             continue
                         message_date = msg.date
@@ -1716,9 +1704,6 @@ async def run(once=False):
                     state["joined_group_cursor"] = group_id
                     # Persist after every completed group so rotation survives a timeout.
                     write_state(state)
-                    if message_limit_reached:
-                        log.info("Reached the per-run Telegram message cap (%s); remaining groups rotate into later windows.", MAX_MESSAGES_PER_RUN)
-                        break
 
 
                 if last_group_visited is not None:
@@ -1752,8 +1737,7 @@ async def run(once=False):
                     "joined_duplicates": duplicates,
                     "messages_checked": messages_checked,
                     "messages_processed": messages_processed,
-                    "message_limit_reached": message_limit_reached,
-                    "max_messages_per_run": MAX_MESSAGES_PER_RUN,
+                    "message_count_limit": "unlimited",
                     "seller_posts": seller_posts,
                     "buyer_signals": buyer_signals,
                     "leads_saved": saved,
