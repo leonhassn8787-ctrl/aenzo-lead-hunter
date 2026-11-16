@@ -63,7 +63,11 @@ class LeadSignalTests(unittest.TestCase):
             if isinstance(node, ast.Assign)
             and any(target.id == "SELLER_POST_CONTEXT" for target in node.targets if isinstance(target, ast.Name))
         )
-        for name in ("SELLER_PITCH_CONTEXT", "RECRUITMENT_BUYER_CONTEXT", "KOL_PROJECT_CONTEXT"):
+        for name in (
+            "SELLER_PITCH_CONTEXT", "RECRUITMENT_BUYER_CONTEXT", "KOL_PROJECT_CONTEXT",
+            "INDIVIDUAL_CREATIVE_ROLE_CONTEXT", "CAPITAL_RAISE_CONTEXT",
+            "DIRECT_SERVICE_BUY_REQUEST_CONTEXT",
+        ):
             namespace[name] = next(
                 eval(compile(ast.Expression(body=node.value), str(WORKER), "eval"), {"re": re})
                 for node in tree.body
@@ -138,7 +142,10 @@ class LeadSignalTests(unittest.TestCase):
         self.assertIn("post_scan_audit: buyer_intent_uncertain_manual_review_required", source)
         self.assertIn("ambiguous or incomplete evidence", source)
         self.assertIn("def verify_buyer_evidence(text):", source)
-        self.assertIn("buyer_intent_verified; service_label_repaired", source)
+        self.assertIn("post_scan_audit: buyer_intent_verified", source)
+        self.assertIn("post_scan_audit: service_label_repaired", source)
+        self.assertNotIn("verify_buyer_evidence(evidence) or bool(classify(evidence))", source)
+        self.assertIn("missing_post_scan_buyer_audit", source)
         self.assertIn("source_evidence_does_not_prove_buyer_intent", source)
         self.assertIn("post_scan_verified", source)
         audit_start = source.index("async def audit_current_scan_leads")
@@ -183,6 +190,24 @@ class LeadSignalTests(unittest.TestCase):
         for post in posts:
             with self.subTest(post=post):
                 self.assertFalse(self.verify_buyer_evidence(post))
+
+    def test_content_specialist_and_video_editor_job_post_is_not_a_client_lead(self):
+        message = "Looking for a content specialist?, video editor for marketing? DM me please. Thank you."
+        self.assertEqual(self.classify(message), [])
+        self.assertFalse(self.verify_buyer_evidence(message))
+
+    def test_fundraising_and_liquidity_request_is_not_a_marketing_service_buyer(self):
+        message = (
+            "We are developing a GameFi project and are looking for additional fund "
+            "investment for liquidity and marketing, or we can sell the project and listing contract."
+        )
+        self.assertEqual(self.classify(message), [])
+        self.assertFalse(self.verify_buyer_evidence(message))
+
+    def test_direct_gamefi_marketing_agency_request_is_preserved(self):
+        message = "Our GameFi project is looking for a marketing agency for its launch campaign."
+        self.assertIn("Content Distribution & Marketing", self.classify(message))
+        self.assertTrue(self.verify_buyer_evidence(message))
 
     def test_new_web3_marketing_partner_request_is_detected(self):
         # A general marketing-partner request is classified under the broad
@@ -280,6 +305,12 @@ class LeadSignalTests(unittest.TestCase):
         self.assertEqual(self.dedupe("group-a", 100), self.dedupe("group-a", 100))
         self.assertNotEqual(self.dedupe("group-a", 100), self.dedupe("group-a", 101))
         self.assertNotEqual(self.dedupe("group-a", 100), self.dedupe("group-b", 100))
+
+    def test_worker_enforces_the_requested_100_message_run_cap(self):
+        source = WORKER.read_text(encoding="utf-8")
+        self.assertIn('MAX_MESSAGES_PER_RUN = bounded_int_env("MAX_MESSAGES_PER_RUN", 100, 1, 1000)', source)
+        self.assertIn("if messages_processed >= MAX_MESSAGES_PER_RUN:", source)
+        self.assertIn('"max_messages_per_run": MAX_MESSAGES_PER_RUN', source)
 
     def test_message_scan_is_date_windowed_and_old_backlog_is_not_requested(self):
         from datetime import datetime, timezone
@@ -1227,7 +1258,11 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_vendor_pitch_filters_use_real_word_boundaries(self):
         source = WORKER.read_text(encoding="utf-8")
-        for name in ("SELLER_PITCH_CONTEXT", "RECRUITMENT_BUYER_CONTEXT", "KOL_PROJECT_CONTEXT"):
+        for name in (
+            "SELLER_PITCH_CONTEXT", "RECRUITMENT_BUYER_CONTEXT", "KOL_PROJECT_CONTEXT",
+            "INDIVIDUAL_CREATIVE_ROLE_CONTEXT", "CAPITAL_RAISE_CONTEXT",
+            "DIRECT_SERVICE_BUY_REQUEST_CONTEXT",
+        ):
             with self.subTest(name=name):
                 start = source.index(name + " = re.compile(")
                 end = source.index("\n)", start)
