@@ -51,7 +51,6 @@ BOT_CHAT_IDS = list(dict.fromkeys(
 ))
 POLL_SECONDS = bounded_int_env("POLL_SECONDS", 7200, 60, 86400)
 LOOKBACK_DAYS = bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)
-MAX_JOINED_GROUPS_PER_RUN = bounded_int_env("MAX_JOINED_GROUPS_PER_RUN", 200, 1, 200)
 CLASSIFIER_RULES_VERSION = 26
 
 
@@ -1405,7 +1404,7 @@ async def send_scan_report(http, stats, scan_run_id=None):
     report = (
         "📊 AENZO LABS SCAN REPORT\n\n"
         f"Joined groups available: {stats.get('joined_groups_available', 0)}\n"
-        f"Groups selected this run (maximum {MAX_JOINED_GROUPS_PER_RUN}): {stats.get('joined_groups_selected', 0)}\n"
+        f"Joined groups selected this run: {stats.get('joined_groups_selected', 0)}\n"
         f"Two-hour window (UTC): {stats.get('window_start', 'n/a')} → {stats.get('window_end', 'n/a')}\n"
         f"Joined groups checked: {stats.get('joined_groups_scanned', 0)}\n"
         f"Joined-group messages processed: {stats.get('joined_messages_processed', 0):,}\n"
@@ -1590,7 +1589,6 @@ async def run(once=False):
                 )
                 dialogs = [dialog_by_id[group_id] for group_id in ordered_group_ids]
                 joined_groups_available = len(dialogs)
-                dialogs = dialogs[:MAX_JOINED_GROUPS_PER_RUN]
                 last_group_visited = None
 
                 for dialog in dialogs:
