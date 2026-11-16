@@ -1675,6 +1675,7 @@ async def run(once=False):
                     "scan_errors": 0, **alert_stats,
                 }
                 if not audit_result["ok"]:
+                    log.error("Post-scan audit failed; pending-lead notifications withheld for safety.")
                     raise RuntimeError("Post-scan audit failed; this window will resume and be audited again.")
                 if not await finish_scan_run(http, scan_run_id, stats):
                     raise RuntimeError("Could not persist completed scan metrics.")
