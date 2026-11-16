@@ -985,8 +985,7 @@ async def audit_current_scan_leads(client_http, scan_run_id):
                 and verify_buyer_evidence(evidence)
             )
             if not proven:
-                # A clear seller pitch is cancelled; ambiguous or incomplete evidence
-                # is retained for the owner's manual review instead of being lost.
+                # Clear sellers and ambiguous candidates are retained for manual review.
                 # Preserve records: failed candidates go to manual review, never auto-reject.
                 target_status = "review"
                 reason = (
@@ -1032,7 +1031,7 @@ async def audit_current_scan_leads(client_http, scan_run_id):
                     log.error("Could not record verified buyer audit for lead %s (%s): %s", lead["id"], patch.status_code, patch.text[:300])
                     return {"audited": audited, "rejected": rejected, "verified": verified, "review": review, "ok": False}
             verified += 1
-        log.info("Post-scan evidence audit complete: %s checked, %s verified buyers kept, %s held for review, %s clear sellers/non-buyers cancelled.", audited, verified, review, rejected)
+        log.info("Post-scan evidence audit complete: %s checked, %s verified buyers kept, %s held for review; no candidates were auto-rejected.", audited, verified, review)
         return {"audited": audited, "rejected": rejected, "verified": verified, "review": review, "ok": True}
     except Exception:
         log.exception("Post-scan lead audit failed.")
@@ -1325,6 +1324,8 @@ async def finish_scan_run(http, run_id, stats):
         "window_end": stats.get("window_end"),
         "joined_groups_scanned": stats.get("joined_groups_scanned", 0),
         "joined_messages_processed": stats.get("joined_messages_processed", 0),
+        "max_messages_per_run": stats.get("max_messages_per_run", MAX_MESSAGES_PER_RUN),
+        "message_limit_reached": bool(stats.get("message_limit_reached", False)),
         "joined_messages_checked": stats.get("joined_messages_checked", 0),
         "joined_buyer_signals": stats.get("joined_buyer_signals", 0),
         "joined_leads_saved": stats.get("joined_leads_saved", 0),
@@ -1421,7 +1422,7 @@ async def send_scan_report(http, stats, scan_run_id=None):
         f"Duplicate leads: {stats.get('duplicates', 0)}\n"
         f"Processing errors: {stats.get('scan_errors', 0)}\n"
         f"Post-scan audit status: {'SUCCESS' if stats.get('post_scan_audit_ok') else 'FAILED — alerts withheld'}\n"
-        f"Post-scan audit: {stats.get('post_scan_audited', 0)} checked | {stats.get('post_scan_verified', 0)} verified | {stats.get('post_scan_review', 0)} held for review | {stats.get('post_scan_rejected', 0)} cancelled\n"
+        f"Post-scan audit: {stats.get('post_scan_audited', 0)} checked | {stats.get('post_scan_verified', 0)} verified | {stats.get('post_scan_review', 0)} held for review | {stats.get('post_scan_rejected', 0)} auto-rejected\n"
         f"Telegram lead alerts: {'enabled' if stats.get('alerts_configured') else 'disabled'} | {stats.get('alerts_delivered', 0)} delivered | {stats.get('alerts_failed', 0)} failed | {stats.get('leads_moved_to_review', 0)} moved to review\n"
         f"Pending alerts loaded: {stats.get('pending_alerts_loaded', 0)} | Alert queue read error: {stats.get('alert_load_error', False)}\n"
         f"Scan duration: {minutes}m {seconds}s\n\n"
@@ -1764,7 +1765,7 @@ async def run(once=False):
                     raise RuntimeError("Supabase could not persist the completed scan metrics.")
                 await send_scan_report(http, stats, scan_run_id)
                 log.info(
-                    "Scan complete: %s/%s selected joined groups checked (%s joined groups available); %s joined-group messages processed (maximum {MAX_MESSAGES_PER_RUN} per run); %s text messages checked; %s new leads saved; %.1fs.",
+                    "Scan complete: %s/%s selected joined groups checked (%s joined groups available); %s joined-group messages processed (per-run cap applied); %s text messages checked; %s new leads saved; %.1fs.",
                     checked, len(dialogs), joined_groups_available, joined_messages_processed, messages_checked, saved, duration_seconds
                 )
 
