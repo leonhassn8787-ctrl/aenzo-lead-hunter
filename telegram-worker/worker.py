@@ -51,7 +51,6 @@ BOT_CHAT_IDS = list(dict.fromkeys(
 ))
 POLL_SECONDS = bounded_int_env("POLL_SECONDS", 7200, 60, 86400)
 LOOKBACK_DAYS = bounded_int_env("LOOKBACK_DAYS", 30, 1, 3650)
-MAX_JOINED_GROUPS_PER_RUN = bounded_int_env("MAX_JOINED_GROUPS_PER_RUN", 200, 1, 200)
 CLASSIFIER_RULES_VERSION = 26
 
 
@@ -1250,66 +1249,50 @@ async def notify_pending_leads(http):
 
 
 async def scan_window_already_recorded(http, window_start):
-    """Fail closed if this exact two-hour window has already started in Supabase."""
+    """Only completed windows are skipped; running/failed windows resume."""
     url = f"{SUPABASE_URL}/rest/v1/scan_runs"
-    headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
-    try:
-        response = await http.get(
-            url,
-            headers=headers,
-            params={
-                "select": "id,status",
-                "owner_id": "eq." + SUPABASE_OWNER_ID,
-                "window_start": "eq." + window_start.isoformat(),
-                "limit": "1",
-            },
-            timeout=20,
-        )
-        if response.status_code != 200:
-            raise RuntimeError(
-                "Could not verify whether this two-hour window was already scanned "
-                f"(HTTP {response.status_code}): {response.text[:300]}"
-            )
-        return bool(response.json())
-    except Exception:
-        log.exception("Could not verify two-hour window uniqueness.")
-        raise
+    response = await http.get(url, headers=supabase_headers(SUPABASE_SERVICE_ROLE_KEY), params={
+        "select": "id,status", "owner_id": "eq." + SUPABASE_OWNER_ID,
+        "window_start": "eq." + window_start.isoformat(), "order": "started_at.desc", "limit": "10",
+    }, timeout=20)
+    if response.status_code != 200:
+        raise RuntimeError(f"Could not verify scan window ({response.status_code}): {response.text[:300]}")
+    return any(row.get("status") == "completed" for row in response.json())
 
 
 async def start_scan_run(http, window_start, window_end):
-    """Create a durable scan record containing its window before scanning begins."""
+    """Reuse a prior unfinished run instead of treating it as a completed window."""
     url = f"{SUPABASE_URL}/rest/v1/scan_runs"
     headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
+    params = {"select": "id,status", "owner_id": "eq." + SUPABASE_OWNER_ID,
+              "window_start": "eq." + window_start.isoformat(), "order": "started_at.desc", "limit": "1"}
+    existing = await http.get(url, headers=headers, params=params, timeout=20)
+    if existing.status_code != 200:
+        raise RuntimeError(f"Could not load prior scan run ({existing.status_code}): {existing.text[:300]}")
+    rows = existing.json()
+    if rows:
+        row = rows[0]
+        if row.get("status") == "completed":
+            return "completed"
+        run_id = row["id"]
+        resumed = await http.patch(url, headers={**headers, "Prefer": "return=minimal"},
+            params={"id": "eq." + str(run_id), "owner_id": "eq." + SUPABASE_OWNER_ID},
+            json={"status": "running", "finished_at": None}, timeout=20)
+        if resumed.status_code not in (200, 204):
+            raise RuntimeError(f"Could not resume scan run ({resumed.status_code}): {resumed.text[:300]}")
+        return run_id
     headers["Prefer"] = "return=representation"
-    window_marker = {
-        "window_start": window_start.isoformat(),
-        "window_end": window_end.isoformat(),
-        "phase": "running",
-    }
-    try:
-        response = await http.post(
-            url,
-            headers=headers,
-            json={
-                "owner_id": SUPABASE_OWNER_ID,
-                "status": "running",
-                "window_start": window_start.isoformat(),
-                "window_end": window_end.isoformat(),
-                "error_summary": json.dumps(window_marker, separators=(",", ":")),
-            },
-            timeout=20,
-        )
-        if response.status_code == 409:
-            log.info("The two-hour window was claimed by another run before this insert.")
-            return "duplicate"
-        if response.status_code not in (200, 201):
-            log.warning("Could not create Supabase scan_runs row (%s): %s", response.status_code, response.text[:300])
-            return None
-        rows = response.json()
-        return rows[0].get("id") if rows else None
-    except Exception:
-        log.exception("Could not create Supabase scan_runs row.")
-        return None
+    response = await http.post(url, headers=headers, json={
+        "owner_id": SUPABASE_OWNER_ID, "status": "running",
+        "window_start": window_start.isoformat(), "window_end": window_end.isoformat(),
+        "error_summary": json.dumps({"phase": "running"}, separators=(",", ":")),
+    }, timeout=20)
+    if response.status_code not in (200, 201):
+        raise RuntimeError(f"Could not create scan run ({response.status_code}): {response.text[:300]}")
+    rows = response.json()
+    if not rows:
+        raise RuntimeError("Supabase did not return the new scan run ID.")
+    return rows[0]["id"]
 
 
 async def finish_scan_run(http, run_id, stats):
@@ -1405,7 +1388,7 @@ async def send_scan_report(http, stats, scan_run_id=None):
     report = (
         "📊 AENZO LABS SCAN REPORT\n\n"
         f"Joined groups available: {stats.get('joined_groups_available', 0)}\n"
-        f"Groups selected this run (maximum {MAX_JOINED_GROUPS_PER_RUN}): {stats.get('joined_groups_selected', 0)}\n"
+        f"Joined groups selected this run: {stats.get('joined_groups_selected', 0)}\n"
         f"Two-hour window (UTC): {stats.get('window_start', 'n/a')} → {stats.get('window_end', 'n/a')}\n"
         f"Joined groups checked: {stats.get('joined_groups_scanned', 0)}\n"
         f"Joined-group messages processed: {stats.get('joined_messages_processed', 0):,}\n"
@@ -1483,289 +1466,238 @@ async def login(client):
 
 async def run(once=False):
     SESSION_FILE.parent.mkdir(parents=True, exist_ok=True)
-    if SESSION_STRING:
-        try:
-            session = StringSession(SESSION_STRING)
-        except Exception as exc:
-            raise RuntimeError(
-                "TELEGRAM_SESSION_STRING is invalid or truncated. Generate a fresh "
-                "Telethon StringSession with telegram-worker/session_login.py and "
-                "replace the GitHub Actions secret. Never paste the session into chat."
-            ) from exc
-        client = TelegramClient(session, API_ID, API_HASH)
-    else:
-        client = TelegramClient(str(SESSION_FILE), API_ID, API_HASH)
+    session = StringSession(SESSION_STRING) if SESSION_STRING else None
+    client = TelegramClient(session if session else str(SESSION_FILE), API_ID, API_HASH)
     await client.connect()
     if not await client.is_user_authorized():
         await client.disconnect()
-        raise RuntimeError("Telegram session is not authorized. Run 'python worker.py --login' in an interactive shell first.")
+        raise RuntimeError("Telegram session is not authorized.")
     state = read_state()
     if reset_group_quality_metrics(state):
         write_state(state)
     groups_state = state.setdefault("groups", {})
-    # The configured anchor is authoritative across GitHub Actions and any
-    # optional worker instance. This prevents each host from inventing a
-    # different window schedule from its own first boot time.
     initial_start = os.getenv("INITIAL_SCAN_START_AT", "").strip()
     if initial_start:
-        try:
-            initial_dt = datetime.fromisoformat(initial_start.replace("Z", "+00:00"))
-            if initial_dt.tzinfo is None:
-                initial_dt = initial_dt.replace(tzinfo=timezone.utc)
-        except ValueError as exc:
-            raise RuntimeError("INITIAL_SCAN_START_AT must be an ISO-8601 timestamp.") from exc
+        initial_dt = datetime.fromisoformat(initial_start.replace("Z", "+00:00"))
+        if initial_dt.tzinfo is None:
+            initial_dt = initial_dt.replace(tzinfo=timezone.utc)
         configured_anchor = initial_dt.astimezone(timezone.utc).isoformat()
         if state.get("initial_scan_since") != configured_anchor:
-            log.info("Applying the configured two-hour scan anchor to saved state.")
             state["initial_scan_since"] = configured_anchor
+            state.setdefault("next_window_start", configured_anchor)
             write_state(state)
     elif not state.get("initial_scan_since"):
-        state["initial_scan_since"] = datetime.now(timezone.utc).isoformat()
-        for group_meta in groups_state.values():
-            group_meta["last_seen_id"] = 0
-            group_meta["paused_until"] = None
+        anchor = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+        state["initial_scan_since"] = anchor.isoformat()
+        state["next_window_start"] = anchor.isoformat()
         write_state(state)
-    initial_scan_since = datetime.fromisoformat(state["initial_scan_since"])
-    if initial_scan_since.tzinfo is None:
-        initial_scan_since = initial_scan_since.replace(tzinfo=timezone.utc)
-    initial_scan_anchor = initial_scan_since.astimezone(timezone.utc)
+    anchor = datetime.fromisoformat(state["initial_scan_since"])
+    if anchor.tzinfo is None:
+        anchor = anchor.replace(tzinfo=timezone.utc)
+    anchor = anchor.astimezone(timezone.utc)
+    state.setdefault("next_window_start", anchor.isoformat())
+
     async with httpx.AsyncClient() as http:
         while True:
-            scan_started = asyncio.get_running_loop().time()
-            scan_now_utc = datetime.now(timezone.utc)
-            current_window = two_hour_window(initial_scan_anchor, scan_now_utc)
-            if current_window is None:
-                log.info(
-                    "Initial two-hour collection window is not complete yet; skipping this early scheduled trigger."
-                )
+            window_start = datetime.fromisoformat(state["next_window_start"])
+            if window_start.tzinfo is None:
+                window_start = window_start.replace(tzinfo=timezone.utc)
+            window_start = window_start.astimezone(timezone.utc)
+            window_end = window_start + timedelta(hours=2)
+            if datetime.now(timezone.utc) < window_end:
+                log.info("Next two-hour window is still collecting until %s.", window_end.isoformat())
                 break
-            window_start, window_end = current_window
             if await scan_window_already_recorded(http, window_start):
-                log.info(
-                    "Two-hour window %s to %s was already started in a previous run; "
-                    "skipping it to prevent duplicate scans.",
-                    window_start.isoformat(), window_end.isoformat(),
-                )
-                break
+                state["next_window_start"] = window_end.isoformat()
+                write_state(state)
+                if once:
+                    break
+                continue
+
+            scan_started = asyncio.get_running_loop().time()
             scan_run_id = await start_scan_run(http, window_start, window_end)
-            if scan_run_id == "duplicate":
-                log.info("Two-hour window was claimed by a concurrent run; safely skipping.")
-                break
-            if not scan_run_id:
-                raise RuntimeError(
-                    "Could not create a durable Supabase scan_runs record; "
-                    "refusing to start an untracked Telegram scan."
-                )
+            if scan_run_id == "completed":
+                state["next_window_start"] = window_end.isoformat()
+                write_state(state)
+                if once:
+                    break
+                continue
+
+            all_progress = state.setdefault("window_progress", {})
+            window_key = window_start.isoformat()
+            window_progress = all_progress.setdefault(window_key, {"groups": {}})
+            group_progress = window_progress.setdefault("groups", {})
             try:
-                log.info("Two-hour window UTC: %s to %s", window_start.isoformat(), window_end.isoformat())
-                checked = 0
-                saved = 0
-                messages_checked = 0
-                messages_processed = 0
-                joined_messages_processed = 0
-                seller_posts = 0
-                buyer_signals = 0
-                duplicates = 0
-                scan_errors = 0
-                run_seen_dedupe_keys = set()
                 dialogs = []
                 async for dialog in client.iter_dialogs():
                     entity = dialog.entity
-                    # Scan every accessible group; broadcast-only channels are excluded.
-                    if not bool(getattr(dialog, "is_group", False)) or bool(getattr(entity, "broadcast", False)):
-                        continue
-                    dialogs.append(dialog)
+                    if bool(getattr(dialog, "is_group", False)) and not bool(getattr(entity, "broadcast", False)):
+                        dialogs.append(dialog)
+                dialogs.sort(key=lambda d: group_priority(groups_state.get(str(d.entity.id), {})), reverse=True)
+                dialog_map = {str(d.entity.id): d for d in dialogs}
+                ordered_ids = rotate_group_ids(dialog_map.keys(), state.get("joined_group_cursor"))
+                dialogs = [dialog_map[group_id] for group_id in ordered_ids]
+                checked = saved = messages_checked = messages_processed = 0
+                joined_messages_processed = seller_posts = buyer_signals = duplicates = 0
+                run_seen_dedupe_keys = set()
 
-                # Prioritize groups with proven leads, then rotate so every joined group
-                # gets a turn. At most 200 joined groups are selected per run.
-                dialogs.sort(
-                    key=lambda dialog: group_priority(
-                        groups_state.get(str(dialog.entity.id), {})
-                    ),
-                    reverse=True,
-                )
-                dialog_by_id = {str(dialog.entity.id): dialog for dialog in dialogs}
-                ordered_group_ids = rotate_group_ids(
-                    dialog_by_id.keys(), state.get("joined_group_cursor")
-                )
-                dialogs = [dialog_by_id[group_id] for group_id in ordered_group_ids]
-                joined_groups_available = len(dialogs)
-                dialogs = dialogs[:MAX_JOINED_GROUPS_PER_RUN]
-                last_group_visited = None
+                async def process_message(msg, entity, group_id, meta):
+                    nonlocal saved, messages_checked, messages_processed, joined_messages_processed
+                    nonlocal seller_posts, buyer_signals, duplicates
+                    if not msg or not msg.date:
+                        return
+                    msg_date = msg.date
+                    if msg_date.tzinfo is None:
+                        msg_date = msg_date.replace(tzinfo=timezone.utc)
+                    else:
+                        msg_date = msg_date.astimezone(timezone.utc)
+                    if msg_date < window_start or msg_date >= window_end:
+                        return
+                    messages_processed += 1
+                    joined_messages_processed += 1
+                    if getattr(msg, "out", False) or not msg.message:
+                        return
+                    text_body = msg.message.strip()
+                    messages_checked += 1
+                    meta["messages_seen"] = int(meta.get("messages_seen", 0)) + 1
+                    if SELLER_AD_CONTEXT.search(text_body) or SELLER_POST_CONTEXT.search(text_body) or SELLER_PITCH_CONTEXT.search(text_body):
+                        seller_posts += 1
+                        meta["seller_ads"] = int(meta.get("seller_ads", 0)) + 1
+                    services = classify(text_body)
+                    if not services:
+                        return
+                    try:
+                        sender = await msg.get_sender()
+                    except Exception as exc:
+                        raise RuntimeError(f"Sender lookup failed in group {group_id}, message {msg.id}: {exc}") from exc
+                    if not is_human_sender(sender):
+                        return
+                    buyer_signals += 1
+                    meta["buyer_signals"] = int(meta.get("buyer_signals", 0)) + 1
+                    username = getattr(sender, "username", None)
+                    group_name = (getattr(entity, "title", None) or "Telegram group").strip()
+                    public_name = getattr(entity, "username", None)
+                    group_url = make_message_url(entity, msg.id)
+                    en, bn = make_outreach(services)
+                    payload = {
+                        "owner_id": SUPABASE_OWNER_ID, "source_scan_run_id": scan_run_id,
+                        "company_name": "Potential project (verify)", "website": None,
+                        "industry": "Web3 / Crypto", "service_need": "; ".join(services),
+                        "lead_type": "potential_buyer", "priority_score": priority(text_body, services),
+                        "status": "new", "evidence_summary": text_body[:3500], "evidence_url": group_url,
+                        "evidence_date": msg_date.date().isoformat(),
+                        "telegram_group_url": f"https://t.me/{public_name}" if public_name else group_url,
+                        "contacts": extract_public_contacts(text_body, username),
+                        "outreach_english": en, "outreach_bengali": bn,
+                        "notes": ("Auto-detected buying-intent candidate; not independently verified. "
+                            f"Source group: {group_name}. Message ID: {msg.id}. "
+                            + (f"Telegram User ID: {getattr(sender, 'id', None)}. " if getattr(sender, "id", None) is not None else "Telegram User ID unavailable. ")
+                            + (f"Public sender username: @{username}. " if username else "Public sender username unavailable. ")
+                            + ("Direct message permalink unavailable for this group type. " if not group_url else "Message permalink recorded. ")
+                            + "Verify the sender's role, project identity, and current service need before outreach."),
+                        "dedupe_key": dedupe(group_id, msg.id, getattr(sender, "id", None), text_body),
+                    }
+                    if payload["dedupe_key"] in run_seen_dedupe_keys:
+                        save_status = "duplicate"
+                    else:
+                        save_status = await save_lead(http, payload)
+                        if save_status in ("saved", "duplicate"):
+                            run_seen_dedupe_keys.add(payload["dedupe_key"])
+                    if save_status == "saved":
+                        saved += 1
+                        meta["qualified_leads"] = int(meta.get("qualified_leads", 0)) + 1
+                    elif save_status == "duplicate":
+                        duplicates += 1
+                        meta["qualified_leads"] = int(meta.get("qualified_leads", 0)) + 1
+                    else:
+                        raise RuntimeError(f"Lead save failed for group {group_id}, message {msg.id}; cursor will not advance.")
 
                 for dialog in dialogs:
                     entity = dialog.entity
                     group_id = str(entity.id)
-                    last_group_visited = group_id
+                    gp = group_progress.setdefault(group_id, {"last_message_id": 0, "done": False})
+                    if gp.get("done"):
+                        continue
                     meta = groups_state.setdefault(group_id, {
-                        "last_seen_id": 0,
-                        "messages_seen": 0,
-                        "seller_ads": 0,
-                        "buyer_signals": 0,
-                        "qualified_leads": 0,
-                        "paused_until": None,
+                        "last_seen_id": 0, "messages_seen": 0, "seller_ads": 0,
+                        "buyer_signals": 0, "qualified_leads": 0, "paused_until": None,
                     })
-                    group_write_failed = False
-                    async for msg in client.iter_messages(entity, **message_scan_kwargs(window_start)):
-                        if not msg or not msg.date:
+                    kwargs = message_scan_kwargs(window_start)
+                    kwargs["min_id"] = int(gp.get("last_message_id", 0) or 0)
+                    async for msg in client.iter_messages(entity, **kwargs):
+                        if not msg or not msg.id:
                             continue
-                        message_date = msg.date
-                        if message_date.tzinfo is None:
-                            message_date = message_date.replace(tzinfo=timezone.utc)
-                        else:
-                            message_date = message_date.astimezone(timezone.utc)
-                        if message_date >= window_end:
-                            break
-                        if message_date < window_start:
-                            continue
-                        messages_processed += 1
-                        joined_messages_processed += 1
-                        if getattr(msg, "out", False):
-                            continue
-                        if not msg.message:
-                            continue
-
-                        text_body = msg.message.strip()
-                        messages_checked += 1
-                        meta["messages_seen"] = int(meta.get("messages_seen", 0)) + 1
-                        if SELLER_AD_CONTEXT.search(text_body) or SELLER_POST_CONTEXT.search(text_body) or SELLER_PITCH_CONTEXT.search(text_body):
-                            seller_posts += 1
-                            meta["seller_ads"] = int(meta.get("seller_ads", 0)) + 1
-
-                        services = classify(text_body)
-                        if not services:
-                            continue
-                        try:
-                            sender = await msg.get_sender()
-                        except Exception:
-                            log.exception("Could not resolve message author in group %s, message %s.", group_id, msg.id)
-                            group_write_failed = True
-                            scan_errors += 1
-                            continue
-                        if not is_human_sender(sender):
-                            continue
-                        # Count only actual human-authored group buyer candidates.
-                        buyer_signals += 1
-                        meta["buyer_signals"] = int(meta.get("buyer_signals", 0)) + 1
-                        username = getattr(sender, "username", None) if sender else None
-                        group_name = (getattr(entity, "title", None) or "Telegram group").strip()
-                        public_name = getattr(entity, "username", None)
-                        group_url = make_message_url(entity, msg.id)
-                        en, bn = make_outreach(services)
-                        payload = {
-                            "owner_id": SUPABASE_OWNER_ID,
-                            "source_scan_run_id": scan_run_id,
-                            "company_name": "Potential project (verify)",
-                            "website": None,
-                            "industry": "Web3 / Crypto",
-                            "service_need": "; ".join(services),
-                            "lead_type": "potential_buyer",
-                            "priority_score": priority(text_body, services),
-                            "status": "new",
-                            "evidence_summary": text_body[:3500],
-                            "evidence_url": group_url,
-                            "evidence_date": msg.date.astimezone(timezone.utc).date().isoformat(),
-                            "telegram_group_url": f"https://t.me/{public_name}" if public_name else group_url,
-                            "contacts": extract_public_contacts(text_body, username),
-                            "outreach_english": en,
-                            "outreach_bengali": bn,
-                            "notes": (
-                                "Auto-detected buying-intent candidate; not independently verified. "
-                                f"Source group: {group_name}. Message ID: {msg.id}. "
-                                + (f"Telegram User ID: {getattr(sender, 'id', None)}. " if getattr(sender, "id", None) is not None else "Telegram User ID unavailable. ")
-                                + (f"Public sender username: @{username}. " if username else "Public sender username unavailable. ")
-                                + ("Direct message permalink unavailable for this group type. " if not group_url else "Message permalink recorded. ")
-                                + "Verify the sender's role, project identity, and current service need before outreach."
-                            ),
-                            "dedupe_key": dedupe(group_id, msg.id, getattr(sender, "id", None), text_body),
-                        }
-                        if payload["dedupe_key"] in run_seen_dedupe_keys:
-                            save_status = "duplicate"
-                        else:
-                            save_status = await save_lead(http, payload)
-                            if save_status in ("saved", "duplicate"):
-                                run_seen_dedupe_keys.add(payload["dedupe_key"])
-                        if save_status == "saved":
-                            saved += 1
-                            meta["qualified_leads"] = int(meta.get("qualified_leads", 0)) + 1
-                        elif save_status == "duplicate":
-                            duplicates += 1
-                            meta["qualified_leads"] = int(meta.get("qualified_leads", 0)) + 1
-                        elif save_status == "error":
-                            group_write_failed = True
-                            scan_errors += 1
-
-                    if group_write_failed:
-                        log.warning("Some messages in group %s failed during this window; expired windows will not be replayed.", group_id)
-
+                        if msg.date:
+                            dt = msg.date
+                            if dt.tzinfo is None:
+                                dt = dt.replace(tzinfo=timezone.utc)
+                            else:
+                                dt = dt.astimezone(timezone.utc)
+                            if dt >= window_end:
+                                break
+                        # Older boundary messages are harmlessly filtered by process_message,
+                        # then checkpointed too so a boundary item cannot block resume forever.
+                        # Persist after every successfully processed message; a failure leaves its ID untouched.
+                        await process_message(msg, entity, group_id, meta)
+                        gp["last_message_id"] = int(msg.id)
+                        meta["last_seen_id"] = max(int(meta.get("last_seen_id", 0) or 0), int(msg.id))
+                        write_state(state)
+                    gp["done"] = True
                     checked += 1
-                    # Persist rotation progress after each completed group so a long
-                    # run that reaches the Actions timeout cannot starve later groups.
                     state["joined_group_cursor"] = group_id
-                    # Persist after every completed group so rotation survives a timeout.
                     write_state(state)
 
+                unfinished = [gid for gid in dialog_map if not group_progress.get(gid, {}).get("done")]
+                if unfinished:
+                    raise RuntimeError("Unfinished joined groups remain: " + ", ".join(unfinished[:20]))
 
-                if last_group_visited is not None:
-                    state["joined_group_cursor"] = last_group_visited
-
-                write_state(state)
                 audit_result = await audit_current_scan_leads(http, scan_run_id)
                 alert_stats = {
-                    "alerts_configured": bool(BOT_TOKEN and BOT_CHAT_IDS),
-                    "pending_alerts_loaded": 0,
-                    "alerts_delivered": 0,
-                    "alerts_failed": 0,
-                    "leads_moved_to_review": 0,
+                    "alerts_configured": bool(BOT_TOKEN and BOT_CHAT_IDS), "pending_alerts_loaded": 0,
+                    "alerts_delivered": 0, "alerts_failed": 0, "leads_moved_to_review": 0,
                     "alert_load_error": False,
                 }
                 if audit_result["ok"]:
                     alert_stats = await notify_pending_leads(http)
-                else:
-                    log.error("Post-scan audit failed; pending-lead notifications withheld for safety.")
                 duration_seconds = asyncio.get_running_loop().time() - scan_started
                 stats = {
-                    "window_start": window_start.isoformat(),
-                    "window_end": window_end.isoformat(),
-                    "joined_groups_available": joined_groups_available,
-                    "joined_groups_selected": len(dialogs),
-                    "joined_groups_scanned": checked,
-                    "joined_messages_processed": joined_messages_processed,
-                    "joined_messages_checked": messages_checked,
-                    "joined_buyer_signals": buyer_signals,
-                    "joined_leads_saved": saved,
-                    "joined_duplicates": duplicates,
-                    "messages_checked": messages_checked,
-                    "messages_processed": messages_processed,
-                    "message_count_limit": "unlimited",
-                    "seller_posts": seller_posts,
-                    "buyer_signals": buyer_signals,
-                    "leads_saved": saved,
-                    "duplicates": duplicates,
-                    "duration_seconds": duration_seconds,
-                    "post_scan_audited": audit_result["audited"],
-                    "post_scan_rejected": audit_result["rejected"],
-                    "post_scan_review": audit_result.get("review", 0),
-                    "post_scan_verified": audit_result["verified"],
-                    "post_scan_audit_ok": audit_result["ok"],
-                    "scan_errors": scan_errors,
-                    **alert_stats,
+                    "window_start": window_start.isoformat(), "window_end": window_end.isoformat(),
+                    "joined_groups_available": len(dialogs), "joined_groups_selected": len(dialogs),
+                    "joined_groups_scanned": checked, "joined_messages_processed": joined_messages_processed,
+                    "joined_messages_checked": messages_checked, "joined_buyer_signals": buyer_signals,
+                    "joined_leads_saved": saved, "joined_duplicates": duplicates,
+                    "messages_checked": messages_checked, "messages_processed": messages_processed,
+                    "message_count_limit": "unlimited", "seller_posts": seller_posts,
+                    "buyer_signals": buyer_signals, "leads_saved": saved, "duplicates": duplicates,
+                    "duration_seconds": duration_seconds, "post_scan_audited": audit_result["audited"],
+                    "post_scan_rejected": audit_result["rejected"], "post_scan_review": audit_result.get("review", 0),
+                    "post_scan_verified": audit_result["verified"], "post_scan_audit_ok": audit_result["ok"],
+                    "scan_errors": 0, **alert_stats,
                 }
-                finished = await finish_scan_run(http, scan_run_id, stats)
-                if not finished:
-                    raise RuntimeError("Supabase could not persist the completed scan metrics.")
+                if not audit_result["ok"]:
+                    log.error("Post-scan audit failed; pending-lead notifications withheld for safety.")
+                    raise RuntimeError("Post-scan audit failed; this window will resume and be audited again.")
+                if not await finish_scan_run(http, scan_run_id, stats):
+                    raise RuntimeError("Could not persist completed scan metrics.")
                 await send_scan_report(http, stats, scan_run_id)
-                log.info(
-                    "Scan complete: %s/%s selected joined groups checked (%s joined groups available); %s joined-group messages processed (no message-count cap); %s text messages checked; %s new leads saved; %.1fs.",
-                    checked, len(dialogs), joined_groups_available, joined_messages_processed, messages_checked, saved, duration_seconds
-                )
-
+                state["next_window_start"] = window_end.isoformat()
+                all_progress.pop(window_key, None)
+                write_state(state)
+                log.info("Completed two-hour window: %s groups, %s messages, %s new leads.",
+                         checked, joined_messages_processed, saved)
             except Exception as exc:
                 await mark_scan_run_failed(http, scan_run_id, exc)
+                log.exception("Window remains incomplete; next run resumes from the last saved message.")
                 raise
             if once:
                 break
-            await asyncio.sleep(POLL_SECONDS)
+        if not once:
+            next_start = datetime.fromisoformat(state["next_window_start"])
+            if next_start.tzinfo is None:
+                next_start = next_start.replace(tzinfo=timezone.utc)
+            next_end = next_start.astimezone(timezone.utc) + timedelta(hours=2)
+            seconds_until_next_window = max(1, (next_end - datetime.now(timezone.utc)).total_seconds())
+            await asyncio.sleep(min(POLL_SECONDS, seconds_until_next_window))
 
 if __name__ == "__main__":
     if "--login" in sys.argv:

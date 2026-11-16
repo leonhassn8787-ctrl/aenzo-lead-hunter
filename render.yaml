@@ -30,8 +30,6 @@ services:
         value: "7200"
       - key: LOOKBACK_DAYS
         value: "30"
-      - key: MAX_JOINED_GROUPS_PER_RUN
-        value: "200"
       - key: INITIAL_SCAN_START_AT
         value: "2026-11-15T22:04:35+00:00"
       - key: AENZO_BOT_TOKEN
