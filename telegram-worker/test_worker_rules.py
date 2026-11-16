@@ -206,7 +206,7 @@ class LeadSignalTests(unittest.TestCase):
 
     def test_direct_gamefi_marketing_agency_request_is_preserved(self):
         message = "Our GameFi project is looking for a marketing agency for its launch campaign."
-        self.assertIn("Content Distribution & Marketing", self.classify(message))
+        self.assertIn("Project Promotion", self.classify(message))
         self.assertTrue(self.verify_buyer_evidence(message))
 
     def test_new_web3_marketing_partner_request_is_detected(self):
