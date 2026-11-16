@@ -1596,6 +1596,12 @@ async def run(once=False):
                 message_limit_reached = False
 
                 for dialog in dialogs:
+                    # Check the run-wide cap before marking a group as visited.
+                    # If the cap was reached at the end of the previous group, do
+                    # not advance the cursor past this untouched group.
+                    if messages_processed >= MAX_MESSAGES_PER_RUN:
+                        message_limit_reached = True
+                        break
                     entity = dialog.entity
                     group_id = str(entity.id)
                     last_group_visited = group_id
