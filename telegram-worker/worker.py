@@ -115,6 +115,7 @@ SIGNALS = {
         r"need (content distribution|content marketing)",
         r"content distribution (partner|service|agency)",
         r"looking for (marketing|content) agency",
+        r"looking for (a |an )?(web3 |crypto )?marketing (agency|partner|team)",
         r"(need|seeking) (a |an )?(web3 |crypto )?marketing (agency|partner|team)",
         r"looking for (a |an )?(web3 |crypto )?growth (agency|partner|team)",
         r"need (a |an )?growth (agency|partner|team)",
@@ -194,7 +195,7 @@ SIGNALS = {
 }
 COMPILED = {name: [re.compile(p, re.I) for p in patterns] for name, patterns in SIGNALS.items()}
 BUYING_CONTEXT = re.compile(r"\b(struggling to (get|attract|reach|grow|increase)|having trouble (getting|attracting|reaching|growing)|not getting (enough|many) (users|registrations|signups|members|engagement|traction)|could use more|how can we (get|attract|reach|grow|increase)|what.s the best way to (get|attract|reach|grow|increase)|looking for|looking to work with|looking to grow|looking to increase|looking to boost|looking to attract|looking to reach|looking to get|in search of|trying to find|trying to grow|trying to increase|trying to reach|want to grow|want to increase|want to boost|want to attract|want to reach|need|needs|need more|seeking|hiring|searching for|want to hire|want someone to|need someone to|need a team|need a hand|any recommendation|recommend a|recommendations for|can anyone recommend|anyone know|does anyone know|who can help|can anyone help|anyone able to|someone who can|anyone experienced in|could use|need help with|help us|partner with|any agency|suggest a)\b", re.I)
-CRYPTO_CONTEXT = re.compile(r"\b(web3|crypto|blockchain|solana|memecoins?|defi|cefi|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet|layer[- ]?[12])\b", re.I)
+CRYPTO_CONTEXT = re.compile(r"\b(web3|crypto|blockchain|solana|memecoins?|defi|cefi|cex|token|wallet|exchange|launchpad|staking|mining|rwa|gamefi|metaverse|ai agent|trading|forex|telegram|airdrop|dapp|testnet|layer[- ]?[12])\b", re.I)
 # Posts selling tools, accounts, traffic, or services are vendors—not buyers.
 # This catches ads that contain phrases such as "looking for an account" while
 # the author is actually offering rentals or inventory.
@@ -354,8 +355,8 @@ INDIVIDUAL_CREATIVE_ROLE_CONTEXT = re.compile(
     re.I,
 )
 CAPITAL_RAISE_CONTEXT = re.compile(
-    r"\b(looking for|seeking|need|raising|raise|want)\b.{0,100}\b"
-    r"(additional )?(funds?|funding|investment|investors?|capital|liquidity)\b|"
+    r"\b(looking for|seeking|need|raising|raise|want to raise)\b.{0,80}\b"
+    r"(additional funds?|funding|investment|investors?|capital|liquidity)\b|"
     r"\b(sell|selling)\s+(the\s+)?(project|company)\b|"
     r"\bproject for sale\b|\blisting contract\b",
     re.I,
@@ -364,7 +365,7 @@ DIRECT_SERVICE_BUY_REQUEST_CONTEXT = re.compile(
     r"\b(looking for|need|seeking|want to hire|hiring|we need|we are looking for)\b"
     r".{0,120}\b(marketing (agency|team|partner|service|services|campaign)|"
     r"growth (agency|team|partner)|kol(s)?|influencers?|community (promotion|growth|management)|"
-    r"member acquisition|pr (agency|services)|ama (host|hosting)|content (marketing|distribution)|"
+    r"member acquisition|pr (agency|partner|service|services)|ama (host|hosting)|content (marketing|distribution)|"
     r"video production|promotional video|giveaway campaign|airdrop campaign|"
     r"social media marketing|user acquisition|website (design|development)|"
     r"brand ambassadors?|paid campaign)\b",
@@ -556,8 +557,8 @@ def classify(text):
     )
 
     identified_project_context = CRYPTO_CONTEXT.search(text) or re.search(
-        r"\\b(project|product|app|platform|website|software|saas|digital product|"
-        r"startup|brand|launch|game|exchange|wallet|protocol)\\b",
+        r"\b(project|product|app|platform|website|software|saas|digital product|"
+        r"startup|brand|launch|game|exchange|wallet|protocol)\b",
         text,
         re.I,
     )
@@ -684,7 +685,7 @@ def verify_buyer_evidence(text):
         r"growth (agency|team|partner|service|marketing)|growth|"
         r"community (growth|promotion|management|engagement)|community growth|"
         r"telegram (promotion|member acquisition|community growth)|member acquisition|"
-        r"pr agency|media coverage|press release|ama hosting|ama|"
+        r"pr (agency|partner|service|services)|media coverage|press release|ama hosting|ama|"
         r"giveaway campaign|airdrop campaign|social media management|"
         r"content marketing|content distribution|content creators?|brand ambassadors?|"
         r"influencer outreach|sponsored posts?|brand awareness|"
@@ -985,7 +986,7 @@ async def audit_current_scan_leads(client_http, scan_run_id):
                 and verify_buyer_evidence(evidence)
             )
             if not proven:
-                # Clear sellers and ambiguous candidates are retained for manual review.
+                # Clear sellers are held; ambiguous or incomplete evidence remains in manual review.
                 # Preserve records: failed candidates go to manual review, never auto-reject.
                 target_status = "review"
                 reason = (
