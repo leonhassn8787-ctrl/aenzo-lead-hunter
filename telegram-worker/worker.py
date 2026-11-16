@@ -1450,6 +1450,31 @@ async def mark_scan_run_failed(http, run_id, error):
         log.exception("Could not mark scan run %s as failed.", run_id)
 
 
+async def retry_pending_scan_reports(http):
+    """Retry reports for completed windows that were not fully delivered."""
+    url = f"{SUPABASE_URL}/rest/v1/scan_runs"
+    headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
+    try:
+        response = await http.get(
+            url, headers=headers,
+            params={"select": "id,error_summary", "owner_id": "eq." + SUPABASE_OWNER_ID,
+                    "status": "eq.completed", "report_delivered_at": "is.null",
+                    "order": "started_at.asc", "limit": "50"},
+            timeout=30,
+        )
+        if response.status_code != 200:
+            raise RuntimeError(f"Could not load pending scan reports ({response.status_code}): {response.text[:300]}")
+        for row in response.json():
+            try:
+                stats = json.loads(row.get("error_summary") or "{}")
+                if isinstance(stats, dict):
+                    await send_scan_report(http, stats, row["id"])
+            except Exception:
+                log.exception("Could not retry scan report for completed run %s.", row.get("id"))
+    except Exception:
+        log.exception("Could not load pending completed-window scan reports.")
+
+
 async def send_scan_report(http, stats, scan_run_id=None):
     """Send a compact per-run scan-usage report to the owner's Telegram chat."""
     if not BOT_TOKEN or not BOT_CHAT_IDS:
@@ -1503,10 +1528,26 @@ async def send_scan_report(http, stats, scan_run_id=None):
             return False
         headers = supabase_headers(SUPABASE_SERVICE_ROLE_KEY)
         url = f"{SUPABASE_URL}/rest/v1/scan_runs"
-        delivery_state = {}
+        current = await http.get(
+            url, headers=headers,
+            params={"select": "report_deliveries,report_delivered_at", "id": "eq." + str(scan_run_id),
+                    "owner_id": "eq." + SUPABASE_OWNER_ID, "limit": "1"},
+            timeout=20,
+        )
+        if current.status_code != 200 or not current.json():
+            log.error("Could not load existing scan-report delivery state (%s).", current.status_code)
+            return False
+        if current.json()[0].get("report_delivered_at"):
+            log.info("Scan report for run %s was already fully delivered; skipping duplicate.", scan_run_id)
+            return True
+        delivery_state = current.json()[0].get("report_deliveries") or {}
+        if not isinstance(delivery_state, dict):
+            delivery_state = {}
         errors = []
         for chat_id in BOT_CHAT_IDS:
             key = recipient_key(chat_id)
+            if delivery_state.get(key):
+                continue
             delivered, error = await send_telegram_to_chat(http, chat_id, report, timeout=30)
             if not delivered:
                 errors.append(f"{key}: {error}")
@@ -1585,6 +1626,7 @@ async def run(once=False):
 
     async with httpx.AsyncClient() as http:
         while True:
+            await retry_pending_scan_reports(http)
             try:
                 await reconcile_next_window_start(http, anchor, state)
             except Exception as exc:
