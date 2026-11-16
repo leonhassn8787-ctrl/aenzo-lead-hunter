@@ -1585,7 +1585,14 @@ async def run(once=False):
 
     async with httpx.AsyncClient() as http:
         while True:
-            await reconcile_next_window_start(http, anchor, state)
+            try:
+                await reconcile_next_window_start(http, anchor, state)
+            except Exception as exc:
+                log.exception("Could not reconcile scan windows; no window will be skipped.")
+                if once:
+                    raise
+                await asyncio.sleep(retry_delay_seconds(exc))
+                continue
             window_start = datetime.fromisoformat(state["next_window_start"])
             if window_start.tzinfo is None:
                 window_start = window_start.replace(tzinfo=timezone.utc)
